@@ -444,7 +444,11 @@ export function connectHost(now: () => number = () => performance.now()): () => 
         ? route.app
         : null
     for (const app of MEDIA_APPS)
-      postToHost({ type: 'mediaActivity', app, foreground: active === (app === 'appleMusic' ? 'music' : app) })
+      postToHost({
+        type: 'mediaActivity',
+        app,
+        foreground: (active === 'radio' ? 'ximalaya' : active) === (app === 'appleMusic' ? 'music' : app),
+      })
   }
   reportMedia()
   const reportBrightness = () => postToHost({ type: 'brightness', level: useCabin.getState().brightness })
@@ -686,7 +690,7 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         receiveXimalayaState(message.signedIn, message.playing, message.signingIn)
         break
       case 'ximalayaAnswer':
-        receiveXimalayaAnswer(message.id, message.failed, message.error, message.tracks, message.albums)
+        receiveXimalayaAnswer(message.id, message.failed, message.error, message.tracks, message.albums, message.radio)
         break
       case 'ximalayaPlayback':
         receiveXimalayaPlayback(message.playback)

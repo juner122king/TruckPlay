@@ -14,7 +14,17 @@ describe('navigate', () => {
   it('opens an app and moves it to the front of the recents', () => {
     const state = navigate(INITIAL_NAVIGATION, { type: 'openApp', app: 'youtube' })
     expect(state.route).toEqual({ kind: 'app', app: 'youtube' })
-    expect(state.recents).toEqual(['youtube', 'maps', 'music', 'netease', 'bilibili', 'ximalaya', 'douyin', 'hongguo'])
+    expect(state.recents).toEqual([
+      'youtube',
+      'maps',
+      'music',
+      'netease',
+      'bilibili',
+      'ximalaya',
+      'radio',
+      'douyin',
+      'hongguo',
+    ])
   })
 
   it('adds a new app to the recents, keeping every app used', () => {
@@ -26,6 +36,7 @@ describe('navigate', () => {
       'netease',
       'bilibili',
       'ximalaya',
+      'radio',
       'douyin',
       'hongguo',
       'youtube',

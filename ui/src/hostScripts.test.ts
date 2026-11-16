@@ -11,6 +11,7 @@ import cabSound from '../../crates/host/src/cab_sound.js?raw'
 import netease from '../../crates/host/src/netease.js?raw'
 import neteaseSignIn from '../../crates/host/src/netease_sign_in.js?raw'
 import ximalaya from '../../crates/host/src/ximalaya.js?raw'
+import ximalayaHls from '../../crates/host/src/ximalaya_hls.js?raw'
 import ximalayaSignIn from '../../crates/host/src/ximalaya_sign_in.js?raw'
 import youtube from '../../crates/host/src/youtube.js?raw'
 
@@ -25,7 +26,7 @@ const AS_RUN: Record<string, string[]> = {
   "Apple Music's sign-in": [appleMusicSignIn],
   Bilibili: [cabSound, bilibili],
   "Bilibili's sign-in": [bilibiliSignIn],
-  Ximalaya: [cabSound, ximalaya],
+  Ximalaya: [cabSound, ximalayaHls, ximalaya],
   "Ximalaya's sign-in": [ximalayaSignIn],
   Douyin: [cabSound, douyin],
   "Douyin's sign-in": [douyinSignIn],

@@ -34,7 +34,7 @@ export const RECENTS_LIMIT = APP_IDS.length
  */
 const SIDEBAR_SLOTS: readonly (readonly AppId[])[] = [
   ['maps'],
-  ['music', 'netease', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'player', 'podcasts'],
+  ['music', 'netease', 'bilibili', 'ximalaya', 'radio', 'douyin', 'hongguo', 'player', 'podcasts'],
   ['phone', 'messages'],
   ['calendar', 'weather', 'settings', 'safari'],
 ]
@@ -56,7 +56,7 @@ export function sidebarApps(recents: readonly AppId[], room: number): AppId[] {
 
 export const INITIAL_NAVIGATION: NavigationState = {
   route: { kind: 'dashboard' },
-  recents: ['maps', 'music', 'netease', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'youtube'],
+  recents: ['maps', 'music', 'netease', 'bilibili', 'ximalaya', 'radio', 'douyin', 'hongguo', 'youtube'],
   base: 'dashboard',
 }
 

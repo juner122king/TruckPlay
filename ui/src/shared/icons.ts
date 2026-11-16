@@ -11,6 +11,7 @@ export type AppIconRole =
   | 'music'
   | 'bilibili'
   | 'ximalaya'
+  | 'radio'
   | 'netease'
   | 'douyin'
   | 'hongguo'
@@ -31,6 +32,7 @@ const FILES: Record<AppIconRole, string> = {
   music: 'music',
   bilibili: 'bilibili',
   ximalaya: 'ximalaya',
+  radio: 'radio',
   netease: 'netease',
   douyin: 'douyin',
   hongguo: 'hongguo',

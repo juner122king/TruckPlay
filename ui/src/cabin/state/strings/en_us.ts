@@ -489,6 +489,7 @@ export const strings: Strings = {
     music: 'Music',
     bilibili: 'Bilibili',
     ximalaya: 'Ximalaya',
+    radio: 'Radio',
     netease: 'NetEase Music',
     douyin: 'Douyin',
     hongguo: 'Hongguo',

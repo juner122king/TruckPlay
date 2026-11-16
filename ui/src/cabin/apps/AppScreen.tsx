@@ -12,6 +12,7 @@ import { SafariApp } from './safari/SafariApp'
 import { SettingsApp } from './settings/SettingsApp'
 import { BilibiliApp } from './bilibili/BilibiliApp'
 import { XimalayaApp } from './ximalaya/XimalayaApp'
+import { RadioApp } from './radio/RadioApp'
 import { NeteaseApp } from './netease/NeteaseApp'
 import { DouyinApp } from './douyin/DouyinApp'
 import { HongguoApp } from './hongguo/HongguoApp'
@@ -93,6 +94,8 @@ function AppContent({ app }: { app: AppId }) {
       return <BilibiliApp />
     case 'ximalaya':
       return <XimalayaApp />
+    case 'radio':
+      return <RadioApp />
     case 'netease':
       return <NeteaseApp />
     case 'douyin':

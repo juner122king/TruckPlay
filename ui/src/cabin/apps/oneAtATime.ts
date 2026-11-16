@@ -13,7 +13,7 @@ export function oneAtATime(players: readonly MusicPlayer[]): () => void {
       if (!started) return
       notifyPlaybackStarted(player.name)
       for (const other of players) {
-        if (other !== player && other.playingHere()) other.pauseHere()
+        if (other !== player && (other.playingHere() || other.pendingHere?.())) other.pauseHere()
       }
     }),
   )

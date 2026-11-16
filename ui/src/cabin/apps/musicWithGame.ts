@@ -14,6 +14,8 @@ import { poweredOff, withGame } from './youtube/withGame'
 export interface MusicPlayer {
   /** Its name: one fade at a time for each (fade.ts). */
   name: string
+  /** Whether a local playback request is still connecting. */
+  pendingHere?(): boolean
   /** Whether music plays here now. */
   playingHere(): boolean
   pauseHere(): void
@@ -63,6 +65,12 @@ export function pauseMusicWithGame(player: MusicPlayer): () => void {
     // Its own acknowledgement may arrive synchronously inside resumeHere: keep that fade intact.
     if (action === 'started' && target === playbackApp) return
     if (
+      target !== playbackApp &&
+      ['play', 'resume', 'load', 'next', 'previous', 'started'].includes(action) &&
+      player.pendingHere?.()
+    )
+      automatic.pauseHere()
+    if (
       target === playbackApp ||
       ['play', 'resume', 'load', 'next', 'previous', 'selectEpisode', 'started'].includes(action)
     ) {
@@ -76,7 +84,7 @@ export function pauseMusicWithGame(player: MusicPlayer): () => void {
     const away = isAway(live)
     const wasAway = isAway(before)
     if (away === wasAway) return
-    const action = withGame(away, wasAway, player.playingHere(), paused, !isOff())
+    const action = withGame(away, wasAway, player.playingHere() || Boolean(player.pendingHere?.()), paused, !isOff())
     if (action === 'pause') {
       rememberPause(true)
       fadeOutAndPause(automatic)
@@ -88,12 +96,15 @@ export function pauseMusicWithGame(player: MusicPlayer): () => void {
   const power = useCabin.subscribe((cabin, before) => {
     if (!poweredOff(before.power.phase === 'off', cabin.power.phase === 'off')) return
     // Whatever it's doing, at once (no fade: owner 2026-10-21), and not played on after.
-    if (player.playingHere()) player.pauseHere()
+    if (player.playingHere() || player.pendingHere?.()) player.pauseHere()
     rememberPause(false)
   })
-  // Nothing plays while they're off: music that starts playing here then is paused as it starts.
+  // Leaving the game pauses on the transition above. A manual play while already away is allowed,
+  // as for every other player; the truck's power still blocks connecting and playing at all times.
   const dark = player.subscribe((started) => {
-    if (isOff() && started) player.pauseHere()
+    if (!isOff()) return
+    if (player.pendingHere?.()) automatic.pauseHere()
+    else if (started) player.pauseHere()
   })
   return () => {
     game()

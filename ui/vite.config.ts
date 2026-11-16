@@ -90,6 +90,13 @@ export default defineConfig({
     environment: 'node',
   },
   server: {
+    proxy: {
+      '/__radio-api': {
+        target: 'https://mobile.ximalaya.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/__radio-api', '/radio-first-page-app'),
+      },
+    },
     port: 5173,
     strictPort: true,
     // The development map's tiles are tens of thousands of files (and more with each export kept): watching

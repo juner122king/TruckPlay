@@ -713,6 +713,7 @@ export function languageOf(gameLanguage: string | null): Language {
 const DEFAULT_APPS: Record<string, string> = {
   bilibili: '哔哩哔哩',
   ximalaya: '喜马拉雅',
+  radio: '电台',
   netease: '网易云音乐',
   douyin: '抖音',
   hongguo: '红果短剧',

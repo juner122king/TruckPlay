@@ -15,6 +15,7 @@ const ROLES: AppIconRole[] = [
   'music',
   'bilibili',
   'ximalaya',
+  'radio',
   'netease',
   'podcasts',
   'messages',

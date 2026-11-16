@@ -18,6 +18,7 @@ export interface MediaSource {
   /** The position at `positionAt` (Unix ms); while playing, the clock runs on from there. */
   positionMs: number
   positionAt: number
+  live?: boolean
   durationMs: number
   controls: { playPause: boolean; next: boolean; previous: boolean; shuffle: boolean; repeat: boolean }
   shuffle: boolean | null

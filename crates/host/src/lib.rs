@@ -1123,7 +1123,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     }
                 }
                 Some(PageMessage::Ximalaya { command }) => {
-                    if ximalaya.is_none() && matches!(command, ximalaya::Command::Pause) {
+                    if ximalaya.is_none() && matches!(command, ximalaya::Command::Pause { .. }) {
                         // Nothing to pause.
                     } else if let Some(player) = start_ximalaya(&mut ximalaya, &stage, &config) {
                         player.command(&command);

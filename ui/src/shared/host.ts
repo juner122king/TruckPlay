@@ -676,11 +676,12 @@ export type XimalayaCommand =
   | { action: 'start' }
   | { action: 'signIn' }
   | { action: 'signOut' }
-  | { action: 'play'; track?: XimalayaTrack }
-  | { action: 'pause' }
+  | { action: 'play'; track?: XimalayaTrack; requestId?: number }
+  | { action: 'pause'; requestId?: number }
   | { action: 'next' }
   | { action: 'previous' }
   | { action: 'seek'; seconds: number }
+  | { action: 'speed'; rate: number }
   | { action: 'volume'; percent: number }
   | { action: 'ask'; id: number; question: XimalayaQuestion }
 
@@ -689,6 +690,10 @@ export type XimalayaQuestion =
   | { ask: 'recommend' }
   | { ask: 'category'; category: string }
   | { ask: 'albumTracks'; albumId: string }
+  | { ask: 'radioHome' }
+  | { ask: 'radioList'; locationId: number; locationTypeId: number; categoryId: number; pageNum: number }
+  | { ask: 'radioDetail'; radioId: number }
+  | { ask: 'radioSchedule'; radioId: number }
 
 export interface XimalayaTrack {
   id: string
@@ -698,6 +703,8 @@ export interface XimalayaTrack {
   artwork?: string
   duration?: number
   url?: string
+  radio?: boolean
+  radioId?: number
 }
 
 export interface XimalayaAlbum {
@@ -715,11 +722,17 @@ export interface XimalayaPlayback {
   duration: number
   position: number
   status: string
+  owner?: 'ximalaya' | 'radio'
+  radioId?: number
+  isLive?: boolean
+  requestId?: number
+  error?: string | null
 }
 
 export interface XimalayaAnswers {
   tracks?: XimalayaTrack[]
   albums?: XimalayaAlbum[]
+  radio?: { kind: string; data: unknown }
 }
 
 /** What the NetEase Cloud Music app asks of NetEase's web player (`westplay_host::netease::Command`). */

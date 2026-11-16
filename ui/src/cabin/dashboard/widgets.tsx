@@ -89,7 +89,7 @@ function XimalayaWidget({ ximalaya }: { ximalaya: NonNullable<ReturnType<typeof 
       artwork={ximalaya.artwork}
       onOpen={() => {
         useXimalaya.setState({ nowPlaying: true })
-        go({ type: 'openApp', app: 'ximalaya' })
+        go({ type: 'openApp', app: ximalaya.radio ? 'radio' : 'ximalaya' })
       }}
       onControl={(action) => {
         if (action === 'playPause') playOrPauseXimalaya()

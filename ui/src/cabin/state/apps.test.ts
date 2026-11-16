@@ -9,6 +9,7 @@ describe('the apps this release has', () => {
       'netease',
       'bilibili',
       'ximalaya',
+      'radio',
       'douyin',
       'hongguo',
       'youtube',

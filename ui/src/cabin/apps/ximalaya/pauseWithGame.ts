@@ -1,17 +1,16 @@
 import { type MusicPlayer, pauseMusicWithGame } from '../musicWithGame'
-import { playOrPause, sendVolume, skip, useXimalaya } from './ximalaya'
+import { playOrPause, pausePlayback, sendPlaybackVolume, sendVolume, skip, useXimalaya } from './ximalaya'
 
 export const ximalayaPlayer: MusicPlayer = {
   name: 'ximalaya',
   playingHere: () => Boolean(useXimalaya.getState().playing),
-  pauseHere: () => {
-    if (useXimalaya.getState().playing) playOrPause()
-  },
+  pendingHere: () => useXimalaya.getState().playback?.status === 'loading',
+  pauseHere: pausePlayback,
   resumeHere: () => {
     if (!useXimalaya.getState().playing) playOrPause()
   },
   volume: () => useXimalaya.getState().volume,
-  sendVolume: (share) => sendVolume(share),
+  sendVolume: (share) => sendPlaybackVolume(share),
   setVolume: (share) => sendVolume(share),
   skip: (direction) => skip(direction),
   subscribe: (changed) =>
