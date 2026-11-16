@@ -223,7 +223,20 @@ export function followBearing(listener: (bearing: number) => void): () => void {
 
 let live: LiveMap | null = null
 const currentOverview = createOverviewSession(
-  (routeOverview) => useMapBrowsing.setState({ routeOverview }),
+  (routeOverview) => {
+    useMapBrowsing.setState({ routeOverview })
+    if (!live) return
+    if (routeOverview) {
+      live.map.dragRotate.disable()
+      live.map.touchZoomRotate.disableRotation()
+      if (live.map.getBearing() !== 0 || live.map.getPitch() !== 0) {
+        live.map.easeTo({ bearing: 0, pitch: 0, duration: reducedMotion() ? 0 : 300 })
+      }
+    } else if (live.interactive && !live.overview) {
+      live.map.dragRotate.enable()
+      live.map.touchZoomRotate.enableRotation()
+    }
+  },
   () => recentreLiveMap(),
 )
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -567,9 +580,15 @@ function follow(target: LiveMap) {
 function setInteractive(target: LiveMap, interactive: boolean) {
   target.interactive = interactive
   const { map } = target
-  for (const handler of [map.dragPan, map.dragRotate]) {
-    if (interactive) handler.enable()
-    else handler.disable()
+  const overviewActive = currentOverview.active() || target.overview
+  map.dragPan[interactive ? 'enable' : 'disable']()
+  map.touchZoomRotate[interactive ? 'enable' : 'disable']()
+  if (interactive && !overviewActive) {
+    map.dragRotate.enable()
+    map.touchZoomRotate.enableRotation()
+  } else {
+    map.dragRotate.disable()
+    map.touchZoomRotate.disableRotation()
   }
   if (!interactive) {
     exitCurrentOverview(target)
@@ -899,6 +918,8 @@ export function showOfferedRoutes(lines: Point[][], picked: number | null, onPic
   if (lines.length > 0 && !live.overview) {
     browse(live)
     live.overview = true
+    live.map.dragRotate.disable()
+    live.map.touchZoomRotate.disableRotation()
     // (A loop: a long route has too many points to spread into Math.min.)
     let [x0, x1, z0, z1] = [Infinity, -Infinity, Infinity, -Infinity]
     for (const [x, z] of lines.flat()) {
@@ -919,9 +940,15 @@ export function showOfferedRoutes(lines: Point[][], picked: number | null, onPic
           duration: 900,
         },
       )
+    } else if (live.map.getBearing() !== 0 || live.map.getPitch() !== 0) {
+      live.map.easeTo({ bearing: 0, pitch: 0, duration: reducedMotion() ? 0 : 300 })
     }
   } else if (lines.length === 0 && live.overview) {
     live.overview = false
+    if (live.interactive && !currentOverview.active()) {
+      live.map.dragRotate.enable()
+      live.map.touchZoomRotate.enableRotation()
+    }
     // Back on the truck at the zoom the player had before the routes were offered: zooming out to show them
     // all was the map's doing, not a zoom they chose (owner 2026-10-21).
     live.browsedFrom = live.map.getZoom()
@@ -995,7 +1022,12 @@ function frameCurrentRoute(target: LiveMap) {
   // top inset first, otherwise the current-position marker is pushed against the bottom edge.
   target.map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
   target.map.fitBounds([toLngLat(x0, z1), toLngLat(x1, z0)], {
-    padding: { top: 72, bottom: 90, left: 64, right: Math.min(140, width / 4) },
+    padding: {
+      top: 72,
+      bottom: 90,
+      left: target.interactive ? Math.max(160, width * 0.18) : 64,
+      right: Math.min(140, width / 4),
+    },
     bearing: 0,
     pitch: 0,
     maxZoom: 17,

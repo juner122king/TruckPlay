@@ -14,6 +14,7 @@ import { SpeedDisplay } from '../maps/SpeedDisplay'
 import { useClockStyle } from '../state/hooks'
 import { useLive } from '../state/store'
 import { useText } from '../state/text'
+import { useTripProgress } from './tripProgress'
 import './map.css'
 
 /**
@@ -116,24 +117,38 @@ function TripPill({ concealed }: { concealed: boolean }) {
           )
         : null
       const total = formatTripTime(minutes, text)
-      return [
-        formatGameTime(Math.round(cabClock(telemetry, state.clockShift) + minutes), clock),
-        stop ? `${formatTripTime(stop.minutes, text)} | ${total}` : total,
-        formatTripDistance(telemetry.navigationDistance, text.decimal, state.mph),
-      ]
+      return {
+        arrival: formatGameTime(Math.round(cabClock(telemetry, state.clockShift) + minutes), clock),
+        time: stop ? `${formatTripTime(stop.minutes, text)} | ${total}` : total,
+        distance: formatTripDistance(telemetry.navigationDistance, text.decimal, state.mph),
+        navigationDistance: telemetry.navigationDistance,
+        routeId: state.route?.id,
+        routeDistances: state.route?.distances,
+        job: state.job,
+      }
     }),
   )
+  const progressPercent = useTripProgress(trip?.navigationDistance ?? 0, trip?.routeId, trip?.routeDistances, trip?.job)
   if (!trip) return null
-  const [arrival, time, distance] = trip
   return (
     <div className="eta-pill glass" aria-hidden={concealed}>
       <div className="eta-arrival">
-        <b>{arrival}</b> <span>{text.arrival}</span>
+        <b>{trip.arrival}</b> <span>{text.arrival}</span>
       </div>
       <div className="eta-remaining">
-        <span>{time}</span>
+        <span>{trip.time}</span>
         <span className="dot">·</span>
-        <span>{distance}</span>
+        <span>{trip.distance}</span>
+      </div>
+      <div
+        className="eta-progress-track"
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={text.arrival}
+      >
+        <div className="eta-progress-fill" style={{ width: `${progressPercent}%` }} />
       </div>
     </div>
   )

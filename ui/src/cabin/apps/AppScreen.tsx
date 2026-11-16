@@ -63,11 +63,16 @@ export function AppScreen({ app }: { app: AppId }) {
   if (!live && copy !== null) {
     // The copy: markup this page saved from its own app, shown as it was (no script in it).
     return (
-      <div ref={appWindow} className="screen app-window" style={launch} dangerouslySetInnerHTML={{ __html: copy }} />
+      <div
+        ref={appWindow}
+        className={`screen app-window app-${app}`}
+        style={launch}
+        dangerouslySetInnerHTML={{ __html: copy }}
+      />
     )
   }
   return (
-    <div ref={appWindow} className="screen app-window" style={launch}>
+    <div ref={appWindow} className={`screen app-window app-${app}`} style={launch}>
       <AppContent app={app} />
     </div>
   )
@@ -78,7 +83,7 @@ function AppContent({ app }: { app: AppId }) {
   switch (app) {
     case 'maps':
       return (
-        <section className="app-panel maps-app" aria-label={text.apps.maps}>
+        <section className="maps-app" aria-label={text.apps.maps}>
           <MapView interactive />
         </section>
       )

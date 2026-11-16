@@ -319,6 +319,11 @@
   flex-direction: column;
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
 }
+.map-navigation .guidance-banner {
+  left: var(--content-left);
+  top: var(--edge);
+  max-width: min(520px, calc(100% - var(--content-left) - 130px));
+}
 
 /* Search (MapSearch.tsx): a round button over the map's top left, opening the search panel there. Dark glass
    over the map like the map's other buttons. */
@@ -374,6 +379,11 @@
   gap: 14px;
   background: rgb(28 30 34 / 0.84);
   transition: height var(--motion-duration) var(--motion-ease);
+}
+.map-navigation .map-search {
+  left: var(--content-left);
+  top: var(--edge);
+  height: calc(100% - var(--edge) * 2);
 }
 
 /* Offering routes (Directions), narrower: the map shows them all beside it (liveMap.ts frames them there). */
@@ -787,6 +797,10 @@
   right: 16px;
   transform-origin: top right;
 }
+.map-navigation .map-search.right {
+  left: auto;
+  right: var(--edge);
+}
 
 .map-tile .map-search.closing {
   animation: search-panel-out 280ms var(--motion-ease) both;
@@ -1194,12 +1208,16 @@
 .guidance-widget .guidance-instruction {
   font-size: calc(22px * var(--text-scale, 1));
 }
+.map-navigation .map-controls {
+  right: calc(var(--edge) + 6px);
+  bottom: calc(var(--edge) + 8px);
+}
 .map-navigation .map-search-button,
 .map-navigation .map-search-button.guided {
   left: auto;
-  right: 102px;
+  right: calc(var(--edge) + 86px);
   top: auto;
-  bottom: 24px;
+  bottom: calc(var(--edge) + 8px);
 }
 .map-controls .map-overview.selected {
   background: #1266e9;
@@ -1208,6 +1226,8 @@
 @container carplay (max-height: 520px) {
   .map-navigation .map-controls {
     gap: 10px;
+    right: calc(var(--edge) + 6px);
+    bottom: calc(var(--edge) + 8px);
   }
   .map-navigation .map-control {
     width: 48px;
@@ -1225,8 +1245,10 @@
     height: 24px;
   }
   .map-navigation .guidance-banner {
+    left: var(--content-left);
+    top: var(--edge);
     padding: 14px 18px;
-    max-width: min(460px, 58%);
+    max-width: min(460px, calc(100% - var(--content-left) - 110px));
   }
   .map-navigation .guidance-distance {
     font-size: calc(34px * var(--text-scale, 1));
@@ -1246,7 +1268,8 @@
     height: 32px;
   }
   .map-navigation .map-search-button {
-    right: 86px;
+    right: calc(var(--edge) + 68px);
+    bottom: calc(var(--edge) + 8px);
     width: 48px;
     height: 48px;
   }

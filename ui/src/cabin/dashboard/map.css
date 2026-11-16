@@ -9,6 +9,21 @@
   border-radius: var(--panel-radius);
 }
 
+/* In navigation app: true full-screen, filling all 4 sides with no card radius or shadow. */
+.map-tile.map-navigation {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.map-tile.map-navigation :is(.map-clip, .map-window) {
+  clip-path: none;
+  border-radius: 0;
+}
+
+.map-tile.map-navigation :is(.map-shadow-clip, .map-shadow) {
+  display: none;
+}
+
 /* Its layers (MapView.tsx), each the tile's size; on the Dashboard the window, the content and the still layer
    slide by transforms as the map grows and shrinks (dashboard.css). */
 .map-clip,
@@ -158,6 +173,35 @@
   opacity: 0.55;
 }
 
+.eta-progress-track {
+  width: 100%;
+  height: 5px;
+  margin-top: 10px;
+  background: rgb(255 255 255 / 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.appearance-light .eta-progress-track {
+  background: rgb(0 0 0 / 0.12);
+}
+
+.eta-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #30d158;
+  transition: width 0.35s ease;
+}
+
+.appearance-light .eta-progress-fill {
+  background: #28cd41;
+}
+
+.dashboard .eta-progress-track {
+  margin-top: 8px;
+  height: 4px;
+}
+
 /* One black capsule, a region-specific sign and a large white actual speed, by day and night. */
 .speed-stack {
   position: absolute;
@@ -264,11 +308,19 @@
   transform: scale(0.78);
   transform-origin: top right;
 }
+.map-navigation .speed-stack {
+  top: calc(var(--edge) + 6px);
+  right: calc(var(--edge) + 6px);
+}
 .dashboard .eta-pill {
   left: 18px;
   bottom: 18px;
   padding: 12px 20px;
   border-radius: 24px;
+}
+.map-navigation .eta-pill {
+  left: calc(var(--content-left) + 6px);
+  bottom: calc(var(--edge) + 8px);
 }
 .dashboard .eta-arrival {
   font-size: calc(26px * var(--text-scale, 1));
@@ -383,11 +435,16 @@
   .map-navigation .eta-pill {
     padding: 12px 20px;
   }
+  .map-navigation .eta-progress-track {
+    margin-top: 8px;
+    height: 4px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .map-guidance-layer,
   .eta-pill,
-  .speed-stack {
+  .speed-stack,
+  .eta-progress-fill {
     transition: none;
   }
 }
@@ -408,6 +465,10 @@
   font-size: 16px;
   line-height: 1.2;
   pointer-events: none;
+}
+.map-navigation .map-cache-notice {
+  left: calc(var(--content-left) + 6px);
+  bottom: calc(var(--edge) + 2px);
 }
 .map-cache-notice[data-empty] {
   left: 50%;
