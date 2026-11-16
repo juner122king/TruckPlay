@@ -23,6 +23,9 @@ export const SCREEN_LAYOUT_IDS = [
   'ford-f150-2023',
   'ford-bronco-2024',
   'volvo-vnl-2025',
+  'freightliner-cascadia-2024',
+  'kenworth-t680-2022',
+  'western-star-57x',
 ] as const
 
 export type ScreenLayoutId = (typeof SCREEN_LAYOUT_IDS)[number]
@@ -60,6 +63,9 @@ const PAGE_HEIGHTS: Partial<Record<ScreenLayoutId, number>> = {
   'ford-f150-2023': 812,
   'ford-bronco-2024': 796,
   'volvo-vnl-2025': 712,
+  'freightliner-cascadia-2024': 514,
+  'kenworth-t680-2022': 683,
+  'western-star-57x': 513,
 }
 
 /** Frame pixels (SCREEN_WIDTH x SCREEN_HEIGHT, as a screen's script and the truck's strip are measured) as the
