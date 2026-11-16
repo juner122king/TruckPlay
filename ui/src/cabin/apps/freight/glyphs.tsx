@@ -3,6 +3,66 @@
  * Only glyphs actively used by FreightApp.tsx are retained.
  */
 
+export function RouteArrowGlyph({ size = 22, color = '#38bdf8' }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <polyline points="13 4 21 12 13 20" />
+    </svg>
+  )
+}
+
+export function ArrowUpGlyph({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <polyline points="5 12 12 5 19 12" />
+    </svg>
+  )
+}
+
+export function CoffeeCupGlyph({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M18 8h1a3.5 3.5 0 0 1 0 7h-1" />
+      <path d="M2 8h16v8a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
+      <line x1="6" y1="2" x2="6" y2="5" />
+      <line x1="10" y1="2" x2="10" y2="5" />
+      <line x1="14" y1="2" x2="14" y2="5" />
+    </svg>
+  )
+}
+
 export function ShieldAlertGlyph({ size = 20 }: { size?: number }) {
   return (
     <svg

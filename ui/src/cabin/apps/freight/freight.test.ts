@@ -1,17 +1,77 @@
 import { describe, expect, it } from 'vitest'
 import {
   calculateJourneyTimeline,
+  calculateNetPayout,
   calculateOverallHealth,
   calculateRate,
   calculateRouteProgress,
   evaluateBuffer,
   evaluateHos,
   evaluateWear,
+  formatArrivalTime,
   formatCargoMass,
   formatDuration,
+  formatNextBreakLocation,
+  resolveLocalizedCity,
+  resolveLocalizedCompany,
 } from './freight'
 
 describe('freight logic helpers', () => {
+  it('resolves localized city and company names with dictionary and map labels', () => {
+    // Szczecin and Berlin from user screenshot
+    expect(resolveLocalizedCity('Szczecin', undefined, true)).toBe('什切青')
+    expect(resolveLocalizedCity('Berlin', undefined, true)).toBe('柏林')
+    expect(resolveLocalizedCity('Duisburg', undefined, true)).toBe('杜伊斯堡')
+    expect(resolveLocalizedCity('Amsterdam', undefined, true)).toBe('阿姆斯特丹')
+    expect(resolveLocalizedCity('Szczecin', undefined, false)).toBe('Szczecin')
+
+    // Company names
+    expect(resolveLocalizedCompany('ITCC', true)).toBe('欧洲化工')
+    expect(resolveLocalizedCompany('Sanbuilders', true)).toBe('圣建重工')
+    expect(resolveLocalizedCompany('Kaarfor', true)).toBe('卡福货运')
+    expect(resolveLocalizedCompany('ITCC', false)).toBe('ITCC')
+
+    // Map labels resolution
+    const mockLabels = [
+      { name: 'Kraków', localized: '克拉科夫', kind: 'city', at: [0, 0] as [number, number], population: 100 },
+    ]
+    expect(resolveLocalizedCity('Kraków', mockLabels, true)).toBe('克拉科夫')
+  })
+
+  it('calculates net payout correctly with cargo damage', () => {
+    expect(calculateNetPayout(18450, 0)).toBe(18450)
+    expect(calculateNetPayout(18450, 0.01)).toBe(18450 - 185) // 18265
+    expect(calculateNetPayout(10000, 0.1)).toBe(9000)
+    expect(calculateNetPayout(0, 0.05)).toBe(0)
+  })
+
+  it('formats arrival time in English and Chinese', () => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const zhDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    // Game time: Wed 15:00 = 2 * 1440 + 15 * 60 = 2880 + 900 = 3780
+    // Nav seconds: 4h 49m = 289m = 17340 seconds -> Arrival Wed 19:49 (same day)
+    const arrivalSameDay = formatArrivalTime(3780, 17340, 0, days, undefined, false)
+    expect(arrivalSameDay).toBe('Arrival 19:49')
+
+    // Different day: 10 hours later -> Thu 01:49
+    const arrivalNextDay = formatArrivalTime(3780, 36000, 0, days, undefined, false)
+    expect(arrivalNextDay).toBe('Arrival Thu 01:00')
+
+    const zhNextDay = formatArrivalTime(3780, 36000, 0, zhDays, undefined, true)
+    expect(zhNextDay).toBe('预计到达 周四 01:00')
+  })
+
+  it('formats next break location details', () => {
+    const enText = formatNextBreakLocation('Amsterdam', 67000, '15:02', false, false)
+    expect(enText).toBe('Rest area in Amsterdam · 67 km · 15:02')
+
+    const zhText = formatNextBreakLocation('阿姆斯特丹', 67000, '15:02', false, true)
+    expect(zhText).toBe('阿姆斯特丹服务区 · 67 km · 15:02')
+
+    const miText = formatNextBreakLocation('Los Angeles', 67000, '15:02', true, false)
+    expect(miText).toContain('mi')
+  })
+
   it('calculates kilometer and mile rates accurately', () => {
     expect(calculateRate(10000, 500, false)).toBe('20.0')
     expect(calculateRate(0, 500, false)).toBe('--')

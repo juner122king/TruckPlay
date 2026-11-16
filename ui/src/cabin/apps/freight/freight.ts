@@ -1,11 +1,330 @@
+import { type ClockStyle, formatGameTime, HOURS_24 } from '../../../shared/format'
+import type { MapLabel } from '../../maps/mapData'
+
 /**
  * Automotive In-Cabin Fullscreen Freight HUD Logic & Calculation Engine
- * Contains strictly the domain models and calculations required for:
+ * Contains domain models and calculations required for:
  * - Route progress & delivery buffer margin
- * - Cargo manifest formatting & unit rate calculation
+ * - Cargo manifest formatting, unit rate, and net payout calculation
  * - Vehicle health & individual component wear evaluation
- * - Driver HOS fatigue countdown & journey Gantt timeline simulation
+ * - Driver HOS fatigue countdown & Next Break location simulation
  */
+
+/** Comprehensive ETS2 / ATS city name translations for Chinese system language. */
+export const CITY_ZH: Record<string, string> = {
+  // Poland
+  Szczecin: '什切青',
+  Warsaw: '华沙',
+  Warszawa: '华沙',
+  Krakow: '克拉科夫',
+  Kraków: '克拉科夫',
+  Wrocław: '弗罗茨瓦夫',
+  Poznań: '波兹南',
+  Gdańsk: '格但斯克',
+  Katowice: '卡托维兹',
+  Lublin: '卢布林',
+  Białystok: '比亚韦斯托克',
+  Bialystok: '比亚韦斯托克',
+  Bydgoszcz: '比得哥什',
+  Olsztyn: '奥尔什丁',
+  Łódź: '罗兹',
+  Lodz: '罗兹',
+
+  // Germany
+  Berlin: '柏林',
+  Duisburg: '杜伊斯堡',
+  Hamburg: '汉堡',
+  Munich: '慕尼黑',
+  München: '慕尼黑',
+  Frankfurt: '法兰克福',
+  'Frankfurt am Main': '法兰克福',
+  Cologne: '科隆',
+  Köln: '科隆',
+  Stuttgart: '斯图加特',
+  Düsseldorf: '杜塞尔多夫',
+  Dortmund: '多特蒙德',
+  Bremen: '不来梅',
+  Hannover: '汉诺威',
+  Nuremberg: '纽伦堡',
+  Nürnberg: '纽伦堡',
+  Leipzig: '莱比锡',
+  Dresden: '德累斯顿',
+  Kassel: '卡塞尔',
+  Mannheim: '曼海姆',
+  Erfurt: '埃尔福特',
+  Magdeburg: '马格德堡',
+  Rostock: '罗斯托克',
+  Osnabrück: '奥斯纳布吕克',
+  Kiel: '基尔',
+  Lübeck: '吕贝克',
+  Lubeck: '吕贝克',
+
+  // Netherlands & Belgium
+  Amsterdam: '阿姆斯特丹',
+  Rotterdam: '鹿特丹',
+  Groningen: '格罗宁根',
+  Brussels: '布鲁塞尔',
+  Bruxelles: '布鲁塞尔',
+  Brussel: '布鲁塞尔',
+  Antwerp: '安特卫普',
+  Antwerpen: '安特卫普',
+  Liège: '列日',
+  Liege: '列日',
+
+  // France
+  Paris: '巴黎',
+  Lyon: '里昂',
+  Marseille: '马赛',
+  Lille: '里尔',
+  Bordeaux: '波尔多',
+  Toulouse: '图卢兹',
+  Strasbourg: '斯特拉斯堡',
+  Nantes: '南特',
+  Rennes: '雷恩',
+  Nice: '尼斯',
+  Calais: '加来',
+  Dijon: '第戎',
+  Metz: '梅斯',
+  Reims: '兰斯',
+  'Le Havre': '勒阿弗尔',
+  Brest: '布雷斯特',
+  Montpellier: '蒙彼利埃',
+
+  // UK
+  London: '伦敦',
+  Manchester: '曼彻斯特',
+  Birmingham: '伯明翰',
+  Liverpool: '利物浦',
+  Glasgow: '格拉斯哥',
+  Edinburgh: '爱丁堡',
+  Newcastle: '纽卡斯尔',
+  Sheffield: '谢菲尔德',
+  Southampton: '南安普敦',
+  Dover: '多佛',
+  Cardiff: '加的夫',
+  Aberdeen: '阿伯丁',
+  Swansea: '斯旺西',
+  Plymouth: '普利茅斯',
+  Felixstowe: '菲利克斯托',
+  Cambridge: '剑桥',
+
+  // Italy
+  Rome: '罗马',
+  Roma: '罗马',
+  Milan: '米兰',
+  Milano: '米兰',
+  Turin: '都灵',
+  Torino: '都灵',
+  Venice: '威尼斯',
+  Venezia: '威尼斯',
+  Florence: '佛罗伦萨',
+  Firenze: '佛罗伦萨',
+  Naples: '那不勒斯',
+  Napoli: '那不勒斯',
+  Bologna: '博洛尼亚',
+  Genoa: '热那亚',
+  Genova: '热那亚',
+  Verona: '维罗纳',
+  Bari: '巴里',
+  Ancona: '安科纳',
+  Palermo: '巴勒莫',
+  Catania: '卡塔尼亚',
+
+  // Austria & Switzerland
+  Vienna: '维也纳',
+  Wien: '维也纳',
+  Salzburg: '萨尔茨堡',
+  Innsbruck: '因斯布鲁克',
+  Linz: '林茨',
+  Graz: '格拉茨',
+  Klagenfurt: '克拉根福',
+  Zurich: '苏黎世',
+  Zürich: '苏黎世',
+  Geneva: '日内瓦',
+  Genève: '日内瓦',
+  Bern: '伯尔尼',
+  Basel: '巴塞尔',
+
+  // Czech & Slovakia & Hungary
+  Prague: '布拉格',
+  Praha: '布拉格',
+  Brno: '布尔诺',
+  Ostrava: '俄斯特拉发',
+  Bratislava: '布拉迪斯拉发',
+  Košice: '科希策',
+  Kosice: '科希策',
+  Budapest: '布达佩斯',
+  Debrecen: '德布勒森',
+  Szeged: '塞格德',
+  Pécs: '佩奇',
+  Pecs: '佩奇',
+
+  // Scandinavia & Baltics
+  Stockholm: '斯德哥尔摩',
+  Gothenburg: '哥德堡',
+  Göteborg: '哥德堡',
+  Malmö: '马尔默',
+  Malmo: '马尔默',
+  Oslo: '奥斯陆',
+  Bergen: '卑尔根',
+  Stavanger: '斯塔万格',
+  Copenhagen: '哥本哈根',
+  København: '哥本哈根',
+  Aalborg: '奥尔堡',
+  Odense: '欧登塞',
+  Helsinki: '赫尔辛基',
+  Turku: '图尔库',
+  Tampere: '坦佩雷',
+  Tallinn: '塔林',
+  Riga: '里加',
+  Vilnius: '维尔纽斯',
+  Klaipėda: '克莱佩达',
+
+  // Iberia
+  Madrid: '马德里',
+  Barcelona: '巴塞罗那',
+  Valencia: '瓦伦西亚',
+  Seville: '塞维利亚',
+  Sevilla: '塞维利亚',
+  Zaragoza: '萨拉戈萨',
+  Málaga: '马拉加',
+  Bilbao: '毕尔巴鄂',
+  Lisbon: '里斯本',
+  Lisboa: '里斯本',
+  Porto: '波尔图',
+
+  // ATS (American Truck Simulator)
+  'Los Angeles': '洛杉矶',
+  'San Francisco': '旧金山',
+  'Las Vegas': '拉斯维加斯',
+  'San Diego': '圣迭戈',
+  Phoenix: '菲尼克斯',
+  Tucson: '图森',
+  Seattle: '西雅图',
+  Portland: '波特兰',
+  Denver: '丹佛',
+  'Salt Lake City': '盐湖城',
+  Albuquerque: '阿尔伯克基',
+  Boise: '博伊西',
+  Houston: '休斯敦',
+  Dallas: '达拉斯',
+  'San Antonio': '圣安东尼奥',
+  Austin: '奥斯汀',
+  'El Paso': '埃尔帕索',
+  Sacramento: '萨克拉门托',
+  Fresno: '弗雷斯诺',
+  Bakersfield: '贝克斯菲尔德',
+  Reno: '里诺',
+}
+
+/** Common company translations for Chinese system language. */
+export const COMPANY_ZH: Record<string, string> = {
+  ITCC: '欧洲化工',
+  Sanbuilders: '圣建重工',
+  Kaarfor: '卡福货运',
+  'Tree-ET': '泛欧环保',
+  TradeAux: '欧贸互通',
+  EuroGoodies: '欧品生鲜',
+  NBFC: '北方石油',
+  Trameri: '特拉梅里',
+  Transinet: '全网物流',
+  WGCC: '世界绿化',
+  Stokes: '斯托克斯',
+  BCP: '波罗的海石化',
+  LKW: '德意志货运',
+  'LKW Log': '德意志货运',
+  Posped: '波兰速递',
+  FCP: '法国化学',
+  SellPlan: '超值平价',
+  Steinbruch: '采石场',
+  Vitas: '维塔斯能源',
+  Scania: '斯堪尼亚',
+  Volvo: '沃尔沃',
+  Renault: '雷诺',
+  MAN: '曼恩',
+  DAF: '达夫',
+  Iveco: '依维柯',
+  Mercedes: '梅赛德斯',
+}
+
+/**
+ * Localizes city name by checking map labels first, then CITY_ZH dictionary.
+ */
+export function resolveLocalizedCity(
+  city: string | undefined,
+  labels: readonly MapLabel[] | undefined,
+  isZh: boolean,
+): string {
+  if (!city) return '--'
+  if (labels && labels.length > 0) {
+    const trimmed = city.trim().toLowerCase()
+    const found = labels.find(
+      (l) => l.kind === 'city' && (l.name.toLowerCase() === trimmed || l.localized?.toLowerCase() === trimmed),
+    )
+    if (found?.localized) {
+      return isZh ? (CITY_ZH[found.name] ?? found.localized) : found.localized
+    }
+  }
+  if (isZh) {
+    return CITY_ZH[city] ?? city
+  }
+  return city
+}
+
+/** Localizes company name according to language. */
+export function resolveLocalizedCompany(company: string | undefined, isZh: boolean): string {
+  if (!company) return '--'
+  if (!isZh) return company
+  return COMPANY_ZH[company] ?? company
+}
+
+/** Calculates net payout considering damage deduction. */
+export function calculateNetPayout(income: number, cargoDamage: number): number {
+  if (income <= 0) return 0
+  const damageFraction = Math.max(0, Math.min(1, cargoDamage))
+  const deduction = Math.round(income * damageFraction)
+  return Math.max(0, income - deduction)
+}
+
+/** Formats ETA arrival into localized header string, e.g. "Arrival Wed 19:49" or "预计到达 周三 19:49". */
+export function formatArrivalTime(
+  gameTime: number,
+  navSeconds: number,
+  clockShift: number,
+  days: readonly string[],
+  style: ClockStyle = HOURS_24,
+  isZh = false,
+): string {
+  if (navSeconds <= 0 && gameTime <= 0) return '--'
+  const navMinutes = Math.ceil(Math.max(0, navSeconds) / 60)
+  const etaMinutes = gameTime + navMinutes + clockShift
+  const dayIndex = Math.floor(etaMinutes / 1440) % 7
+  const dayStr = days[dayIndex] ?? ''
+  const timeStr = formatGameTime(etaMinutes, style)
+  const isToday = Math.floor(etaMinutes / 1440) === Math.floor((gameTime + clockShift) / 1440)
+  const dayPart = isToday ? '' : `${dayStr} `
+  if (isZh) {
+    return `预计到达 ${dayPart}${timeStr}`
+  }
+  return `Arrival ${dayPart}${timeStr}`
+}
+
+/** Formats next break subtext, e.g. "Rest area in Amsterdam · 67 km · 15:02". */
+export function formatNextBreakLocation(
+  cityName: string,
+  distanceMeters: number,
+  etaClockTime: string,
+  isMph: boolean,
+  isZh: boolean,
+): string {
+  const dist = isMph
+    ? `${Math.round((distanceMeters / 1000) * 0.621371).toLocaleString()} mi`
+    : `${Math.round(distanceMeters / 1000).toLocaleString()} km`
+  if (isZh) {
+    return `${cityName}服务区 · ${dist} · ${etaClockTime}`
+  }
+  return `Rest area in ${cityName} · ${dist} · ${etaClockTime}`
+}
 
 /** Calculates unit rate earnings (€/km or $/mi). */
 export function calculateRate(income: number, plannedKm: number, isMph: boolean): string {

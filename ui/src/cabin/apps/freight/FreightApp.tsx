@@ -1,39 +1,30 @@
 import { useMemo } from 'react'
 import { formatDeadline } from '../../dashboard/destination'
+import { useMapData } from '../../maps/mapData'
+import { nextStop } from '../../maps/nextStop'
 import { useClockStyle } from '../../state/hooks'
 import { useLive } from '../../state/store'
 import { useLanguage, useText } from '../../state/text'
 import {
-  calculateJourneyTimeline,
-  calculateOverallHealth,
-  calculateRate,
+  calculateNetPayout,
   calculateRouteProgress,
   evaluateBuffer,
   evaluateHos,
-  evaluateWear,
+  formatArrivalTime,
   formatCargoMass,
   formatDuration,
+  formatNextBreakLocation,
+  resolveLocalizedCity,
+  resolveLocalizedCompany,
 } from './freight'
-import {
-  BedRestGlyph,
-  CargoBoxGlyph,
-  ClockRingGlyph,
-  EngineCheckGlyph,
-  NavigationArrowGlyph,
-  ShieldAlertGlyph,
-  ShieldCheckGlyph,
-  SpeedGlyph,
-  TachographRing,
-  TruckLineGlyph,
-} from './glyphs'
+import { ArrowUpGlyph, CargoBoxGlyph, CoffeeCupGlyph, RouteArrowGlyph } from './glyphs'
 import './freight.css'
 
 /**
- * Automotive In-Cabin Fullscreen Freight HUD Cockpit
- * Designed specifically for vehicle displays:
- * - 4 core quadrants: Route Process, Cargo Details, Vehicle Condition, HOS Fatigue.
- * - Vehicle condition ONLY displays overall health and component wear bars.
- * - Spacious, elegant, breathable typography and generous padding.
+ * Automotive In-Cabin Modern Glassmorphism Freight Cockpit HUD
+ * Refactored to strictly match the reference image:
+ * - Two independent glassmorphic cards (Job Card + Progress Card)
+ * - Margins to sidebar, edges, and inter-card gap strictly unified via design tokens
  */
 export function FreightApp() {
   const text = useText()
@@ -41,423 +32,256 @@ export function FreightApp() {
   const isZh = language === 'zh_cn' || language.startsWith('zh')
   const clockStyle = useClockStyle()
 
-  // Live simulator telemetry
+  // Live simulator telemetry from store
   const rawJob = useLive((state) => state.job)
   const telemetry = useLive((state) => state.telemetry)
-  const truck = useLive((state) => state.truck)
   const mph = useLive((state) => state.mph)
+  const clockShift = useLive((state) => state.clockShift)
+  const route = useLive((state) => state.route)
+  const routeStops = useLive((state) => state.routeStops)
+  const routeNext = useLive((state) => state.routeNext)
 
   const hasLiveJob = Boolean(rawJob && rawJob.active)
 
-  // Job data: live game job or realistic standby fallback
+  // Game time reference: fallback to Wed 15:00 (day 2, 15*60 = 3780)
+  const gameTime = telemetry?.gameTime ?? 3780
+  const navSeconds = telemetry?.navigationTime ?? 17340 // ~4h 49m -> ETA 19:49
+  const navDistance = telemetry?.navigationDistance ?? 411000 // 411 km left
+
+  // Active or reference demo fallback job
   const job = useMemo(() => {
     if (hasLiveJob) return rawJob!
     return {
       active: true,
       cargoLoaded: true,
       special: false,
-      cargo: isZh ? '堆场卡车' : 'Yard Truck',
-      cargoMass: 18500,
-      sourceCity: 'Las Vegas',
-      sourceCompany: 'Apade Logistics',
-      destinationCity: 'Los Angeles',
-      destinationCompany: 'LA Seaport',
-      deliveryTime: (telemetry?.gameTime ?? 823) + 480, // delivery window
-      plannedDistanceKm: 531, // ~330 miles
-      income: 31832,
+      cargo: isZh ? '酸奶' : 'Yogurt',
+      cargoMass: 18200,
+      sourceCity: isZh ? '杜伊斯堡' : 'Duisburg',
+      sourceCompany: isZh ? '卡福物流' : 'Kaarfor',
+      destinationCity: isZh ? '阿姆斯特丹' : 'Amsterdam',
+      destinationCompany: isZh ? '泛欧环保' : 'Tree-ET',
+      deliveryTime: gameTime + 510, // Wed 23:30 (8.5 hours delivery window)
+      plannedDistanceKm: 430, // 430 km planned
+      income: 18450,
     }
-  }, [hasLiveJob, rawJob, isZh, telemetry?.gameTime])
+  }, [hasLiveJob, rawJob, isZh, gameTime])
 
-  const gameTime = telemetry?.gameTime ?? 823
-  const navSeconds = telemetry?.navigationTime ?? 24480 // ~6h 48m
-  const navDistance = telemetry?.navigationDistance ?? 531000 // 531 km / 330 mi
+  // Map labels for official game-map city localizations
+  const labels = useMapData()?.labels
+  const displaySourceCity = resolveLocalizedCity(job.sourceCity, labels, isZh)
+  const displaySourceCompany = resolveLocalizedCompany(job.sourceCompany, isZh)
+  const displayDestCity = resolveLocalizedCity(job.destinationCity, labels, isZh)
+  const displayDestCompany = resolveLocalizedCompany(job.destinationCompany, isZh)
 
-  // Route Progress
+  // Progress calculations
   const progress = useMemo(() => {
-    if (!job) {
-      return {
-        progressRatio: 0,
-        progressPercent: 0,
-        distanceCoveredKm: 0,
-        distanceRemainingKm: 0,
-        plannedDistanceKm: 0,
-        coveredText: '--',
-        remainingText: '--',
-        totalText: '--',
-      }
-    }
     const navMeters = hasLiveJob ? telemetry?.navigationDistance : navDistance
     return calculateRouteProgress(job.plannedDistanceKm, navMeters, mph)
-  }, [job, hasLiveJob, telemetry?.navigationDistance, navDistance, mph])
+  }, [job.plannedDistanceKm, hasLiveJob, telemetry?.navigationDistance, navDistance, mph])
 
-  // Delivery Buffer Margin
+  // Remaining distance hero number
+  const remainingDistKm = (hasLiveJob ? (telemetry?.navigationDistance ?? 0) : navDistance) / 1000
+  const remainingDistScale = mph ? 0.621371 : 1
+  const remainingDistNum = Math.max(0, Math.round(remainingDistKm * remainingDistScale))
+  const distUnit = mph ? 'mi' : 'km'
+  const heroDistanceText = isZh
+    ? `剩余 ${remainingDistNum.toLocaleString()} ${distUnit}`
+    : `${remainingDistNum.toLocaleString()} ${distUnit} left`
+
+  // Delivery Buffer
   const buffer = useMemo(() => {
-    if (!job) {
-      return { bufferMinutes: 0, status: 'ample' as const, remainingText: '--', bufferRatio: 0 }
-    }
     const navSec = hasLiveJob ? (telemetry?.navigationTime ?? 0) : navSeconds
     return evaluateBuffer(job.deliveryTime, gameTime, navSec, isZh)
-  }, [job, hasLiveJob, telemetry?.navigationTime, navSeconds, gameTime, isZh])
+  }, [job.deliveryTime, hasLiveJob, telemetry?.navigationTime, navSeconds, gameTime, isZh])
 
-  // Cargo & payout formatting
-  const cargoMassText = job ? formatCargoMass(job.cargoMass, mph) : '--'
-  const payoutStr = job && job.income > 0 ? `${job.income.toLocaleString()} €` : '--'
-  const rateUnit = mph ? (isZh ? '€/mi' : '€/mi') : isZh ? '€/km' : '€/km'
-  const rateStr = job ? `${calculateRate(job.income, job.plannedDistanceKm, mph)} ${rateUnit}` : '--'
-  const deadlineStr = job ? formatDeadline(job.deliveryTime, gameTime, text.days, clockStyle) : '--'
+  // Formatted Cargo & Financials
+  const cargoMassText = formatCargoMass(job.cargoMass, mph)
+  const rawDamage = telemetry?.cargoDamage ?? (hasLiveJob ? 0 : 0.01) // 1% fallback matching reference
+  const damagePercentText = `${Math.round(rawDamage * 100)}%`
+  const netIncome = calculateNetPayout(job.income, rawDamage)
+  const plannedDistanceText = `${Math.round(mph ? job.plannedDistanceKm * 0.621371 : job.plannedDistanceKm).toLocaleString()} ${distUnit}`
 
-  const cargoDamage = telemetry?.cargoDamage ?? 0
-  const isSafeCargo = cargoDamage <= 0.001
-  const damagePercentText = `${(cargoDamage * 100).toFixed(1)}%`
-  const estimatedDeduction = job && job.income > 0 && cargoDamage > 0.001 ? Math.round(job.income * cargoDamage) : 0
-
-  // Vehicle Condition: Individual Component Wear
-  const truckWears = [
-    evaluateWear(isZh ? '发动机' : 'Engine', telemetry?.wearEngine ?? 0.0),
-    evaluateWear(isZh ? '变速箱' : 'Gearbox', telemetry?.wearTransmission ?? 0.0),
-    evaluateWear(isZh ? '驾驶室' : 'Cabin', telemetry?.wearCabin ?? 0.0),
-    evaluateWear(isZh ? '底盘' : 'Chassis', telemetry?.wearChassis ?? 0.0),
-    evaluateWear(isZh ? '轮胎' : 'Wheels', telemetry?.wearWheels ?? 0.0),
-    evaluateWear(isZh ? '挂车货厢' : 'Trailer', telemetry?.wearTrailerBody ?? 0.0),
-  ]
-
-  const hasTrailer =
-    telemetry?.wearTrailerChassis != null || telemetry?.wearTrailerWheels != null || Boolean(job?.active)
-
-  const overallHealth = calculateOverallHealth(truckWears.slice(0, 5), hasTrailer ? [truckWears[5]] : [])
-
-  // HOS Driver & Fatigue Planning
-  const nextRestStopMinutes = telemetry?.nextRestStop ?? 804 // default 13h 24m
-  const hos = evaluateHos(nextRestStopMinutes, navSeconds, isZh)
-
-  const timeline = calculateJourneyTimeline(
+  // Arrival & Deadline Strings
+  const arrivalText = formatArrivalTime(
     gameTime,
-    navSeconds,
-    nextRestStopMinutes,
-    job?.deliveryTime ?? gameTime + 480,
+    hasLiveJob ? (telemetry?.navigationTime ?? 0) : navSeconds,
+    clockShift,
+    text.days,
+    clockStyle,
+    isZh,
   )
+  const deadlineStr = formatDeadline(job.deliveryTime, gameTime, text.days, clockStyle)
+  const bufferDurationText = formatDuration(Math.max(0, buffer.bufferMinutes), isZh)
 
-  // Truck Model
-  const truckTitle = truck ? `${truck.brand} ${truck.name}` : 'Volvo VNL'
+  // Driver Rest & Next Break
+  const nextRestStopMinutes = telemetry?.nextRestStop ?? (hasLiveJob ? 480 : 312) // 5h 12m fallback
+  const hos = evaluateHos(nextRestStopMinutes, hasLiveJob ? (telemetry?.navigationTime ?? 0) : navSeconds, isZh)
+
+  // Subtitle for Next Break
+  const nextBreakSubtitle = useMemo(() => {
+    if (!hasLiveJob) {
+      return isZh ? '阿姆斯特丹服务区 · 67 km · 15:02' : 'Rest area in Amsterdam · 67 km · 15:02'
+    }
+    if (route && routeStops.length > 0 && telemetry?.navigationDistance) {
+      const stop = nextStop(
+        routeStops,
+        route.distances,
+        routeNext,
+        telemetry.navigationDistance,
+        telemetry.navigationTime,
+      )
+      if (stop) {
+        const stopMinutes = Math.ceil(stop.minutes)
+        const stopEtaTime = formatDeadline(gameTime + stopMinutes + clockShift, gameTime, text.days, clockStyle)
+        return formatNextBreakLocation(isZh ? '沿途' : 'En route', stop.distance, stopEtaTime, mph, isZh)
+      }
+    }
+    const destCity = displayDestCity || (isZh ? '目的地' : 'Destination')
+    const defaultMeters = Math.min(67000, telemetry?.navigationDistance ?? 67000)
+    const approxMinutes = Math.round((defaultMeters / 1000) * 1.2)
+    const defaultEta = formatDeadline(gameTime + approxMinutes + clockShift, gameTime, text.days, clockStyle)
+    return formatNextBreakLocation(destCity, defaultMeters, defaultEta, mph, isZh)
+  }, [
+    hasLiveJob,
+    isZh,
+    route,
+    routeStops,
+    routeNext,
+    telemetry,
+    gameTime,
+    clockShift,
+    text.days,
+    clockStyle,
+    mph,
+    displayDestCity,
+  ])
 
   return (
-    <section className="app-panel freight-app logitrack-fullscreen-hud" aria-label={text.freight.title}>
-      {/* 2x2 Clean, Spacious Cockpit HUD Grid */}
-      <main className="hud-main-grid">
-        {/* =================================================================
-            1. 装卸地流程状态 (Pickup / Delivery Process & Route Progress)
-            ================================================================= */}
-        <section className="hud-card card-route-process">
-          <div className="card-header-line">
-            <div className="card-title-badge">
-              <NavigationArrowGlyph size={20} color="#38bdf8" />
-              <h2 className="panel-title">{isZh ? '装卸地流程状态' : 'Route & Delivery Progress'}</h2>
+    <section className="app-panel freight-app modern-hud" aria-label={text.freight.title}>
+      {/* =================================================================
+          LEFT CARD: Job (货运任务)
+          ================================================================= */}
+      <section className="hud-glass-card card-job">
+        {/* Card Header */}
+        <div className="card-top-header">
+          <div className="card-title-cluster">
+            <div className="card-icon-badge purple" aria-hidden>
+              <CargoBoxGlyph size={18} />
             </div>
-            <span className={`status-pill ${job?.cargoLoaded ? 'in-transit' : 'pickup'}`}>
-              {job?.cargoLoaded ? (isZh ? '运送中' : 'In Transit') : isZh ? '前往装货' : 'To Pickup'}
+            <h2 className="card-heading">{isZh ? '货运任务' : 'Job'}</h2>
+          </div>
+          <span className="market-pill-badge">
+            {job.special ? (isZh ? '特种大件' : 'Special transport') : isZh ? '货运市场' : 'Freight market'}
+          </span>
+        </div>
+
+        {/* Route City Pair */}
+        <div className="route-cities-row">
+          <div className="city-block origin">
+            <div className="city-title">{displaySourceCity}</div>
+            <div className="city-company">{displaySourceCompany}</div>
+          </div>
+
+          <div className="route-arrow-cell" aria-hidden>
+            <RouteArrowGlyph size={22} color="#38bdf8" />
+          </div>
+
+          <div className="city-block destination">
+            <div className="city-title">{displayDestCity}</div>
+            <div className="city-company">{displayDestCompany}</div>
+          </div>
+        </div>
+
+        {/* Cargo Manifest Summary */}
+        <div className="cargo-tagline">
+          {job.cargo} {cargoMassText}
+        </div>
+
+        {/* Financial & Status Metrics */}
+        <div className="card-kv-list">
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '合同运费' : 'Pay'}</span>
+            <span className="card-kv-value">{job.income.toLocaleString()} €</span>
+          </div>
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '途中费用' : 'Costs on the road'}</span>
+            <span className="card-kv-value">0 €</span>
+          </div>
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '净收益' : 'Net'}</span>
+            <span className="card-kv-value highlight-net">{netIncome.toLocaleString()} €</span>
+          </div>
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '运输里程' : 'Distance'}</span>
+            <span className="card-kv-value">{plannedDistanceText}</span>
+          </div>
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '货物货损' : 'Cargo damage'}</span>
+            <span className={`card-kv-value ${rawDamage > 0.05 ? 'damage-alert' : ''}`}>{damagePercentText}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* =================================================================
+          RIGHT CARD: Progress (行程进度)
+          ================================================================= */}
+      <section className="hud-glass-card card-progress">
+        {/* Card Header */}
+        <div className="card-top-header">
+          <div className="card-title-cluster">
+            <div className="card-icon-badge cyan" aria-hidden>
+              <ArrowUpGlyph size={18} />
+            </div>
+            <h2 className="card-heading">{isZh ? '行程进度' : 'Progress'}</h2>
+          </div>
+        </div>
+
+        {/* Distance Remaining Hero */}
+        <div className="progress-hero-text">{heroDistanceText}</div>
+
+        {/* Sleek Progress Bar */}
+        <div className="sleek-progress-bar" aria-label="Route Progress">
+          <div
+            className="sleek-progress-fill"
+            style={{ width: `${Math.max(4, Math.min(100, progress.progressPercent))}%` }}
+          />
+        </div>
+
+        {/* Schedule & Buffer Metrics */}
+        <div className="card-kv-list">
+          <div className="card-kv-row">
+            <span className="card-kv-label-plain">{arrivalText}</span>
+            <span className={`arrival-status-pill ${buffer.status}`}>
+              {buffer.status === 'ample' && (isZh ? '准时' : 'on time')}
+              {buffer.status === 'tight' && (isZh ? '时效紧迫' : 'tight')}
+              {buffer.status === 'late' && (isZh ? '延误' : 'delayed')}
             </span>
           </div>
-
-          <div className="process-body">
-            {/* Origin -> Destination Stepper Row */}
-            <div className="process-stepper-row">
-              <div className="step-node origin">
-                <span className="node-kicker">{isZh ? '装货地' : 'Pickup'}</span>
-                <div className="node-city">{job?.sourceCity}</div>
-                <div className="node-company">{job?.sourceCompany || '--'}</div>
-              </div>
-
-              <div className="step-connector">
-                <div className="connector-line">
-                  <div
-                    className="connector-active-flow"
-                    style={{ width: `${Math.max(5, progress.progressPercent)}%` }}
-                  />
-                </div>
-                <div
-                  className="truck-stepper-icon"
-                  style={{ left: `${Math.max(5, Math.min(95, progress.progressPercent))}%` }}
-                >
-                  <TruckLineGlyph size={22} />
-                </div>
-              </div>
-
-              <div className="step-node destination">
-                <span className="node-kicker">{isZh ? '卸货地' : 'Delivery'}</span>
-                <div className="node-city">{job?.destinationCity}</div>
-                <div className="node-company">{job?.destinationCompany || '--'}</div>
-              </div>
-            </div>
-
-            {/* Relaxed Progress Bar and Metrics */}
-            <div className="progress-metrics-block">
-              <div className="progress-bar-track">
-                <div className="progress-bar-fill" style={{ width: `${progress.progressPercent}%` }} />
-              </div>
-
-              <div className="progress-stats-row">
-                <div className="pstat-item">
-                  <span className="pstat-label">{isZh ? '已行驶' : 'Covered'}</span>
-                  <span className="pstat-val">{progress.coveredText}</span>
-                </div>
-
-                <div className="pstat-item main-percent">
-                  <span className="huge-percent-num">{progress.progressPercent}%</span>
-                </div>
-
-                <div className="pstat-item right">
-                  <span className="pstat-label">{isZh ? '剩余路程' : 'Remaining'}</span>
-                  <span className="pstat-val highlight">{progress.remainingText}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Deadline & Buffer Margin */}
-            <div className="deadline-buffer-strip">
-              <div className="deadline-cell">
-                <ClockRingGlyph size={18} />
-                <div className="cell-texts">
-                  <span className="cell-sub">{isZh ? '交付期限' : 'Delivery Deadline'}</span>
-                  <span className="cell-main">{deadlineStr}</span>
-                </div>
-              </div>
-
-              <div className={`buffer-cell buffer-${buffer.status}`}>
-                <span className="buffer-kicker">{isZh ? '时效缓冲' : 'Buffer'}</span>
-                <span className="buffer-val">{formatDuration(Math.max(0, buffer.bufferMinutes), isZh)}</span>
-                <span className="buffer-tag">
-                  {buffer.status === 'ample' && (isZh ? '时间充裕' : 'On Schedule')}
-                  {buffer.status === 'tight' && (isZh ? '时效紧迫' : 'Tight')}
-                  {buffer.status === 'late' && (isZh ? '延误预警' : 'Delayed')}
-                </span>
-              </div>
-            </div>
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '交付截止' : 'Deadline'}</span>
+            <span className="card-kv-value">{deadlineStr}</span>
           </div>
-        </section>
-
-        {/* =================================================================
-            2. 货物明细与收益 (Cargo Details & Payout)
-            ================================================================= */}
-        <section className="hud-card card-cargo-details">
-          <div className="card-header-line">
-            <div className="card-title-badge">
-              <CargoBoxGlyph size={20} />
-              <h2 className="panel-title">{isZh ? '货物明细与收益' : 'Cargo Manifest & Financials'}</h2>
-            </div>
-            {job?.special && (
-              <span className="special-transport-badge">{isZh ? '特种大件运输' : 'Special Transport'}</span>
-            )}
+          <div className="card-kv-row">
+            <span className="card-kv-label">{isZh ? '时效缓冲' : 'Buffer'}</span>
+            <span className="card-kv-value">{bufferDurationText}</span>
           </div>
+        </div>
 
-          <div className="cargo-body">
-            {/* Cargo Hero Information */}
-            <div className="cargo-hero-row">
-              <div className="cargo-primary-info">
-                <span className="cargo-kicker">{isZh ? '装载货物' : 'Cargo Manifest'}</span>
-                <h3 className="cargo-huge-title">{job?.cargo}</h3>
+        {/* Next Break Micro-Card */}
+        <div className="next-break-card">
+          <div className="next-break-top-row">
+            <div className="next-break-title-group">
+              <div className="card-icon-badge amber" aria-hidden>
+                <CoffeeCupGlyph size={16} />
               </div>
-              <div className="cargo-weight-chip">
-                <span className="weight-label">{isZh ? '货物净重' : 'Net Weight'}</span>
-                <span className="weight-val">{cargoMassText}</span>
-              </div>
+              <span className="next-break-title">{isZh ? '下次休息' : 'Next break'}</span>
             </div>
-
-            {/* Payout & Cargo Integrity Split Cells */}
-            <div className="cargo-twin-cards">
-              {/* Financial Contract Payout */}
-              <div className="twin-cell payout-cell">
-                <span className="twin-label">{isZh ? '合同运费收益' : 'Contract Payout'}</span>
-                <div className="huge-payout-num">{payoutStr}</div>
-                <div className="rate-subtext">
-                  {isZh ? '结算单价' : 'Unit Rate'}: {rateStr}
-                </div>
-              </div>
-
-              {/* Cargo Damage & Intact Status */}
-              <div className={`twin-cell damage-cell ${isSafeCargo ? 'safe' : 'damaged'}`}>
-                <span className="twin-label">{isZh ? '货物完好状态' : 'Cargo Integrity'}</span>
-                <div className="damage-stat-row">
-                  {isSafeCargo ? (
-                    <>
-                      <ShieldCheckGlyph size={24} />
-                      <span className="damage-status-text safe">{isZh ? '100% 完好无损' : '100% Intact'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldAlertGlyph size={24} />
-                      <span className="damage-status-text damaged">
-                        {isZh ? `受损 ${damagePercentText}` : `Damage ${damagePercentText}`}
-                      </span>
-                    </>
-                  )}
-                </div>
-                {estimatedDeduction > 0 ? (
-                  <div className="deduction-warn">
-                    {isZh
-                      ? `预估扣除运费: -${estimatedDeduction.toLocaleString()} €`
-                      : `Penalty: -${estimatedDeduction.toLocaleString()} €`}
-                  </div>
-                ) : (
-                  <div className="damage-safe-sub">{isZh ? '交付无扣款风险' : 'Zero payout penalty'}</div>
-                )}
-              </div>
-            </div>
+            <span className="next-break-timer">{hos.restDueText}</span>
           </div>
-        </section>
-
-        {/* =================================================================
-            3. 卡车车况检测 (Vehicle Health & Component Wear ONLY)
-            ================================================================= */}
-        <section className="hud-card card-vehicle-condition">
-          <div className="card-header-line">
-            <div className="card-title-badge">
-              <EngineCheckGlyph size={20} color="#34d399" />
-              <h2 className="panel-title">{isZh ? '卡车车况检测' : 'Vehicle Health & Condition'}</h2>
-            </div>
-            <span className="truck-model-pill">{truckTitle}</span>
-          </div>
-
-          <div className="condition-body">
-            {/* Top: 综合车况核心指标 */}
-            <div className="overall-health-card">
-              <div className="health-lead-group">
-                <div className={`health-dial-ring rating-${overallHealth.rating}`}>
-                  <span className="health-score-huge">{overallHealth.score}</span>
-                  <span className="health-unit">%</span>
-                </div>
-                <div className="health-dial-text">
-                  <div className="hdial-kicker">{isZh ? '机件综合健康度' : 'Overall Health Rating'}</div>
-                  <div className={`hdial-rating rating-${overallHealth.rating}`}>
-                    {overallHealth.rating === 'excellent' &&
-                      (isZh ? '车况优良 · 性能处于最佳状态' : 'Excellent Condition')}
-                    {overallHealth.rating === 'good' && (isZh ? '车况良好 · 各机件工况正常' : 'Good Condition')}
-                    {overallHealth.rating === 'fair' && (isZh ? '需要维保 · 注意核心机件磨损' : 'Needs Service')}
-                    {overallHealth.rating === 'critical' &&
-                      (isZh ? '严重损耗 · 建议立即进站检修' : 'Critical Wear Alert')}
-                  </div>
-                </div>
-              </div>
-              <span className={`health-status-badge rating-${overallHealth.rating}`}>
-                {overallHealth.rating === 'excellent' && (isZh ? '状态极佳' : 'Optimal')}
-                {overallHealth.rating === 'good' && (isZh ? '工况正常' : 'Normal')}
-                {overallHealth.rating === 'fair' && (isZh ? '注意保养' : 'Warning')}
-                {overallHealth.rating === 'critical' && (isZh ? '建议检修' : 'Urgent')}
-              </span>
-            </div>
-
-            {/* Bottom: 各核心机件损耗条 (6 Components expanding to fully utilize space) */}
-            <div className="wear-grid-list">
-              {truckWears.map((item) => (
-                <div key={item.name} className="wear-item">
-                  <div className="witem-header">
-                    <div className="witem-name-group">
-                      <span className={`witem-dot grade-${item.grade}`} />
-                      <span className="wname">{item.name}</span>
-                    </div>
-                    <span className={`wval grade-${item.grade}`}>{item.percentText}</span>
-                  </div>
-                  <div className="wbar-track">
-                    <div
-                      className={`wbar-fill grade-${item.grade}`}
-                      style={{ width: `${Math.max(4, item.fraction * 100)}%` }}
-                    />
-                  </div>
-                  <div className="witem-footer">
-                    <span className="witem-sub-label">{isZh ? '损耗状态' : 'Condition'}</span>
-                    <span className={`witem-tag grade-${item.grade}`}>
-                      {item.grade === 'good' && (isZh ? '正常' : 'Good')}
-                      {item.grade === 'warn' && (isZh ? '预警' : 'Caution')}
-                      {item.grade === 'bad' && (isZh ? '需检修' : 'Service')}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* =================================================================
-            4. 驾驶工时与疲劳规划 (HOS Rest Countdown & Fatigue Planning)
-            ================================================================= */}
-        <section className="hud-card card-hos-fatigue">
-          <div className="card-header-line">
-            <div className="card-title-badge">
-              <BedRestGlyph size={20} />
-              <h2 className="panel-title">{isZh ? '驾驶工时与疲劳规划' : 'HOS & Fatigue Planning'}</h2>
-            </div>
-            <span className={`fatigue-badge level-${hos.level}`}>
-              {hos.level === 'fresh' && (isZh ? '精力充沛' : 'Rested')}
-              {hos.level === 'normal' && (isZh ? '工时正常' : 'Normal')}
-              {hos.level === 'tired' && (isZh ? '疲劳警示' : 'Fatigued')}
-            </span>
-          </div>
-
-          <div className="hos-body">
-            {/* Hero Rest Timer & Tachograph Ring */}
-            <div className="hos-hero-cluster">
-              <TachographRing
-                fatiguePercent={hos.fatiguePercent}
-                level={hos.level}
-                restDueText={hos.restDueText}
-                size={76}
-              />
-
-              <div className="rest-timer-box">
-                <span className="rtimer-sub">{isZh ? '距强制休整剩余驾驶工时' : 'Mandatory Rest Due In'}</span>
-                <div className="huge-rest-timer">{hos.restDueText}</div>
-                <div className="rtimer-note">
-                  {isZh ? '卡车工时规范：连续驾驶上限 11小时' : 'Rule: 11h max continuous driving'}
-                </div>
-              </div>
-            </div>
-
-            {/* Journey Gantt Timeline */}
-            <div className="rest-timeline-bar-wrapper">
-              <div className="gantt-strip">
-                <div className="gsegment nav" style={{ flex: timeline.navRatio }} title="驾驶时间">
-                  <SpeedGlyph size={13} />
-                  <span>
-                    {isZh ? '航程' : 'Drive'} {formatDuration(timeline.navMinutes, isZh)}
-                  </span>
-                </div>
-
-                <div className="gsegment rest" style={{ flex: timeline.restRatio }} title="8小时法定休整">
-                  <BedRestGlyph size={13} />
-                  <span>{isZh ? '8h 休整' : '8h Rest'}</span>
-                </div>
-
-                {timeline.bufferRatio > 0 && (
-                  <div className="gsegment buffer" style={{ flex: timeline.bufferRatio }} title="时效富余">
-                    <span>{isZh ? '时效富余' : 'Buffer'}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="gantt-strip-labels">
-                <span>{isZh ? '当前' : 'Now'}</span>
-                <span>{isZh ? '中途休整点' : 'Rest Stop'}</span>
-                <span>{isZh ? '交单截止' : 'Deadline'}</span>
-              </div>
-            </div>
-
-            {/* Smart Dispatch Advice */}
-            <div className={`smart-advice-pill ${hos.needRestEnRoute ? 'warning' : 'safe'}`}>
-              <div className="advice-icon-cell">
-                {hos.needRestEnRoute ? <ShieldAlertGlyph size={18} /> : <ShieldCheckGlyph size={18} />}
-              </div>
-              <div className="advice-msg">
-                {hos.needRestEnRoute
-                  ? isZh
-                    ? '驾驶工时不足以直达，建议在沿途服务区休整 8 小时，避免违规罚款。'
-                    : 'Remaining hours insufficient. Plan an 8h sleep break at next service plaza.'
-                  : isZh
-                    ? '可用工时充裕，无需中途进站休整，可一趟直达目的地交付！'
-                    : 'Driving hours ample. Direct non-stop delivery feasible without rest.'}
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
+          <div className="next-break-subtext">{nextBreakSubtitle}</div>
+        </div>
+      </section>
     </section>
   )
 }
