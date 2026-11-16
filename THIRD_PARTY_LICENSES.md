@@ -326,6 +326,7 @@ each printed once with the libraries it covers. Written for each release by the 
 | scheduler | 0.28.0 | MIT | npm package |
 | tinyqueue | 3.0.0 | ISC | npm package |
 | zustand | 5.0.15 | MIT | npm package |
+| hls.js (light bundle) | 1.7.4 | Apache-2.0 | Vendored JavaScript |
 
 Packages that carry no licence file of their own (their licence is as listed above): alloc-stdlib 0.3.0, i_key_sort 0.12.0, i_overlay 9.1.0, lofty 0.25.5, lofty_attr 0.13.0, ogg_pager 0.8.0, selectors 0.38.0, webview2-com 0.39.1, webview2-com-macros 0.8.1, webview2-com-sys 0.39.1, murmurhash-js 1.0.0.
 
@@ -348,7 +349,7 @@ AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### 2. Used by adler2 2.0.1, cargo-platform 0.1.9
+### 2. Used by adler2 2.0.1, cargo-platform 0.1.9, hls.js 1.7.4
 
 ```
 Apache License

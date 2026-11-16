@@ -3,6 +3,13 @@
 What changed in each release of WestPlay. The newest release's notes are what the app shows when it offers the
 update.
 
+## 2.3.0-domestic.2 国内定制版 / Domestic Edition (2026-11-16)
+- 新增电台 App：喜马拉雅真实电台目录、地区与类型筛选、分页、本地收藏，以及北京时间昨天/今天/明天节目表。
+- 电台与喜马拉雅点播共用音频宿主、媒体元素和音效链路；支持 HLS 直播、循环切台、断流有限重连和过期请求隔离，继续参与全局媒体互斥、游戏暂停及断电停止。
+- 修复连接中自动暂停引发的递归调用，以及游戏已暂停时手动播放电台无响应；更新喜马拉雅浏览、专辑详情、节目列表和播放界面。
+- 整合全屏导航、路线进度与北向概览、双卡货运 HUD 及中文本地化，补全新增车型与大屏平板适配。
+- Adds live radio with a shared Ximalaya audio session, refreshed Ximalaya browsing, playback fixes, and the latest navigation, freight HUD and screen support. Upgrade manually; existing user data is preserved.
+
 ## 2.3.0-domestic.1 国内定制版 / Domestic Edition (2026-11-12)
 - 同步上游 2.3.0：Safari、全屏亮度、卡车收费通道与称重站导航、主页与平板适配、键盘与视频显示、图形工具兼容及引擎生命周期修复。
 - 保留国内平台、货运 HUD、信号灯倒计时、车道引导、全程路线概览和 30 秒闲置资源回收；Safari 参与播放互斥与游戏暂停，沿用上游标签恢复机制。

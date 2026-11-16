@@ -10,7 +10,8 @@
       "../target/release/westplay-maps.exe": "westplay-maps.exe",
       "../LICENSE": "LICENSE.txt",
       "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
-      "../THIRD_PARTY_LICENSES.md": "THIRD_PARTY_LICENSES.md"
+      "../THIRD_PARTY_LICENSES.md": "THIRD_PARTY_LICENSES.md",
+      "../crates/host/src/ximalaya_hls.LICENSE": "licenses/hls.js.LICENSE"
     },
     "windows": {
       "nsis": {
