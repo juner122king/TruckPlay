@@ -164,6 +164,7 @@ export const words: CompanionWords = {
     inCab: 'In the cab',
     built: 'Prepared {date}',
     notBuilt: 'Not prepared yet',
+    olderMap: 'Using an older map; roads may differ from the game',
     profiles: 'Your Profiles',
     checking: 'Looking at your profiles…',
     gameStopped: {

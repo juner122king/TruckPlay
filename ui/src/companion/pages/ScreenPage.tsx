@@ -1,3 +1,4 @@
+import { companionMapCacheNotice } from '../../cabin/maps/cacheNotice'
 import { GAME_KINDS, GAME_NAMES } from '../setup'
 import { setWestplayOpen } from '../useHostStatus'
 import { Group, Note, Panel, Row, Status, Switch, Tick } from '../room/parts'
@@ -88,6 +89,9 @@ export function ScreenPage({ status, settings, setup, cw }: PageProps) {
           }
         />
       </Group>
+      {status && companionMapCacheNotice(status.map.state, Boolean(status.mapFolder), 'zh_cn') && (
+        <Note tone="calm">{cw.map.olderMap}</Note>
+      )}
       {status?.gameElevated && (
         <Note tone="bad">
           <b>{w.elevated.title}</b> {w.elevated.text}

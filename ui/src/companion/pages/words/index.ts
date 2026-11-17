@@ -169,6 +169,7 @@ export interface CompanionWords {
     /** `{date}` */
     built: string
     notBuilt: string
+    olderMap: string
     profiles: string
     checking: string
     /** The sheet saying a map's preparation stopped: the game started while it was prepared (`GameStoppedSheet`). */

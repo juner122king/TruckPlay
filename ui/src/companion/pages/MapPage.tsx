@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react'
 import { hvtMapMessage } from '../../cabin/maps/blockedMap'
-import { Button, Group, MapProgress, Note, Panel, Row, Switch, Tick } from '../room/parts'
+import { companionMapCacheNotice } from '../../cabin/maps/cacheNotice'
+import { Button, Group, MapProgress, Note, Panel, Row, Status, Switch, Tick } from '../room/parts'
 import { GAME_NAMES, prepareMaps } from '../setup'
 import { banner, WordsContext } from '../room/room'
 import { GLOW, ON_SCREEN, useScreenAt, useTour } from '../room/screen'
@@ -73,6 +74,13 @@ export function MapPage(props: PageProps) {
             ? cw.map.titles.noGame
             : cw.map.titles.ready
   const built = status?.mapBuilt
+  const builtText = built
+    ? cw.map.built.replace(
+        '{date}',
+        new Intl.DateTimeFormat(words.locale, { dateStyle: 'medium' }).format(new Date(built * 1000)),
+      )
+    : cw.map.notBuilt
+  const olderMapNotice = companionMapCacheNotice(map.state, Boolean(status?.mapFolder), code)
   // A map being made: the button waits for it. Once asked, it turns until a map is being made, or for a moment
   // (the game open, the maps wait for it to close).
   const [asked, setAsked] = useState(false)
@@ -117,19 +125,13 @@ export function MapPage(props: PageProps) {
       {(building || (watched && finished)) && (
         <MapProgress shown={shown} stage={building?.stage ?? null} finished={!building && finished} />
       )}
-      {map.state === 'ready' && !watched && !building && (
+      {(map.state === 'ready' || olderMapNotice) && !watched && !building && (
         <Group place={4}>
           <Row
             title={cw.map.inCab}
-            detail={
-              built
-                ? cw.map.built.replace(
-                    '{date}',
-                    new Intl.DateTimeFormat(words.locale, { dateStyle: 'medium' }).format(new Date(built * 1000)),
-                  )
-                : cw.map.notBuilt
-            }
-            accessory={<Tick done />}
+            detail={olderMapNotice ? (built ? `${builtText} · ${olderMapNotice}` : olderMapNotice) : builtText}
+            wrap={Boolean(olderMapNotice)}
+            accessory={olderMapNotice ? <Status tone="busy" /> : <Tick done />}
           />
         </Group>
       )}

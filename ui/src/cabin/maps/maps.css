@@ -63,9 +63,8 @@
   -webkit-text-stroke-color: rgb(55 77 100 / 0.9);
 }
 
-/* The Maps app's buttons (MapControls.tsx): at the right edge, glass a little denser than elsewhere so it
-   reads over the busy map, as the ETA pill does. Recentre appears above the zoom pair once the map has
-   been moved away from the truck. */
+/* The Maps app's buttons (MapControls.tsx): at the right edge, dense frosted glass so they read crisply
+   over the busy map. Recentre appears above the zoom pair once the map has been moved away from the truck. */
 .map-controls {
   position: absolute;
   right: 22px;
@@ -73,17 +72,25 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .map-controls .glass {
   color: #fff;
-  background: rgb(20 22 26 / 0.55);
+  background: rgb(20 23 28 / 0.72);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    var(--shadow-raised-large);
 }
 
 .appearance-light .map-controls .glass {
   color: #14161a;
-  background: rgb(255 255 255 / 0.78);
+  background: rgb(255 255 255 / 0.84);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.88),
+    var(--shadow-raised-large);
 }
 
 .map-control {
@@ -91,6 +98,18 @@
   place-items: center;
   width: 64px;
   height: 64px;
+  border-radius: 50%;
+  transition:
+    background-color 160ms var(--motion-ease),
+    scale 150ms var(--motion-ease);
+}
+
+.map-control:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.appearance-light .map-control:hover {
+  background: rgb(0 0 0 / 0.06);
 }
 
 .map-control svg {
@@ -100,10 +119,15 @@
   stroke: currentColor;
   stroke-width: 2.6;
   stroke-linecap: round;
+  transition: scale 150ms var(--motion-ease);
+}
+
+.map-control:active {
+  scale: 0.93;
 }
 
 .map-control:active svg {
-  scale: 0.88;
+  scale: 0.92;
 }
 
 .map-zoom {
@@ -111,13 +135,18 @@
   flex-direction: column;
   align-items: center;
   border-radius: 32px;
+  overflow: hidden;
+}
+
+.map-zoom .map-control {
+  border-radius: 0;
 }
 
 .map-zoom-divider {
-  width: 34px;
+  width: 36px;
   height: 1.5px;
   background: currentColor;
-  opacity: 0.2;
+  opacity: 0.18;
 }
 
 /* Round, and blue like the puck it brings back. */
@@ -128,7 +157,8 @@
   pointer-events: none;
   transition:
     opacity 220ms var(--motion-ease),
-    scale 300ms var(--motion-ease);
+    scale 300ms var(--motion-ease),
+    background-color 160ms var(--motion-ease);
 }
 
 .map-controls .map-recentre {
@@ -141,6 +171,10 @@
   pointer-events: auto;
 }
 
+.map-recentre.shown:active {
+  scale: 0.92;
+}
+
 .map-recentre svg {
   stroke: none;
 }
@@ -151,10 +185,21 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
+  transition:
+    background-color 160ms var(--motion-ease),
+    scale 150ms var(--motion-ease);
 }
 
-.map-compass:active .map-compass-dial svg {
-  scale: 0.88;
+.map-compass:hover {
+  background: rgb(255 255 255 / 0.78);
+}
+
+.appearance-dark .map-compass:hover {
+  background: rgb(32 36 44 / 0.82);
+}
+
+.map-compass:active {
+  scale: 0.93;
 }
 
 .map-compass-dial,
@@ -163,14 +208,23 @@
   height: 100%;
 }
 
+.map-compass-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  opacity: 0.16;
+}
+
 .map-compass-north {
   fill: #ff453a;
 }
 
+/* Fixed in the 44x44 SVG coordinate space so large --text-scale settings never overflow the dial. */
 .map-compass text {
   fill: currentColor;
-  font-size: calc(17px * var(--text-scale, 1));
-  font-weight: 600;
+  font-size: 15.5px;
+  font-weight: 760;
+  letter-spacing: -0.02em;
 }
 
 /* The end of the GPS route: a red pin with a flag, as Apple's destination. */
@@ -196,8 +250,10 @@
    and away as the next rises in, the "then" row opens and closes, and the card fades away when the route
    ends (the durations: STEP_CHANGE_MS and CLOSE_MS). */
 .guidance {
-  --glass: #0d6266;
-  --glass-rim: rgb(183 237 229 / 0.35);
+  --glass: linear-gradient(160deg, rgb(15 110 116 / 0.88) 0%, rgb(10 78 84 / 0.94) 100%);
+  --glass-rim: rgb(200 248 242 / 0.36);
+  background: var(--glass);
+  backdrop-filter: blur(32px) saturate(180%);
   color: #fff;
   animation: guidance-open var(--motion-spring-duration) var(--motion-ease) both;
 }
@@ -300,11 +356,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgb(255 255 255 / 0.25);
-  font-size: calc(22px * var(--text-scale, 1));
-  font-weight: 600;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgb(255 255 255 / 0.2);
+  font-size: calc(21px * var(--text-scale, 1));
+  font-weight: 640;
+  color: rgb(235 252 250 / 0.92);
 }
 
 /* In the Maps app: a banner over the map's top left. */
@@ -313,31 +370,34 @@
   left: 22px;
   top: 22px;
   max-width: min(520px, 56%);
-  padding: 18px 26px;
+  padding: 18px 24px;
   border-radius: 30px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  box-shadow:
+    inset 0 1.5px 0 var(--glass-rim),
+    inset 0 -1px 0 rgb(255 255 255 / 0.08),
+    0 12px 32px rgb(0 0 0 / 0.32);
 }
 .map-navigation .guidance-banner {
   left: var(--content-left);
-  top: var(--edge);
-  max-width: min(520px, calc(100% - var(--content-left) - 130px));
+  top: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  max-width: min(500px, calc(100% - var(--content-left) - var(--edge) - 210px));
 }
 
-/* Search (MapSearch.tsx): a round button over the map's top left, opening the search panel there. Dark glass
-   over the map like the map's other buttons. */
+/* Search (MapSearch.tsx): a round button over the map, opening the search panel. Dense glass matching map controls. */
 .map-tile .map-search-button,
 .map-tile .map-search {
   position: absolute;
   color: #fff;
-  background: rgb(20 22 26 / 0.55);
+  background: rgb(20 23 28 / 0.72);
+  backdrop-filter: blur(28px) saturate(180%);
 }
 
 .appearance-light .map-tile .map-search-button,
 .appearance-light .map-tile .map-search {
   color: #14161a;
-  background: rgb(255 255 255 / 0.78);
+  background: rgb(255 255 255 / 0.84);
 }
 
 .map-tile .map-search-button {
@@ -348,6 +408,19 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    var(--shadow-raised-large);
+  transition:
+    background-color 160ms var(--motion-ease),
+    scale 150ms var(--motion-ease);
+}
+
+.appearance-light .map-tile .map-search-button {
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.88),
+    var(--shadow-raised-large);
 }
 
 .map-tile .map-search-button.guided {
@@ -358,10 +431,23 @@
 .map-tile .map-search-button svg {
   width: 30px;
   height: 30px;
+  transition: scale 150ms var(--motion-ease);
+}
+
+.map-tile .map-search-button:hover {
+  background: rgb(32 36 44 / 0.82);
+}
+
+.appearance-light .map-tile .map-search-button:hover {
+  background: rgb(255 255 255 / 0.94);
+}
+
+.map-tile .map-search-button:active {
+  scale: 0.93;
 }
 
 .map-tile .map-search-button:active svg {
-  scale: 0.88;
+  scale: 0.92;
 }
 
 .map-tile .map-search {
@@ -1082,29 +1168,33 @@
 .guidance-distance-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .guidance-signal {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 16px 6px 14px;
+  gap: 8px;
+  padding: 5px 13px 5px 10px;
   border-radius: 9999px;
-  background: rgb(0 0 0 / 0.45);
-  border: 2px solid rgb(255 255 255 / 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  font-size: calc(26px * var(--text-scale, 1));
-  font-weight: 800;
+  background: rgb(8 20 24 / 0.56);
+  border: 1.5px solid rgb(255 255 255 / 0.24);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: calc(21px * var(--text-scale, 1));
+  font-weight: 780;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 3px 10px rgb(0 0 0 / 0.45);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 4px 12px rgb(0 0 0 / 0.28);
 }
 
 .guidance-signal-dot {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -1112,61 +1202,75 @@
 .guidance-signal.traffic-green .guidance-signal-dot {
   background-color: #34c759;
   box-shadow:
-    0 0 10px #34c759,
-    0 0 18px rgb(52 199 89 / 0.95);
+    0 0 8px #34c759,
+    0 0 16px rgb(52 199 89 / 0.9);
 }
 
 .guidance-signal.traffic-yellow .guidance-signal-dot {
   background-color: #ff9f0a;
   box-shadow:
-    0 0 10px #ff9f0a,
-    0 0 18px rgb(255 159 10 / 0.95);
+    0 0 8px #ff9f0a,
+    0 0 16px rgb(255 159 10 / 0.9);
 }
 
 .guidance-signal.traffic-red .guidance-signal-dot {
   background-color: #ff3b30;
   box-shadow:
-    0 0 10px #ff3b30,
-    0 0 18px rgb(255 59 48 / 0.95);
+    0 0 8px #ff3b30,
+    0 0 16px rgb(255 59 48 / 0.9);
 }
 
 .guidance-signal.traffic-red-amber .guidance-signal-dot {
   background: linear-gradient(135deg, #ff3b30 50%, #ff9f0a 50%);
   box-shadow:
-    0 0 10px #ff9f0a,
-    0 0 18px rgb(255 159 10 / 0.95);
+    0 0 8px #ff9f0a,
+    0 0 16px rgb(255 159 10 / 0.9);
 }
 
-/* Navigation information hierarchy: teal instruction, inset lane ribbon, quiet secondary step. */
+/* Navigation information hierarchy: highway-teal glass, recessed lane ribbon, quiet secondary step. */
 .appearance-dark .guidance {
-  --glass: #124c53;
-  --glass-rim: rgb(172 219 220 / 0.22);
+  --glass: linear-gradient(160deg, rgb(18 90 96 / 0.9) 0%, rgb(10 60 66 / 0.95) 100%);
+  --glass-rim: rgb(172 228 226 / 0.28);
 }
 .guidance-instruction {
   text-wrap: pretty;
   overflow-wrap: anywhere;
 }
 .guidance-step > div {
+  flex: 1;
   min-width: 0;
 }
 .lane-guidance {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  background: rgb(0 28 32 / 0.25);
-  border-radius: 15px;
-  padding: 8px 12px;
+  gap: 2px;
+  background: rgb(0 22 26 / 0.34);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.28),
+    inset 0 0 0 1px rgb(255 255 255 / 0.1);
+  border-radius: 18px;
+  padding: 7px 10px;
   margin-top: 14px;
 }
 .lane-guidance-lane {
   position: relative;
-  color: rgb(207 235 235 / 0.34);
-  padding: 0 7px 4px;
+  color: rgb(207 238 238 / 0.34);
+  padding: 3px 8px 6px;
   flex: 0 1 64px;
   min-width: 0;
+  border-radius: 11px;
+  transition:
+    background-color 180ms var(--motion-ease),
+    color 180ms var(--motion-ease);
 }
-.lane-guidance-lane + .lane-guidance-lane {
-  border-left: 1px dashed rgb(210 240 240 / 0.12);
+.lane-guidance-lane + .lane-guidance-lane::before {
+  content: '';
+  position: absolute;
+  left: -1.5px;
+  top: 18%;
+  bottom: 18%;
+  border-left: 1px dashed rgb(210 242 242 / 0.16);
 }
 .lane-guidance-lane svg {
   display: block;
@@ -1182,18 +1286,21 @@
 }
 .lane-guidance-lane.recommended {
   color: #fff;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, rgb(158 245 223 / 0.18) 100%);
 }
 .lane-guidance-lane.recommended svg {
   stroke-width: 4;
+  filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.28));
 }
 .lane-recommended-mark {
   position: absolute;
-  width: 14px;
-  height: 3px;
-  bottom: 0;
-  left: calc(50% - 7px);
+  width: 18px;
+  height: 3.5px;
+  bottom: 2px;
+  left: calc(50% - 9px);
   border-radius: 2px;
-  background: #a6f2df;
+  background: #9ef5df;
+  box-shadow: 0 0 8px rgb(158 245 223 / 0.65);
 }
 .guidance-widget .lane-guidance {
   margin-top: 10px;
@@ -1209,33 +1316,30 @@
   font-size: calc(22px * var(--text-scale, 1));
 }
 .map-navigation .map-controls {
-  right: calc(var(--edge) + 6px);
-  bottom: calc(var(--edge) + 8px);
+  right: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  bottom: calc(var(--edge) + var(--nav-corner-inset, 8px));
 }
 .map-navigation .map-search-button,
 .map-navigation .map-search-button.guided {
   left: auto;
-  right: calc(var(--edge) + 86px);
+  right: calc(var(--edge) + var(--nav-corner-inset, 8px) + 78px);
   top: auto;
-  bottom: calc(var(--edge) + 8px);
+  bottom: calc(var(--edge) + var(--nav-corner-inset, 8px));
 }
 .map-controls .map-overview.selected {
-  background: #1266e9;
+  background: #0a84ff;
   color: #fff;
 }
 @container carplay (max-height: 520px) {
   .map-navigation .map-controls {
-    gap: 10px;
-    right: calc(var(--edge) + 6px);
-    bottom: calc(var(--edge) + 8px);
+    gap: 8px;
+    right: calc(var(--edge) + var(--nav-corner-inset, 6px));
+    bottom: calc(var(--edge) + var(--nav-corner-inset, 6px));
   }
-  .map-navigation .map-control {
+  .map-navigation .map-control,
+  .map-navigation .map-compass {
     width: 48px;
     height: 48px;
-  }
-  .map-navigation .map-compass {
-    width: 36px;
-    height: 36px;
   }
   .map-navigation .map-zoom {
     border-radius: 24px;
@@ -1246,30 +1350,31 @@
   }
   .map-navigation .guidance-banner {
     left: var(--content-left);
-    top: var(--edge);
-    padding: 14px 18px;
-    max-width: min(460px, calc(100% - var(--content-left) - 110px));
+    top: calc(var(--edge) + var(--nav-corner-inset, 6px));
+    padding: 13px 18px;
+    max-width: min(440px, calc(100% - var(--content-left) - var(--edge) - 160px));
   }
   .map-navigation .guidance-distance {
-    font-size: calc(34px * var(--text-scale, 1));
+    font-size: calc(32px * var(--text-scale, 1));
   }
   .map-navigation .guidance-instruction {
-    font-size: calc(21px * var(--text-scale, 1));
+    font-size: calc(20px * var(--text-scale, 1));
   }
   .map-navigation .maneuver-glyph {
-    width: 52px;
-    height: 52px;
+    width: 50px;
+    height: 50px;
   }
   .map-navigation .lane-guidance {
     padding: 5px 8px;
-    margin-top: 10px;
+    margin-top: 9px;
   }
   .map-navigation .lane-guidance-lane svg {
-    height: 32px;
+    height: 30px;
   }
-  .map-navigation .map-search-button {
-    right: calc(var(--edge) + 68px);
-    bottom: calc(var(--edge) + 8px);
+  .map-navigation .map-search-button,
+  .map-navigation .map-search-button.guided {
+    right: calc(var(--edge) + var(--nav-corner-inset, 6px) + 60px);
+    bottom: calc(var(--edge) + var(--nav-corner-inset, 6px));
     width: 48px;
     height: 48px;
   }

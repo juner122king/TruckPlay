@@ -16,22 +16,16 @@ describe('2.4.0-domestic.1 domestic edition integration', () => {
     vi.clearAllMocks()
   })
 
-  it('keeps the domestic apps, freight and existing retained players, not removed services', () => {
+  it('keeps the released domestic apps, freight and existing retained players, while hiding deferred ones', () => {
     expect(RELEASED_APP_IDS).toEqual(
-      expect.arrayContaining([
-        'netease',
-        'bilibili',
-        'ximalaya',
-        'radio',
-        'douyin',
-        'hongguo',
-        'freight',
-        'safari',
-        'music',
-        'youtube',
-        'player',
-      ]),
+      expect.arrayContaining(['netease', 'bilibili', 'radio', 'freight', 'safari', 'music', 'youtube', 'player']),
     )
+    expect(RELEASED_APP_IDS).not.toContain('ximalaya')
+    expect(RELEASED_APP_IDS).not.toContain('douyin')
+    expect(RELEASED_APP_IDS).not.toContain('hongguo')
+    expect(isAppId('ximalaya')).toBe(true)
+    expect(isAppId('douyin')).toBe(true)
+    expect(isAppId('hongguo')).toBe(true)
     expect(isAppId('spotify')).toBe(false)
     expect(isAppId('youtubeMusic')).toBe(false)
   })

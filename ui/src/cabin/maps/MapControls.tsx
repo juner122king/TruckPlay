@@ -141,8 +141,9 @@ function MapCompass({ label }: { label: string }) {
     <button type="button" className="map-compass glass" aria-label={label} onClick={northUpLiveMap}>
       <div ref={dial} className="map-compass-dial">
         <svg viewBox="0 0 44 44" aria-hidden="true">
-          <path className="map-compass-north" d="M22 3.5 25.5 10h-7Z" />
-          <text x="22" y="27.5" textAnchor="middle">
+          <circle className="map-compass-ring" cx="22" cy="22" r="18" />
+          <path className="map-compass-north" d="M22 4 25.4 10.8h-6.8Z" />
+          <text x="22" y="28" textAnchor="middle">
             N
           </text>
         </svg>

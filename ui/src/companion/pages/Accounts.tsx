@@ -4,7 +4,7 @@ import type { Note, Words } from '../onboarding/words'
 import { Button, Checking, Group, Panel, Row } from '../room/parts'
 import { banner, useSignOut, useWords } from '../room/room'
 import { GLOW, useScreenAt } from '../room/screen'
-import type { AppId } from '../../cabin/state/apps'
+import { type AppId, isReleasedApp } from '../../cabin/state/apps'
 import {
   type HostStatus,
   appleMusicSignIn,
@@ -103,7 +103,8 @@ const SERVICES: Record<
   },
 }
 
-const ORDER: Service[] = ['youtube', 'netease', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'appleMusic']
+const ALL_SERVICES: Service[] = ['youtube', 'netease', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'appleMusic']
+const ORDER: Service[] = ALL_SERVICES.filter((service) => isReleasedApp(SERVICES[service].app))
 
 /**
  * The services WestPlay plays from, each signed in (in its own window, on the desktop) or not. WestPlay only

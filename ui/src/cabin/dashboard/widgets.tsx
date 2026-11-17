@@ -28,6 +28,7 @@ import {
 import { playOrPause as playOrPausePlayer, skip as skipPlayer, usePlayer, usePlayerSource } from '../apps/player/player'
 import type { MediaAction, MediaSource } from '../../shared/media'
 import { useLook } from '../state/hooks'
+import { isReleasedApp } from '../state/apps'
 import { go, useCabin } from '../state/store'
 import { useMapData } from '../maps/mapData'
 import { useLive } from '../state/store'
@@ -89,7 +90,7 @@ function XimalayaWidget({ ximalaya }: { ximalaya: NonNullable<ReturnType<typeof 
       artwork={ximalaya.artwork}
       onOpen={() => {
         useXimalaya.setState({ nowPlaying: true })
-        go({ type: 'openApp', app: ximalaya.radio ? 'radio' : 'ximalaya' })
+        go({ type: 'openApp', app: ximalaya.radio || !isReleasedApp('ximalaya') ? 'radio' : 'ximalaya' })
       }}
       onControl={(action) => {
         if (action === 'playPause') playOrPauseXimalaya()

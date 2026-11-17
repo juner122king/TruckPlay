@@ -1,5 +1,6 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { type SignedIn, useAskOnce, useSignedIn } from './accounts'
+import { isReleasedApp } from '../cabin/state/apps'
 import { appVersion, call, PREVIEW_TUTORIAL } from './bridge'
 import { Onboarding } from './onboarding/Onboarding'
 import { chosenLanguage, percent, type Words, wordsFor } from './onboarding/words'
@@ -441,14 +442,14 @@ function SectionList({
       signedIn.youtube === null &&
       signedIn.appleMusic === null &&
       signedIn.bilibili === null &&
-      signedIn.ximalaya === null &&
+      (!isReleasedApp('ximalaya') || signedIn.ximalaya === null) &&
       signedIn.netease === null
         ? ''
         : [
             signedIn.youtube && 'YouTube',
             signedIn.appleMusic && 'Apple Music',
             signedIn.bilibili && '哔哩哔哩',
-            signedIn.ximalaya && '喜马拉雅',
+            isReleasedApp('ximalaya') && signedIn.ximalaya && '喜马拉雅',
             signedIn.netease && '网易云音乐',
           ]
             .filter(Boolean)

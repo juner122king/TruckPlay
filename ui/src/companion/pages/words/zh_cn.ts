@@ -157,6 +157,7 @@ export const words: CompanionWords = {
     inCab: '在驾驶室里',
     built: '准备于 {date}',
     notBuilt: '尚未准备',
+    olderMap: '正在使用旧地图，可能与游戏不一致',
     profiles: '档案',
     checking: '正在查看档案…',
     gameStopped: {

@@ -55,10 +55,11 @@ export function isAppId(value: unknown): value is AppId {
   return typeof value === 'string' && (APP_IDS as readonly string[]).includes(value)
 }
 
-/** Not in this release: Podcasts. Its id stays (its icon, players' icon sets), but it's not on Home, and a saved
- * screen or recent can't open it. (Phone and Messages are on Home, their windows saying they aren't ready yet:
+/** Not in this release: Podcasts, and temporarily hidden domestic apps (Ximalaya, Douyin, Hongguo). Their ids
+ * stay (icons, players' icon sets, and shared host plumbing), but they aren't on Home, and a saved screen or
+ * recent can't open them. (Phone and Messages are on Home, their windows saying they aren't ready yet:
  * owner 2026-11-03.) */
-const NEXT_RELEASE: ReadonlySet<AppId> = new Set<AppId>(['podcasts'])
+const NEXT_RELEASE: ReadonlySet<AppId> = new Set<AppId>(['podcasts', 'ximalaya', 'douyin', 'hongguo'])
 
 /** The apps this release has, in Home grid order. */
 export const RELEASED_APP_IDS: readonly AppId[] = APP_IDS.filter((id) => !NEXT_RELEASE.has(id))

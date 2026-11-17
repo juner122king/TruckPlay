@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isReleasedApp } from '../cabin/state/apps'
 import {
   type HostStatus,
   appleMusicCheck,
@@ -94,12 +95,12 @@ export function useSignedIn(status: HostStatus | null): SignedIn {
 export function useAskOnce(): void {
   useEffect(() => {
     const known = kept()
-    if (known.youtube === null) youtubeCheck().catch(() => {})
-    if (known.bilibili === null) bilibiliCheck().catch(() => {})
-    if (known.ximalaya === null) ximalayaCheck().catch(() => {})
-    if (known.douyin === null) douyinCheck().catch(() => {})
-    if (known.hongguo === null) hongguoCheck().catch(() => {})
-    if (known.netease === null) neteaseCheck().catch(() => {})
-    if (known.appleMusic === null) appleMusicCheck().catch(() => {})
+    if (known.youtube === null && isReleasedApp('youtube')) youtubeCheck().catch(() => {})
+    if (known.bilibili === null && isReleasedApp('bilibili')) bilibiliCheck().catch(() => {})
+    if (known.ximalaya === null && isReleasedApp('ximalaya')) ximalayaCheck().catch(() => {})
+    if (known.douyin === null && isReleasedApp('douyin')) douyinCheck().catch(() => {})
+    if (known.hongguo === null && isReleasedApp('hongguo')) hongguoCheck().catch(() => {})
+    if (known.netease === null && isReleasedApp('netease')) neteaseCheck().catch(() => {})
+    if (known.appleMusic === null && isReleasedApp('music')) appleMusicCheck().catch(() => {})
   }, [])
 }
