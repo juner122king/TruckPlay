@@ -8,7 +8,8 @@ export type BaseScreen = 'home' | 'dashboard'
 
 export interface NavigationState {
   route: Route
-  /** The apps in the order last used, newest first; the sidebar shows each kind's last ([`sidebarApps`]). */
+  /** The apps in the order last used, newest first; the sidebar pins Maps first and fills the rest from here
+   * ([`sidebarApps`]). */
   recents: AppId[]
   /** Home or the Dashboard, whichever was shown last: where the Home button leaves an app for. */
   base: BaseScreen
@@ -26,37 +27,37 @@ export type NavigationAction =
  * many others were opened since. */
 export const RECENTS_LIMIT = APP_IDS.length
 
-/**
- * The sidebar's slots, as CarPlay's (owner 2026-11-03): not the last opened apps but one app of each kind, the
- * last used of it: a maps app, a music app, Phone or Messages, and the fourth Calendar, Weather, Settings or Safari
- * (owner 2026-11-08). Each slot's apps, its first shown until another is used. A slot whose apps this release hasn't
- * is left out.
- */
-const SIDEBAR_SLOTS: readonly (readonly AppId[])[] = [
-  ['maps'],
-  ['music', 'netease', 'bilibili', 'ximalaya', 'radio', 'douyin', 'hongguo', 'player', 'podcasts'],
-  ['phone', 'messages'],
-  ['calendar', 'weather', 'settings', 'safari'],
-]
-
-/** At most this many: the fourth (Calendar, Weather, Settings or Safari) only where the screen has room
- * (`ScreenProfile.recents`). */
-export const SIDEBAR_SLOT_COUNT = SIDEBAR_SLOTS.length
-
-/** The sidebar's apps: each slot's last used (`recents`, newest first) or its first, at most `room`. */
-export function sidebarApps(recents: readonly AppId[], room: number): AppId[] {
-  const apps: AppId[] = []
-  for (const slot of SIDEBAR_SLOTS) {
-    const released = slot.filter(isReleasedApp)
-    if (released.length === 0) continue
-    apps.push(recents.find((app) => released.includes(app)) ?? released[0])
+/** Filters `apps` to unique released apps in their original order, at most `limit`. */
+export function uniqueReleasedApps(apps: readonly AppId[], limit: number): AppId[] {
+  if (limit <= 0) return []
+  const result: AppId[] = []
+  const seen = new Set<AppId>()
+  for (const app of apps) {
+    if (!isReleasedApp(app) || seen.has(app)) continue
+    seen.add(app)
+    result.push(app)
+    if (result.length >= limit) break
   }
-  return apps.slice(0, Math.min(room, SIDEBAR_SLOT_COUNT))
+  return result
+}
+
+/** The sidebar's apps: Maps pinned first, followed by the most recently used released apps (`recents`, newest first),
+ * at most `room`. */
+export function sidebarApps(recents: readonly AppId[], room: number): AppId[] {
+  if (room <= 0) return []
+  const pinned: AppId = 'maps'
+  return [
+    pinned,
+    ...uniqueReleasedApps(
+      recents.filter((app) => app !== pinned),
+      room - 1,
+    ),
+  ]
 }
 
 export const INITIAL_NAVIGATION: NavigationState = {
   route: { kind: 'dashboard' },
-  recents: ['maps', 'music', 'netease', 'bilibili', 'ximalaya', 'radio', 'douyin', 'hongguo', 'youtube'],
+  recents: ['maps', 'music', 'netease', 'bilibili', 'radio', 'youtube'],
   base: 'dashboard',
 }
 
@@ -79,6 +80,7 @@ export function homeButtonTarget(state: NavigationState): BaseScreen {
 export function navigate(state: NavigationState, action: NavigationAction): NavigationState {
   switch (action.type) {
     case 'openApp':
+      if (!isReleasedApp(action.app)) return state
       return {
         ...state,
         route: { kind: 'app', app: action.app },

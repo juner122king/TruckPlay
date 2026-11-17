@@ -94,8 +94,8 @@ export interface ScreenProfile {
   /** How large the sidebar's buttons (Home and Dashboard, the truck) are, their symbols with them, against their first
    * size ([`SIDEBAR_BUTTONS`] when not set): each stays as far from the sidebar's bottom at any size. */
   sidebarButtons?: number
-  /** How many of the sidebar's app slots fit (three when not set; `sidebarApps`, four at most): a tall screen's
-   * has room for the fourth, a short one's for fewer. */
+  /** How many recent apps the sidebar shows (three when not set; `sidebarApps`): a tall screen's has room for
+   * more, a short one's for fewer. */
   recents?: number
   /** A short sidebar's spacing (page units), tighter than every other screen's so its apps stay in its middle clear of
    * the clock and the buttons: between the apps (shell.css: 18), the Home symbol from the bottom (58.67), and between

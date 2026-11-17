@@ -8,9 +8,9 @@ import { useText } from '../state/text'
 import { cabClock } from '../../shared/host'
 
 /**
- * The CarPlay sidebar: clock and signal, an app of each kind (the last used maps app, music app...:
- * `sidebarApps`), and at the bottom the truck button (back to the truck's own screen, like CarPlay's car button)
- * and the Home button.
+ * The CarPlay sidebar: clock and signal, Maps pinned first followed by the most recently used apps
+ * (`sidebarApps`), and at the bottom the truck button (back to the truck's own screen, like CarPlay's car
+ * button) and the Home button.
  */
 export function Sidebar() {
   const recents = useCabin((state) => state.navigation.recents)

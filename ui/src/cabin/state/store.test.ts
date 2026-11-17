@@ -69,3 +69,42 @@ describe('the saved Text Size', () => {
     expect(useCabin.getState().textSize).toBe(DEFAULT_TEXT_SIZE)
   })
 })
+
+describe('the saved navigation recents', () => {
+  it('preserves real MRU order, deduplicates, and filters unreleased apps', async () => {
+    vi.stubGlobal(
+      'localStorage',
+      savedStorage(
+        {
+          navigation: {
+            route: { kind: 'dashboard' },
+            recents: ['freight', 'ximalaya', 'youtube', 'freight', 'settings', 'douyin', 'maps'],
+            base: 'dashboard',
+          },
+        },
+        3,
+      ),
+    )
+    const { useCabin } = await import('./store')
+    expect(useCabin.getState().navigation.recents).toEqual(['freight', 'youtube', 'settings', 'maps'])
+  })
+
+  it('falls back to initial recents if saved recents contain no released apps', async () => {
+    vi.stubGlobal(
+      'localStorage',
+      savedStorage(
+        {
+          navigation: {
+            route: { kind: 'dashboard' },
+            recents: ['ximalaya', 'douyin'],
+            base: 'dashboard',
+          },
+        },
+        3,
+      ),
+    )
+    const { useCabin } = await import('./store')
+    const { INITIAL_NAVIGATION } = await import('./navigation')
+    expect(useCabin.getState().navigation.recents).toEqual(INITIAL_NAVIGATION.recents)
+  })
+})

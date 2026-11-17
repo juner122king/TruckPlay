@@ -77,8 +77,10 @@ import {
   navigate,
   type NavigationAction,
   type NavigationState,
+  RECENTS_LIMIT,
   type Route,
   routeKey,
+  uniqueReleasedApps,
 } from './navigation'
 import { isIconStyle, setIcons, useLooks } from './looks'
 import type { OemMode } from './oem'
@@ -266,9 +268,10 @@ function sanitize(stored: Partial<Persisted> | undefined): Partial<Persisted> {
   const result: Partial<Persisted> = {}
   if (stored.navigation && isRoute(stored.navigation.route) && Array.isArray(stored.navigation.recents)) {
     const { route, recents, base } = stored.navigation
+    const cleanRecents = uniqueReleasedApps(recents, RECENTS_LIMIT)
     result.navigation = {
       route,
-      recents: recents.filter(isReleasedApp),
+      recents: cleanRecents.length > 0 ? cleanRecents : [...INITIAL_NAVIGATION.recents],
       // Saved before WestPlay remembered it: the screen shown, or the Dashboard (where it starts).
       base: base === 'home' || base === 'dashboard' ? base : route.kind === 'home' ? 'home' : 'dashboard',
     }
