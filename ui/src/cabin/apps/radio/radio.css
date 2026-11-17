@@ -1,510 +1,1694 @@
-.radio-app {
-  --radio-accent: #ff782e;
-  --radio-surface: color-mix(in srgb, var(--text) 5%, transparent);
-  --radio-line: color-mix(in srgb, var(--text) 10%, transparent);
+/* Radio: Apple CarPlay / iOS 26 style (matching apple.css & appleMusic.css), sized for the truck cabin. */
+
+.shell .radio-app,
+.shell .rd-now {
+  --rd-key: var(--apple-orange);
+  --rd-key-fill: color-mix(in srgb, var(--rd-key) 16%, transparent);
+  --rd-label: var(--apple-label);
+  --rd-dim: var(--apple-label-secondary);
+  --rd-faint: var(--apple-label-tertiary);
+  --rd-fill: var(--apple-fill-tertiary);
+  --rd-pressed: var(--apple-fill);
+  --rd-rule: var(--apple-separator);
+
+  --rd-tile: 196px;
+  --rd-corner: 16px;
+  --rd-corner-small: 10px;
+  --rd-bar: 76px;
+  --rd-bar-inset: max(0px, calc((var(--panel-radius) - var(--rd-bar) / 2) * var(--corner-inset)));
+  --rd-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 12px);
+  --rd-gutter: 24px;
+}
+
+.shell .radio-app,
+.shell .rd-now,
+.shell .rd-bar {
+  --rd-type-title: calc(46px * var(--text-scale, 1));
+  --rd-type-section: calc(28px * var(--text-scale, 1));
+  --rd-type-name: calc(22px * var(--text-scale, 1));
+  --rd-type-sub: calc(18px * var(--text-scale, 1));
+  --rd-type-label: calc(15px * var(--text-scale, 1));
+}
+
+.shell .radio-app {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-radius: var(--panel-radius);
   background: var(--app-background);
-  color: var(--text);
-  border-radius: 22px;
+  color: var(--rd-label);
+  isolation: isolate;
+  container-type: size;
+  container-name: radio;
 }
-.radio-app button {
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  border: 0;
-  background: transparent;
-  min-height: 44px;
-  flex-shrink: 0;
+
+.shell .radio-app button,
+.shell .rd-now button {
+  transition:
+    background-color 160ms var(--motion-ease),
+    color 160ms var(--motion-ease),
+    scale 150ms var(--motion-ease),
+    opacity 160ms var(--motion-ease);
 }
-.radio-app button:focus-visible,
-.radio-app input:focus-visible {
-  outline: 3px solid var(--radio-accent);
-  outline-offset: -3px;
+
+.shell .radio-app button.glass,
+.shell .rd-now button.glass {
+  background: var(--glass);
 }
-.radio-app button:disabled {
-  opacity: 0.3;
+
+.shell .radio-app button:focus-visible,
+.shell .rd-now button:focus-visible,
+.shell .rd-now input:focus-visible {
+  outline: 3px solid var(--rd-key);
+  outline-offset: 2px;
+}
+
+.shell .radio-app button:disabled,
+.shell .rd-now button:disabled {
+  opacity: 0.35;
   cursor: default;
 }
-.radio-app button:hover:not(:disabled) {
-  background-color: var(--radio-surface);
-}
-.radio-header {
+
+/* --- Floating Top Bar ----------------------------------------------------------------------------------- */
+
+.shell .rd-bar {
+  --text-scale: 1;
+  --rd-bar-inset: max(0px, calc((var(--panel-radius) - var(--rd-bar) / 2) * var(--corner-inset)));
+  position: relative;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 18px 28px;
-  border-bottom: 1px solid var(--radio-line);
-  flex-shrink: 0;
+  height: var(--rd-bar);
+  margin: var(--rd-bar-inset) var(--rd-bar-inset) 0;
+  padding-inline: 4px;
+  flex: none;
 }
-.radio-brand {
+
+.shell .rd-bar-side {
   display: flex;
-  gap: 12px;
   align-items: center;
+  min-width: 64px;
+  height: 100%;
 }
-.radio-mark {
-  width: 46px;
-  height: 46px;
+
+.shell .rd-bar-side.end {
+  justify-content: flex-end;
+}
+
+.shell .rd-round {
   display: grid;
   place-items: center;
-  color: var(--radio-accent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--radio-accent) 13%, transparent);
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--rd-label);
 }
-.radio-brand h1 {
-  font-size: 25px;
-  margin: 0;
-  font-weight: 650;
-  letter-spacing: 0.04em;
+
+.shell .rd-round:active {
+  scale: 0.93;
 }
-.radio-brand small {
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.12em;
+
+.shell .radio-app button.rd-round.on {
+  background: var(--rd-key);
+  color: #fff;
 }
-.radio-tabs {
-  display: flex;
-  gap: 8px;
-}
-.radio-tabs button {
-  padding: 8px 20px;
-  border-radius: 24px;
-  color: var(--text-dim);
-}
-.radio-tabs button[aria-current] {
-  color: var(--radio-accent);
-  background: color-mix(in srgb, var(--radio-accent) 12%, transparent);
-  font-weight: 650;
-}
-.radio-tabs span {
-  font-size: 12px;
-  opacity: 0.7;
-  margin-left: 5px;
-}
-.radio-content {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 0 28px 14px;
-  scrollbar-width: thin;
-}
-.radio-filter {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--radio-line);
-}
-.radio-filter-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-.radio-filter-row b {
-  font-size: 14px;
-  color: var(--text-dim);
-  line-height: 44px;
-  font-weight: 500;
-  flex: 0 0 42px;
-}
-.radio-filter-row > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-}
-.radio-filter-row button {
-  font-size: 14px;
-  padding: 0 12px;
-  border-radius: 10px;
-}
-.radio-filter-row button[aria-pressed='true'] {
-  color: var(--radio-accent);
-  font-weight: 650;
-  background: color-mix(in srgb, var(--radio-accent) 12%, transparent);
-}
-.radio-filter-row .radio-more {
-  color: var(--text-dim);
-}
-.radio-section-heading {
+
+.shell .rd-tab-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px 0 16px;
+  gap: 4px;
+  height: var(--rd-bar);
+  padding: 6px;
+  border-radius: calc(var(--rd-bar) / 2);
 }
-.radio-section-heading h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-.radio-section-heading > span {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-.radio-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 16px;
-}
-.radio-card {
-  border: 1px solid var(--radio-line);
-  border-radius: 14px;
-  overflow: hidden;
-  background: var(--radio-surface);
-  min-width: 0;
-}
-.radio-card.active {
-  border-color: var(--radio-accent);
-}
-.radio-card .radio-card-main {
-  width: 100%;
+
+.shell .rd-tab {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 18px 12px 9px;
+  justify-content: center;
+  gap: 2px;
+  min-width: 112px;
+  height: 100%;
+  padding-inline: 20px;
+  border-radius: calc((var(--rd-bar) - 12px) / 2);
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--rd-label);
+  white-space: nowrap;
+}
+
+.shell .rd-tab.on {
+  color: var(--rd-key);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.shell .rd-tab:active {
+  scale: 0.96;
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+}
+
+.shell .rd-tab-count {
+  margin-left: 5px;
+  font-style: normal;
+  font-size: 0.85em;
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Scrollable Body ------------------------------------------------------------------------------------ */
+
+.shell .rd-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-top: calc(-1 * (var(--rd-bar) + var(--rd-bar-inset)));
+  padding: calc(var(--rd-bar) + var(--rd-bar-inset) + 20px) max(var(--rd-gutter), var(--rd-corner-clear))
+    max(56px, var(--rd-corner-clear));
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    transparent calc(var(--rd-bar-inset) + 8px),
+    #000 calc(var(--rd-bar) + var(--rd-bar-inset) + 18px)
+  );
+}
+
+.shell .rd-scroll.has-mini {
+  padding-bottom: 136px;
+}
+
+.shell .rd-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .rd-page-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.shell .rd-title {
+  margin: 0;
+  font-size: var(--rd-type-title);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+}
+
+.shell .rd-count {
+  font-size: var(--rd-type-sub);
+  font-weight: 600;
+  color: var(--rd-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- Compact Filter Strip ------------------------------------------------------------------------------- */
+
+.shell .rd-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+
+.shell .rd-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding-inline: 2px 16px;
+  overflow-x: auto;
+  scroll-snap-type: inline proximity;
+  scroll-padding-inline: 20px;
+  scrollbar-width: none;
+}
+
+.shell .rd-chips.fade-right {
+  mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+}
+
+.shell .rd-chips.fade-left {
+  mask-image: linear-gradient(to right, transparent, #000 24px);
+}
+
+.shell .rd-chips.fade-left.fade-right {
+  mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 36px), transparent);
+}
+
+.shell .rd-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .rd-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 22px;
+  background: var(--rd-fill);
+  color: var(--rd-label);
+  font-size: var(--rd-type-sub);
+  font-weight: 600;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+
+.shell .rd-chip:hover {
+  background: var(--rd-pressed);
+}
+
+.shell .rd-chip:active {
+  scale: 0.96;
+}
+
+.shell .rd-chip.active {
+  background: var(--rd-key-fill);
+  color: var(--rd-key);
+  font-weight: 700;
+}
+
+.shell .rd-chip-reset {
+  color: var(--rd-key);
+  background: transparent;
+}
+
+/* --- Glass Filter Popover ------------------------------------------------------------------------------- */
+
+.shell .rd-menu-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgb(0 0 0 / 0.22);
+  animation: rd-fade-in 180ms var(--motion-ease) both;
+}
+
+.shell .rd-popover {
+  position: absolute;
+  top: calc(var(--rd-bar) + var(--rd-bar-inset) + 10px);
+  right: max(var(--rd-gutter), var(--rd-bar-inset));
+  z-index: 6;
+  width: min(680px, calc(100% - 48px));
+  max-height: calc(100% - var(--rd-bar) - var(--rd-bar-inset) - 24px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 22px 24px 24px;
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--apple-card) 84%, transparent);
+  backdrop-filter: blur(36px) saturate(180%);
+  box-shadow:
+    inset 0 1.5px 0 var(--glass-rim),
+    var(--shadow-raised-large);
+  transform-origin: top right;
+  animation: rd-popover-in 220ms var(--motion-ease) both;
+}
+
+.shell .rd-popover::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes rd-popover-in {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+@keyframes rd-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.shell .rd-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.shell .rd-popover-head h2 {
+  margin: 0;
+  font-size: var(--rd-type-section);
+  font-weight: 750;
+}
+
+.shell .rd-popover-reset {
+  min-height: 44px;
+  padding-inline: 14px;
+  border-radius: 16px;
+  font-size: var(--rd-type-sub);
+  font-weight: 650;
+  color: var(--rd-key);
+}
+
+.shell .rd-popover-reset:hover {
+  background: var(--rd-key-fill);
+}
+
+.shell .rd-popover-group + .rd-popover-group {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rd-rule);
+}
+
+.shell .rd-popover-group h3 {
+  margin: 0 0 10px;
+  font-size: var(--rd-type-label);
+  font-weight: 700;
+  color: var(--rd-dim);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.shell .rd-popover-pills {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.radio-card-art {
-  width: 94px;
-  height: 94px;
-  position: relative;
-  margin-bottom: 4px;
+
+.shell .rd-popover-status {
+  margin: 12px 0;
+  font-size: var(--rd-type-sub);
+  color: var(--rd-dim);
 }
-.radio-card-art img,
-.radio-card-art > div {
+
+/* --- Station Tiles Grid --------------------------------------------------------------------------------- */
+
+.shell .rd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--rd-tile), 1fr));
+  gap: 26px 20px;
+  transition: opacity 200ms var(--motion-ease);
+}
+
+.shell .rd-grid.refreshing {
+  opacity: 0.65;
+}
+
+.shell .rd-tile {
+  min-width: 0;
+}
+
+.shell .rd-tile-art-wrap {
+  position: relative;
+}
+
+.shell .rd-tile-main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.shell .rd-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--rd-corner);
+  margin-bottom: 10px;
+  background: var(--rd-fill);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  transition:
+    scale 180ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease);
+}
+
+.shell.appearance-light .rd-cover {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+
+.shell .rd-tile-main:hover .rd-cover {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.14),
+    var(--shadow-raised);
+}
+
+.shell .rd-tile-main:active .rd-cover {
+  scale: 0.96;
+}
+
+.shell .rd-tile.active .rd-cover {
+  box-shadow:
+    0 0 0 3px var(--rd-key),
+    var(--shadow-raised);
+}
+
+.shell .rd-cover img,
+.shell .rd-cover > .xima-art-placeholder {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 14px;
-  background: var(--radio-line);
 }
-.radio-card-play {
+
+.shell .rd-cover-overlay {
   position: absolute;
-  right: -8px;
-  bottom: -5px;
+  inset: 0;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--radio-accent);
-  color: white;
-  box-shadow: 0 2px 8px #0003;
+  background: rgb(0 0 0 / 0.42);
+  color: #fff;
 }
-.radio-card-main strong,
-.radio-card-main small {
-  display: block;
-  max-width: 100%;
-  white-space: nowrap;
+
+.shell .rd-tile-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
   overflow: hidden;
+  font-size: var(--rd-type-name);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.shell .rd-tile.active .rd-tile-name {
+  color: var(--rd-key);
+}
+
+.shell .rd-tile-sub {
+  overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+  margin-top: 2px;
+  font-size: var(--rd-type-sub);
+  font-weight: 500;
+  color: var(--rd-dim);
 }
-.radio-card-main strong {
-  font-size: 17px;
-  font-weight: 600;
-}
-.radio-card-main small {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.radio-card.active .radio-card-main small {
-  color: var(--radio-accent);
-}
-.radio-card-actions {
+
+.shell .rd-tile-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
-  border-top: 1px solid var(--radio-line);
+  gap: 6px;
+  opacity: 0.78;
+  transition: opacity 160ms var(--motion-ease);
 }
-.radio-card-actions button {
-  min-width: 44px;
+
+.shell .rd-tile:hover .rd-tile-actions,
+.shell .rd-tile:focus-within .rd-tile-actions,
+.shell .rd-tile.active .rd-tile-actions,
+.shell .rd-tile-actions:has(.on) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .shell .rd-tile-actions {
+    opacity: 1;
+  }
+}
+
+.shell .rd-tile-btn {
   display: grid;
   place-items: center;
-  color: var(--text-dim);
-  font-size: 13px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.56);
+  backdrop-filter: blur(12px);
+  color: #fff;
+}
+
+.shell .rd-tile-btn:hover {
+  background: rgb(0 0 0 / 0.76);
+}
+
+.shell .rd-tile-btn:active {
+  scale: 0.92;
+}
+
+.shell .rd-tile-btn.on {
+  color: var(--rd-key);
+  background: rgb(0 0 0 / 0.72);
+}
+
+/* Skeleton loading tiles */
+.shell .rd-tile.skeleton .rd-cover,
+.shell .rd-skel-line {
+  background: linear-gradient(90deg, var(--rd-fill) 25%, var(--rd-pressed) 50%, var(--rd-fill) 75%);
+  background-size: 200% 100%;
+  animation: rd-shimmer 1.4s ease-in-out infinite;
+}
+
+.shell .rd-skel-line {
+  height: 18px;
   border-radius: 8px;
+  margin-top: 4px;
 }
-.radio-card-actions button[aria-pressed='true'],
-.radio-favorite[aria-pressed='true'] {
-  color: var(--radio-accent);
-}
-.radio-pages {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 24px;
-  margin-top: 20px;
-  font-size: 14px;
-}
-.radio-pages button {
-  border-radius: 10px;
-  padding: 0 16px;
-  border: 1px solid var(--radio-line);
-}
-.radio-feedback,
-.radio-notice {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  align-items: center;
-  color: var(--text-dim);
-  font-size: 14px;
-  padding: 8px 12px;
-}
-.radio-feedback button {
-  color: var(--radio-accent);
-  padding: 0 18px;
-  border: 1px solid var(--radio-line);
-  border-radius: 12px;
-}
-.radio-notice {
-  flex-shrink: 0;
-  background: var(--radio-surface);
-}
-.radio-notice span {
-  flex: 1;
-}
-.radio-notice button {
-  font-size: 24px;
-  min-width: 44px;
-}
-.radio-empty {
-  min-height: 160px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  color: var(--text-dim);
-  gap: 12px;
-  text-align: center;
-}
-.radio-back {
-  color: var(--text-dim) !important;
-  padding: 0;
+
+.shell .rd-skel-line.short {
+  width: 66%;
+  height: 14px;
   margin-top: 8px;
 }
-.radio-detail-head {
+
+@keyframes rd-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* --- Animated Sound Bars -------------------------------------------------------------------------------- */
+
+.shell .rd-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 1.1em;
+}
+
+.shell .rd-cover-overlay .rd-bars {
+  height: 36px;
+  gap: 4px;
+}
+
+.shell .rd-bars i {
+  width: 3px;
+  height: 38%;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.shell .rd-cover-overlay .rd-bars i {
+  width: 5px;
+}
+
+.shell .rd-bars.playing i {
+  animation: rd-bar 900ms ease-in-out infinite alternate;
+}
+
+.shell .rd-bars.playing i:nth-child(2) {
+  animation-delay: -300ms;
+}
+
+.shell .rd-bars.playing i:nth-child(3) {
+  animation-delay: -600ms;
+}
+
+.shell .rd-bars.playing i:nth-child(4) {
+  animation-delay: -150ms;
+}
+
+@keyframes rd-bar {
+  from {
+    height: 22%;
+  }
+
+  to {
+    height: 100%;
+  }
+}
+
+/* --- Feedback, Notice, Empty, Pagination ---------------------------------------------------------------- */
+
+.shell .rd-notice,
+.shell .rd-feedback {
   display: flex;
-  gap: 22px;
   align-items: center;
-  padding: 16px 0 24px;
-}
-.radio-detail-head > img,
-.radio-detail-head > .xima-art-placeholder {
-  width: 100px;
-  height: 100px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  margin-bottom: 18px;
   border-radius: 16px;
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--radio-surface);
+  background: var(--rd-fill);
+  color: var(--rd-dim);
+  font-size: var(--rd-type-sub);
 }
-.radio-detail-head > div:not(.xima-art-placeholder) {
+
+.shell .rd-notice button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  font-size: 26px;
+  color: var(--rd-label);
+}
+
+.shell .rd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 220px;
+  color: var(--rd-dim);
+  text-align: center;
+  font-size: var(--rd-type-name);
+}
+
+.shell .rd-empty p {
+  margin: 0;
+}
+
+.shell .rd-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 28px;
+  font-size: var(--rd-type-sub);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .rd-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding-inline: 24px;
+  border-radius: 16px;
+  background: var(--rd-fill);
+  color: var(--rd-label);
+  font-size: var(--rd-type-name);
+  font-weight: 650;
+}
+
+.shell .rd-pill:hover:not(:disabled) {
+  background: var(--rd-pressed);
+}
+
+.shell .rd-pill:active:not(:disabled) {
+  scale: 0.97;
+}
+
+.shell .rd-pill.key {
+  background: var(--rd-key-fill);
+  color: var(--rd-key);
+}
+
+.shell .rd-preview {
+  margin-top: 22px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--rd-faint);
+}
+
+/* --- Station Detail & Program Schedule ------------------------------------------------------------------ */
+
+.shell .rd-detail {
+  animation: rd-fade-in 220ms var(--motion-ease) both;
+}
+
+.shell .rd-collection-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 32px;
+  margin-bottom: 28px;
+}
+
+.shell .rd-collection-cover {
+  flex: none;
+  width: 220px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--rd-corner);
+  background: var(--rd-fill);
+  box-shadow: var(--shadow-raised-large);
+}
+
+.shell .rd-collection-cover img,
+.shell .rd-collection-cover > .xima-art-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .rd-collection-text {
   flex: 1;
   min-width: 0;
 }
-.radio-detail-head h2 {
-  font-size: 26px;
-  margin: 6px 0;
+
+.shell .rd-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--rd-type-label);
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  color: var(--rd-key);
+  text-transform: uppercase;
 }
-.radio-detail-head p {
+
+.shell .rd-collection-text h1 {
+  margin: 6px 0 4px;
+  font-size: calc(40px * var(--text-scale, 1));
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.shell .rd-collection-program {
   margin: 0;
-  color: var(--text-dim);
-  font-size: 14px;
+  font-size: var(--rd-type-name);
+  font-weight: 550;
+  color: var(--rd-dim);
 }
-.radio-eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--radio-accent);
+
+.shell .rd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 20px;
 }
-.radio-app .radio-primary {
+
+.shell .rd-schedule-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 20px;
-  border-radius: 24px;
-  color: white;
-  background: var(--radio-accent);
-}
-.radio-app .radio-primary:hover {
-  background: #e96520;
-}
-.radio-favorite {
-  width: 48px;
-}
-.radio-schedule-heading {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--radio-line);
-  gap: 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--rd-rule);
 }
-.radio-schedule-heading small {
-  color: var(--text-dim);
-  font-size: 12px;
-}
-.radio-day-tabs {
-  display: flex;
-  gap: 8px;
-}
-.radio-day-tabs button {
-  padding: 0 22px;
-  border-bottom: 3px solid transparent;
-}
-.radio-day-tabs button[aria-current] {
-  color: var(--radio-accent);
-  border-bottom-color: var(--radio-accent);
-}
-.radio-schedule-row {
-  display: grid;
-  grid-template-columns: 132px minmax(100px, 1fr) minmax(0, 0.6fr) 78px;
-  align-items: center;
-  gap: 18px;
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--radio-line);
-  font-size: 14px;
-}
-.radio-schedule-row time {
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-.radio-schedule-row strong {
-  font-weight: 500;
-}
-.radio-schedule-row > span {
-  color: var(--text-dim);
-  font-size: 12px;
-}
-.radio-schedule-row.live {
-  background: color-mix(in srgb, var(--radio-accent) 8%, transparent);
-  color: var(--radio-accent);
-}
-.radio-schedule-row em {
-  font-size: 12px;
-  font-style: normal;
-  text-align: right;
-}
-.radio-player {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  min-height: 82px;
-  flex-shrink: 0;
-  padding: 10px 26px;
-  background: var(--radio-surface);
-  border-top: 1px solid var(--radio-line);
-  position: relative;
-}
-.radio-player-station {
+
+.shell .rd-schedule-meta {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 0;
-  flex: 1;
-  text-align: left;
-  border-radius: 10px;
-  padding: 0;
-}
-.radio-player-station > img,
-.radio-player-station > div {
-  width: 54px;
-  height: 54px;
-  border-radius: 10px;
-  object-fit: cover;
   flex-shrink: 0;
+  white-space: nowrap;
 }
-.radio-player-station > span {
+
+.shell .rd-schedule-meta small {
+  font-size: var(--rd-type-label);
+  color: var(--rd-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .rd-jump-live {
+  min-height: 36px;
+  padding-inline: 14px;
+  border-radius: 999px;
+  background: var(--rd-key-fill);
+  color: var(--rd-key);
+  font-size: var(--rd-type-label);
+  font-weight: 650;
+}
+
+.shell .rd-jump-live:hover {
+  background: color-mix(in srgb, var(--rd-key) 24%, transparent);
+}
+
+.shell .rd-jump-live:active {
+  scale: 0.96;
+}
+
+.shell .rd-day-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.shell .rd-day-tabs button {
+  position: relative;
+  min-height: 52px;
+  padding-inline: 22px;
+  font-size: var(--rd-type-name);
+  font-weight: 600;
+  color: var(--rd-dim);
+  white-space: nowrap;
+}
+
+.shell .rd-day-tabs button[aria-selected='true'] {
+  color: var(--rd-key);
+  font-weight: 700;
+}
+
+.shell .rd-day-tabs button[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset: auto 10px 0;
+  border-block-end: 3px solid var(--rd-key);
+  border-radius: 2px;
+}
+
+.shell .rd-schedule {
+  display: flex;
+  flex-direction: column;
+}
+
+.shell .rd-schedule-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  min-height: 74px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rd-rule);
+}
+
+.shell .rd-schedule-row time {
+  font-size: var(--rd-type-sub);
+  font-weight: 600;
+  color: var(--rd-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.shell .rd-schedule-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
-.radio-player-station strong,
-.radio-player-station small {
-  display: block;
+
+.shell .rd-schedule-main strong {
+  font-size: var(--rd-type-name);
+  font-weight: 600;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.radio-player-station strong {
-  font-size: 17px;
-  font-weight: 600;
+
+.shell .rd-schedule-main > span {
+  font-size: var(--rd-type-label);
+  color: var(--rd-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.radio-player-station small {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-top: 5px;
+
+.shell .rd-schedule-progress {
+  height: 4px;
+  width: min(320px, 100%);
+  margin-top: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--rd-key) 22%, transparent);
 }
-.radio-player-station em {
+
+.shell .rd-schedule-progress > span {
+  display: block;
+  height: 100%;
+  width: calc(var(--share, 0) * 100%);
+  border-radius: inherit;
+  background: var(--rd-key);
+}
+
+.shell .rd-schedule-row.live {
+  background: var(--rd-key-fill);
+  border-radius: 14px;
+  border-bottom-color: transparent;
+  margin-block: 4px;
+}
+
+.shell .rd-schedule-row.live .rd-schedule-main strong,
+.shell .rd-schedule-row.live time {
+  color: var(--rd-key);
+}
+
+.shell .rd-schedule-badge em {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--rd-key);
+  color: #fff;
   font-style: normal;
-  color: var(--radio-accent);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
-.radio-player-controls {
+
+/* --- Floating Glass Mini Player ------------------------------------------------------------------------- */
+
+.shell .rd-mini {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  z-index: 4;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  width: min(740px, calc(100% - 48px));
+  height: 88px;
+  padding: 10px 14px 10px 12px;
+  overflow: hidden;
+  border-radius: 44px;
+  translate: -50% 0;
+  cursor: pointer;
+  --mini-ink: var(--rd-label);
+  --mini-dim: var(--rd-dim);
+  color: var(--mini-ink);
+  transition:
+    translate 420ms var(--motion-ease),
+    opacity 300ms var(--motion-ease),
+    color 500ms ease;
 }
-.radio-player-controls button {
-  display: grid;
-  place-items: center;
-  width: 48px;
+
+.shell .rd-mini.on-light {
+  --mini-ink: rgb(0 0 0 / 0.88);
+  --mini-dim: rgb(0 0 0 / 0.58);
+}
+
+.shell .rd-mini.away {
+  opacity: 0;
+  translate: -50% 140%;
+  pointer-events: none;
+}
+
+.shell .rd-mini:active {
+  scale: 0.99;
+}
+
+.shell .rd-mini-cover {
+  flex: none;
+  width: 66px;
+  height: 66px;
+  overflow: hidden;
   border-radius: 50%;
+  background: var(--rd-fill);
 }
-.radio-player-controls .radio-play {
-  height: 52px;
-  width: 52px;
-  color: white;
-  background: var(--radio-accent);
+
+.shell .rd-mini-cover img,
+.shell .rd-mini-cover > .xima-art-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.radio-volume {
+
+.shell .rd-mini-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.shell .rd-mini-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--rd-type-name);
+  font-weight: 650;
+}
+
+.shell .rd-mini-by {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 150px;
+  margin-top: 2px;
+  min-width: 0;
+  font-size: var(--rd-type-sub);
+  color: var(--mini-dim);
 }
-.radio-volume input {
-  width: 110px;
-  height: 44px;
-  accent-color: var(--radio-accent);
+
+.shell .rd-mini-station {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.radio-stream-error {
+
+.shell .rd-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--mini-ink) 14%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--mini-dim);
+}
+
+.shell .rd-badge.live {
+  background: var(--rd-key-fill);
+  color: var(--rd-key);
+}
+
+.shell .rd-badge.error {
+  background: color-mix(in srgb, var(--apple-red) 18%, transparent);
+  color: var(--apple-red);
+}
+
+.shell .rd-mini-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+}
+
+.shell .rd-mini-button:hover {
+  background: color-mix(in srgb, var(--mini-ink) 10%, transparent);
+}
+
+.shell .rd-mini-button:active {
+  background: color-mix(in srgb, var(--mini-ink) 20%, transparent);
+  scale: 0.92;
+}
+
+.shell .rd-mini-line {
   position: absolute;
-  right: 24px;
-  bottom: 0;
-  font-size: 10px;
-  color: var(--radio-accent);
+  inset: auto 44px 0;
+  height: 3px;
+  border-radius: 2px;
+  background: transparent;
 }
-.radio-preview {
-  padding: 4px 16px;
-  text-align: right;
-  font-size: 10px;
+
+.shell .rd-mini-line.live {
+  background: var(--rd-key);
+  opacity: 0.85;
+}
+
+.shell .rd-mini-line.loading {
+  background: var(--mini-dim);
+  animation: rd-breathe 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes rd-breathe {
+  from {
+    opacity: 0.9;
+  }
+
+  to {
+    opacity: 0.25;
+  }
+}
+
+/* --- Fullscreen Now Playing (CarPlay Radio Tuner) ------------------------------------------------------- */
+
+.shell .rd-now {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  color: var(--text);
+  translate: 0 100%;
+  visibility: hidden;
+  transition:
+    translate 520ms var(--motion-ease),
+    visibility 0s 520ms;
+}
+
+.shell .rd-now.open {
+  translate: 0 0;
+  visibility: visible;
+  transition:
+    translate 520ms var(--motion-ease),
+    visibility 0s;
+}
+
+.shell .rd-now-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #141416;
+}
+
+.shell.appearance-light .rd-now-backdrop {
+  background: #e5e5ea;
+}
+
+.shell .rd-now-backdrop img {
+  position: absolute;
+  inset: -15%;
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  filter: blur(80px) saturate(150%);
+}
+
+.shell .rd-now-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.44);
+}
+
+.shell.appearance-light .rd-now-backdrop::after {
+  background: rgb(255 255 255 / 0.46);
+}
+
+.shell .rd-now-panel {
+  container-type: size;
+  container-name: radio-now;
+}
+
+.shell .rd-now-layout {
+  --rd-now-inset: max(0px, calc((var(--panel-radius) - 32px) * var(--corner-inset)));
+  position: absolute;
+  inset: var(--rd-now-inset) var(--rd-now-inset) var(--rd-now-inset) 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'header header'
+    'info art'
+    'progress progress'
+    'extras extras';
+  column-gap: 44px;
+}
+
+.shell .rd-now-header {
+  grid-area: header;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.shell .rd-now-header-right {
+  display: flex;
+  gap: 12px;
+}
+
+.shell .rd-corner {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.shell .rd-corner:active {
+  scale: 0.92;
+}
+
+.shell .rd-corner.rd-on {
+  background: color-mix(in srgb, var(--text) 30%, transparent);
+}
+
+.shell .rd-now-info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.shell .rd-now-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+}
+
+.shell .rd-now-status.error {
+  background: color-mix(in srgb, var(--apple-red) 28%, transparent);
+}
+
+.shell .rd-now-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+}
+
+.shell .rd-now-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: calc(40px * var(--text-scale, 1));
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.shell .rd-now-station {
+  max-width: 100%;
+  margin-top: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(28px * var(--text-scale, 1));
+  font-weight: 600;
   color: var(--text-dim);
-  opacity: 0.65;
-  flex-shrink: 0;
 }
-@media (max-height: 600px) {
-  .radio-header {
-    padding: 10px 22px;
+
+.shell .rd-now-station:hover {
+  color: var(--text);
+}
+
+.shell .rd-now-error {
+  margin-top: 6px;
+  font-size: calc(16px * var(--text-scale, 1));
+  color: var(--apple-red);
+}
+
+.shell .rd-now-controls {
+  display: flex;
+  align-items: center;
+  gap: 52px;
+  margin-top: 24px;
+}
+
+.shell .rd-now-button {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.shell .rd-now-button.primary {
+  width: 108px;
+  height: 108px;
+}
+
+.shell .rd-now-button.small {
+  width: 60px;
+  height: 60px;
+  color: var(--text-dim);
+}
+
+.shell .rd-now-button:hover {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.shell .rd-now-button:active {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  scale: 0.92;
+}
+
+.shell .rd-now-button.small.active {
+  color: var(--rd-key);
+  background: color-mix(in srgb, var(--rd-key) 22%, transparent);
+}
+
+.shell .rd-now-art {
+  position: relative;
+  grid-area: art;
+  align-self: center;
+  justify-self: end;
+  height: min(100%, 40cqw);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: var(--shadow-raised-large);
+}
+
+.shell .rd-now-art img,
+.shell .rd-now-art-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .rd-now-art-placeholder {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text-dim);
+}
+
+/* Inline Schedule Panel in Now Playing */
+.shell .rd-now-schedule {
+  grid-area: art;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 44cqw);
+  min-height: 0;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.shell .rd-now-schedule-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex: none;
+}
+
+.shell .rd-now-schedule-head h3 {
+  margin: 0;
+  font-size: calc(24px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .rd-now-schedule-head small {
+  font-size: calc(15px * var(--text-scale, 1));
+  color: var(--text-dim);
+}
+
+.shell .rd-now-schedule-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.shell .rd-now-schedule-list::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .rd-now-schedule-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.shell .rd-now-schedule-row time {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.shell .rd-now-schedule-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.shell .rd-now-schedule-body strong {
+  font-size: calc(19px * var(--text-scale, 1));
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shell .rd-now-schedule-body span {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--text-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shell .rd-now-schedule-row.live {
+  background: color-mix(in srgb, var(--rd-key) 20%, transparent);
+  border-radius: 10px;
+  border-bottom-color: transparent;
+}
+
+.shell .rd-now-schedule-row em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 750;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--rd-key);
+  color: #fff;
+}
+
+.shell .rd-now-schedule-empty {
+  margin: auto;
+  font-size: calc(20px * var(--text-scale, 1));
+  color: var(--text-dim);
+}
+
+/* Broadcast Progress Track */
+.shell .rd-now-progress {
+  grid-area: progress;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.shell .rd-now-time {
+  min-width: 3.4em;
+  font-size: calc(20px * var(--text-scale, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.shell .rd-now-time:last-child {
+  text-align: right;
+}
+
+.shell .rd-now-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 24%, transparent);
+}
+
+.shell .rd-now-track.loading {
+  animation: rd-breathe 1.3s ease-in-out infinite alternate;
+}
+
+.shell .rd-now-elapsed {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--share, 0) * 100%);
+  border-radius: inherit;
+  background: var(--text);
+  transition: width 500ms linear;
+}
+
+.shell .rd-now-elapsed.live-pulse {
+  background: var(--rd-key);
+  opacity: 0.9;
+}
+
+/* Extras & Native Accessible Volume Range Slider */
+.shell .rd-now-extras {
+  grid-area: extras;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.shell .rd-now-detail-pill {
+  min-height: 44px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  color: var(--text);
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .rd-now-detail-pill:hover {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.shell .rd-volume {
+  display: flex;
+  flex: 0 1 360px;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.shell .rd-volume-range {
+  --slider-track-size: 6px;
+  --slider-thumb-size: 18px;
+  --slider-track-color: color-mix(in srgb, var(--text) 24%, transparent);
+  --slider-fill-color: var(--text);
+  --slider-thumb-color: var(--text);
+  appearance: none;
+  flex: 1;
+  block-size: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell .rd-volume-range::-webkit-slider-runnable-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--slider-fill-color) var(--slider-progress, 100%),
+    var(--slider-track-color) var(--slider-progress, 100%)
+  );
+}
+
+.shell .rd-volume-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  margin-block-start: calc((var(--slider-track-size) - var(--slider-thumb-size)) / 2);
+  border: 0;
+  border-radius: 50%;
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+.shell .rd-volume-range::-moz-range-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: 999px;
+  background: var(--slider-track-color);
+}
+
+.shell .rd-volume-range::-moz-range-progress {
+  block-size: var(--slider-track-size);
+  border-radius: 999px;
+  background: var(--slider-fill-color);
+}
+
+.shell .rd-volume-range::-moz-range-thumb {
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  border: 0;
+  border-radius: 50%;
+  background: var(--slider-thumb-color);
+}
+
+/* --- Responsive Container Queries (Scania 7" & Portrait Layouts) --------------------------------------- */
+
+@container radio (max-height: 520px) {
+  .shell .rd-bar,
+  .shell .rd-scroll,
+  .shell .rd-popover {
+    --rd-bar: 58px;
+    --rd-bar-inset: max(0px, calc((var(--panel-radius) - 29px) * var(--corner-inset)));
+    --rd-gutter: 18px;
   }
-  .radio-card-art {
-    width: 74px;
-    height: 74px;
+
+  .shell .rd-day-tabs button {
+    padding-inline: 14px;
+    font-size: calc(19px * var(--text-scale, 1));
   }
-  .radio-player {
-    min-height: 68px;
-    padding: 8px 20px;
+
+  .shell .rd-grid {
+    --rd-tile: 146px;
   }
-  .radio-section-heading {
-    padding: 14px 0;
+
+  .shell .rd-round {
+    width: 48px;
+    height: 48px;
+  }
+
+  .shell .rd-tab {
+    min-width: 94px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+
+  .shell .rd-scroll.has-mini {
+    padding-bottom: 106px;
+  }
+
+  .shell .rd-collection-cover {
+    width: 150px;
+  }
+
+  .shell .rd-mini {
+    height: 70px;
+    border-radius: 35px;
+    width: min(640px, calc(100% - 36px));
+  }
+
+  .shell .rd-mini-cover {
+    width: 50px;
+    height: 50px;
+  }
+
+  .shell .rd-mini-button {
+    width: 50px;
+    height: 50px;
   }
 }
-@media (max-width: 1050px) {
-  .radio-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+
+@container radio (aspect-ratio < 1) {
+  .shell .rd-collection-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  .shell .rd-collection-cover {
+    width: 160px;
+  }
+
+  .shell .rd-schedule-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 12px;
   }
-  .radio-volume {
-    display: none;
+}
+
+@container radio-now (aspect-ratio < 1) {
+  .shell .rd-now-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'header'
+      'art'
+      'info'
+      'progress'
+      'extras';
   }
-  .radio-detail-head {
-    gap: 12px;
+
+  .shell .rd-now-art {
+    justify-self: center;
+    height: min(32cqh, 60cqw);
   }
-  .radio-schedule-heading small {
-    font-size: 10px;
+
+  .shell .rd-now-schedule {
+    width: 100%;
+    max-height: 36cqh;
+  }
+}
+
+@container radio-now (max-height: 520px) {
+  .shell .rd-corner {
+    width: 48px;
+    height: 48px;
+  }
+
+  .shell .rd-now-controls {
+    gap: 32px;
+    margin-top: 14px;
+  }
+
+  .shell .rd-now-button {
+    width: 68px;
+    height: 68px;
+  }
+
+  .shell .rd-now-button.primary {
+    width: 84px;
+    height: 84px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell .radio-app *,
+  .shell .rd-now,
+  .shell .rd-now * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

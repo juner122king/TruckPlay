@@ -52,6 +52,10 @@ export interface RadioState {
   detailError: string | null
   scheduleDay: ScheduleDay
   scheduleDate: string
+  nowPlaying: boolean
+  liveScheduleRadioId: number | null
+  liveScheduleLoading: boolean
+  liveSchedules: Schedules | null
   notice: string | null
 }
 const KEY = 'westplay.radio.favorites'
@@ -78,18 +82,39 @@ function saved(): RadioStation[] {
   }
 }
 export const beijingDate = (now = Date.now()) => new Date(now + 8 * 3600000).toISOString().slice(0, 10)
-export function scheduleIsLive(item: RadioSchedule, day: ScheduleDay, date: string, now = Date.now()): boolean {
+
+export function statusLabel(value: string, t: (zh: string, en: string) => string): string {
+  if (value === 'playing') return t('直播中', 'LIVE')
+  if (value === 'loading') return t('连接中…', 'Connecting…')
+  if (value === 'failed') return t('连接失败 · 重试', 'Connection failed · Retry')
+  return t('已暂停', 'Paused')
+}
+
+function scheduleBounds(item: RadioSchedule, day: ScheduleDay, date: string): { from: number; to: number } | null {
   const minutes = (value: string) => {
     const match = /^(\d{1,2}):(\d{2})$/.exec(value)
     return match ? Number(match[1]) * 60 + Number(match[2]) : NaN
   }
-  const start = minutes(item.startTime),
-    end = minutes(item.endTime)
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return false
+  const start = minutes(item.startTime)
+  const end = minutes(item.endTime)
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null
   const base = Date.parse(date + 'T00:00:00+08:00') + (day === 'yesterday' ? -1 : day === 'tomorrow' ? 1 : 0) * 86400000
   const from = base + start * 60000
   const to = base + (end <= start ? end + 1440 : end) * 60000
-  return now >= from && now < to
+  return to > from ? { from, to } : null
+}
+
+/** Whether a broadcast program is currently on air at `now` (Beijing UTC+8). */
+export function scheduleIsLive(item: RadioSchedule, day: ScheduleDay, date: string, now = Date.now()): boolean {
+  const bounds = scheduleBounds(item, day, date)
+  return bounds !== null && now >= bounds.from && now < bounds.to
+}
+
+/** Fraction (`0..1`) elapsed for a currently airing broadcast, or `null` when not live. */
+export function scheduleProgress(item: RadioSchedule, day: ScheduleDay, date: string, now = Date.now()): number | null {
+  const bounds = scheduleBounds(item, day, date)
+  if (!bounds || now < bounds.from || now >= bounds.to) return null
+  return Math.min(1, Math.max(0, (now - bounds.from) / (bounds.to - bounds.from)))
 }
 export const useRadio = create<RadioState>(() => ({
   stations: [],
@@ -112,10 +137,15 @@ export const useRadio = create<RadioState>(() => ({
   detailError: null,
   scheduleDay: 'today',
   scheduleDate: beijingDate(),
+  nowPlaying: false,
+  liveScheduleRadioId: null,
+  liveScheduleLoading: false,
+  liveSchedules: null,
   notice: null,
 }))
 let listSequence = 0,
   detailSequence = 0,
+  liveScheduleSequence = 0,
   homeSequence = 0
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 export async function loadRadioHome(): Promise<void> {
@@ -231,22 +261,53 @@ export async function loadRadioDetail(station: RadioStation, refresh = false): P
     ...(schedule.status === 'fulfilled' ? { schedules: schedule.value as Schedules, scheduleDate: date } : {}),
   })
 }
+export function setRadioNowPlaying(nowPlaying: boolean): void {
+  useRadio.setState({ nowPlaying })
+}
+export async function loadLiveSchedule(radioId: number, refresh = false): Promise<void> {
+  const s = useRadio.getState()
+  if (!refresh && s.liveScheduleRadioId === radioId && s.liveSchedules) return
+  const token = ++liveScheduleSequence
+  const date = beijingDate()
+  useRadio.setState({
+    liveScheduleRadioId: radioId,
+    liveScheduleLoading: true,
+    ...(refresh || s.liveScheduleRadioId !== radioId ? { liveSchedules: null } : {}),
+  })
+  try {
+    const data = (await queryRadio({ ask: 'radioSchedule', radioId })) as Schedules
+    if (token !== liveScheduleSequence) return
+    useRadio.setState({
+      liveScheduleRadioId: radioId,
+      liveScheduleLoading: false,
+      liveSchedules: data,
+      scheduleDate: date,
+    })
+  } catch {
+    if (token === liveScheduleSequence) useRadio.setState({ liveScheduleLoading: false })
+  }
+}
 export function closeRadioDetail(): void {
   ++detailSequence
   useRadio.setState({ detail: null, schedules: null, detailError: null, detailLoading: false })
 }
 export function resetRadioSession(): void {
   ++detailSequence
+  ++liveScheduleSequence
   ++listSequence
   ++homeSequence
   useRadio.setState({
     loading: false,
     homeLoading: false,
     detailLoading: false,
+    liveScheduleLoading: false,
+    nowPlaying: false,
     stations: [],
     locations: [],
     categories: [],
     detail: null,
     schedules: null,
+    liveScheduleRadioId: null,
+    liveSchedules: null,
   })
 }

@@ -7,14 +7,18 @@ vi.mock('../../../shared/host', async (importOriginal) => ({
   postToHost: (message: unknown) => host.posted.push(message),
 }))
 import {
+  loadLiveSchedule,
   loadRadioList,
   loadRadioDetail,
   closeRadioDetail,
   favoriteMetadata,
+  resetRadioSession,
   scheduleIsLive,
+  scheduleProgress,
   beijingDate,
   playRadio,
   setRadioFilter,
+  setRadioNowPlaying,
   toggleRadioFavorite,
   useRadio,
 } from './radio'
@@ -95,6 +99,35 @@ describe('radio directory and schedules', () => {
     expect(scheduleIsLive(overnight, 'today', beijingDate(now), now)).toBe(false)
     expect(scheduleIsLive(overnight, 'tomorrow', beijingDate(now), now)).toBe(false)
     expect(scheduleIsLive(overnight, 'yesterday', beijingDate(now), now + 40 * 60000)).toBe(false)
+    expect(scheduleProgress(overnight, 'yesterday', beijingDate(now), now)).toBeCloseTo(80 / 120, 5)
+    expect(scheduleProgress(overnight, 'today', beijingDate(now), now)).toBeNull()
+    expect(
+      scheduleProgress({ programName: 'Bad', startTime: 'x', endTime: 'y' }, 'today', beijingDate(now), now),
+    ).toBeNull()
+  })
+  it('loads live schedule independently from detail and resets now playing state on session reset', async () => {
+    useRadio.setState({ detail: { id: 99, name: 'Detail station' } })
+    const old = loadLiveSchedule(1011)
+    const next = loadLiveSchedule(2022)
+    respond(1, 'schedule', {
+      yesterdaySchedules: [],
+      todaySchedules: [{ programName: 'Show 2', startTime: '10:00', endTime: '12:00' }],
+      tomorrowSchedules: [],
+    })
+    await next
+    respond(0, 'schedule', {
+      yesterdaySchedules: [],
+      todaySchedules: [{ programName: 'Show 1', startTime: '08:00', endTime: '09:00' }],
+      tomorrowSchedules: [],
+    })
+    await old
+    expect(useRadio.getState().detail?.id).toBe(99)
+    expect(useRadio.getState().liveScheduleRadioId).toBe(2022)
+    expect(useRadio.getState().liveSchedules?.todaySchedules[0].programName).toBe('Show 2')
+    setRadioNowPlaying(true)
+    expect(useRadio.getState().nowPlaying).toBe(true)
+    resetRadioSession()
+    expect(useRadio.getState()).toMatchObject({ nowPlaying: false, liveScheduleRadioId: null, liveSchedules: null })
   })
 })
 describe('shared audio session', () => {
