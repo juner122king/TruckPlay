@@ -52,17 +52,69 @@ describe('nearestTrafficLightAhead', () => {
     expect(nearest?.distance).toBeCloseTo(50, 1)
   })
 
-  it('ignores traffic lights behind or too far to the side', () => {
+  it('ignores traffic lights behind, on adjacent streets, or on overpasses in free-driving mode', () => {
     const semaphores: SemaphoreInfo[] = [
       // Behind (+z when heading north)
       { x: 0, y: 0, z: 50, heading: 0, state: 2, countdown: 10, duration: 30 },
-      // Too far lateral (> 35m)
-      { x: 100, y: 0, z: -50, heading: 0, state: 0, countdown: 20, duration: 30 },
+      // Adjacent parallel street (25m lateral, previously allowed by 45m corridor)
+      { x: 25, y: 0, z: -60, heading: 0, state: 0, countdown: 20, duration: 30 },
+      // Near cross-street signal (14m lateral at only 15m ahead, outside tapered cone)
+      { x: 14, y: 0, z: -15, heading: 0, state: 1, countdown: 15, duration: 30 },
+      // Overpass signal directly above (y = 18m vs truck y = 0m)
+      { x: 2, y: 18, z: -50, heading: 0, state: 1, countdown: 12, duration: 30 },
       // Inactive / off (state 4)
       { x: 2, y: 0, z: -40, heading: 0, state: 4, countdown: 0, duration: 0 },
     ]
     const nearest = nearestTrafficLightAhead(semaphores, baseTelemetry)
     expect(nearest).toBeNull()
+  })
+
+  it('ignores traffic lights straight ahead of the truck nose when the active navigation route turns away', () => {
+    // Reproduces the yard-exit scenario: truck faces North (heading 0), and a traffic light sits 110m
+    // North at (4, -110), but the active route goes West and then turns South, never going North.
+    const route = {
+      nodes: [
+        { position: [-10, -5] as [number, number], forward: [-1, 0] as [number, number] },
+        { position: [-60, -5] as [number, number], forward: [-1, 0] as [number, number] },
+        { position: [-60, 80] as [number, number], forward: [0, 1] as [number, number] },
+      ],
+    }
+    const semaphores: SemaphoreInfo[] = [
+      { x: 4, y: 0, z: -110, heading: 0.5, state: 1, countdown: 19, duration: 30 },
+    ]
+    const nearest = nearestTrafficLightAhead(semaphores, baseTelemetry, route, 0)
+    expect(nearest).toBeNull()
+  })
+
+  it('matches only traffic lights along the active navigation route and ignores non-route lights past a turn', () => {
+    // Route goes North from (0, 0) to (0, -60), then turns West to (-100, -60).
+    const route = {
+      nodes: [
+        { position: [0, 0] as [number, number], forward: [0, -1] as [number, number] },
+        { position: [0, -60] as [number, number], forward: [0, -1] as [number, number] },
+        { position: [-100, -60] as [number, number], forward: [-1, 0] as [number, number] },
+      ],
+      paths: new Map<number, [number, number][]>([
+        [
+          1,
+          [
+            [0, -60],
+            [-15, -60],
+            [-40, -60],
+            [-100, -60],
+          ],
+        ],
+      ]),
+    }
+    const semaphores: SemaphoreInfo[] = [
+      // Non-route traffic light continuing straight North at (3, -120)
+      { x: 3, y: 0, z: -120, heading: 0.5, state: 1, countdown: 19, duration: 30 },
+      // On-route traffic light along the Westbound road after the turn at (-55, -55)
+      { x: -55, y: 0, z: -55, heading: 0.25, state: 3, countdown: 14, duration: 30 },
+    ]
+    const nearest = nearestTrafficLightAhead(semaphores, baseTelemetry, route, 1)
+    expect(nearest).not.toBeNull()
+    expect(nearest?.semaphore.countdown).toBe(14)
   })
 
   it('works when truck is heading east (0.75 turns, +x)', () => {

@@ -164,7 +164,12 @@ export function GuidanceCard({ variant }: { variant: 'widget' | 'banner' }) {
 function useUpcomingTrafficLight(): { stateClass: string; countdown: number } | null {
   const semaphores = useLive((state) => state.semaphores)
   const telemetry = useLive((state) => state.telemetry)
-  const nearest = useMemo(() => nearestTrafficLightAhead(semaphores, telemetry), [semaphores, telemetry])
+  const route = useLive((state) => state.route)
+  const routeNext = useLive((state) => state.routeNext)
+  const nearest = useMemo(
+    () => nearestTrafficLightAhead(semaphores, telemetry, route, routeNext),
+    [semaphores, telemetry, route, routeNext],
+  )
 
   if (!nearest) return null
 
