@@ -80,6 +80,10 @@ pub struct Outcome {
     pub not_owned: Option<(usize, usize)>,
     /// How well the game's world picture fits the roads, and whether it was used.
     pub world: Option<(f32, bool)>,
+    /// How many definitions and prefabs' descriptors couldn't be read or understood (what they define left out),
+    /// and the first few (each its mod and why).
+    #[serde(default)]
+    pub unread: (usize, Vec<String>),
 }
 
 /// Why a build didn't make the map.
@@ -95,10 +99,17 @@ pub enum Failure {
     },
 }
 
-/// Builds `request`'s map in this process, telling `said` how it goes, and says how it ended.
-pub fn build(request: &Request, said: &mut dyn FnMut(Said), memory: &dyn Fn() -> Option<u64>) -> Said {
-    build_controlled(request, said, memory, None)
+/// Builds `request`'s map in this process, telling `said` how it goes, and says how it ended; `stop` set (by
+/// another thread), it ends at its next step.
+pub fn build(
+    request: &Request,
+    stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    said: &mut dyn FnMut(Said),
+    memory: &dyn Fn() -> Option<u64>,
+) -> Said {
+    build_controlled(request, said, memory, stop)
 }
+
 pub fn build_controlled(
     request: &Request,
     said: &mut dyn FnMut(Said),
@@ -133,6 +144,7 @@ pub fn build_controlled(
             time_zones_unread: built.summary.time_zones_unread,
             not_owned: built.summary.not_owned.map(|dropped| (dropped.guarded, dropped.elsewhere)),
             world: built.summary.world,
+            unread: (built.summary.unread.count, built.summary.unread.first),
         }),
         Err(BuildError::Export(westplay_mapdata::export::ExportError::Stopped)) => Said::Failed(Failure::Cancelled),
         Err(BuildError::GameRunning) => Said::Failed(Failure::GameRunning),

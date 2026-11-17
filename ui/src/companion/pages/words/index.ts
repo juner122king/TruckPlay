@@ -1,12 +1,11 @@
 /**
  * The companion's own words, past the onboarding: its sections, their pages, the tutorial and the uninstall,
- * in each of the game's 43 languages (by the game's codes, as the onboarding's words), in the game's language
+ * in English and Simplified Chinese (by the game's codes, as the onboarding's words), in the game's language
  * as WestPlay speaks it in the cab; English for a language the game doesn't have. Each language says "you"
  * as its onboarding does (informally or not) and names things as it does (the truck, the game's Mod Manager).
  * What the onboarding already says (the keys, the sign-ins, the map's stages, the game's summary) is the
  * onboarding's words.
  *
- * The translations other than English and Turkish were written without a native speaker's review yet.
  */
 export interface CompanionWords {
   sections: Record<SectionId, string>
@@ -72,6 +71,16 @@ export interface CompanionWords {
     gpuAutoDetail: string
     gpuInUse: string
     gpuNote: string
+    /** The coach speakers (owner 2026-11-13): a coach plays through its driver's pair, or through every unit over
+     * the passengers' seats; a choice here, never in the cab, with a word for players with weak processors: the
+     * coach driven's own count (`coachNote`, `{n}`), or none outside a coach (`coachNoteAny`, the group greyed). */
+    coachSpeakers: string
+    coachDriver: string
+    coachDriverDetail: string
+    coachPassengers: string
+    coachPassengersDetail: string
+    coachNote: string
+    coachNoteAny: string
     /** The game runs as administrator: WestPlay can't read its route, guidance or weather (owner 2026-10-28:
      * WestPlay doesn't reach into an elevated game; the player is told). */
     elevated: { title: string; text: string }
@@ -103,6 +112,8 @@ export interface CompanionWords {
     volumeUp: string
     volumeDown: string
     playPause: string
+    brightnessDown: string
+    brightnessUp: string
     /** A keybind listening for its new key. */
     pressKey: string
     /** `{key}`: the screen's key. */
@@ -160,6 +171,8 @@ export interface CompanionWords {
     notBuilt: string
     profiles: string
     checking: string
+    /** The sheet saying a map's preparation stopped: the game started while it was prepared (`GameStoppedSheet`). */
+    gameStopped: { title: string; text: string; ok: string }
     /** Waiting for memory to be free: the page's title, the screen's banner, and the note (`{needed}`,
      * `{free}`: gigabytes). */
     memory: { title: string; banner: { title: string; text: string }; note: { title: string; text: string } }

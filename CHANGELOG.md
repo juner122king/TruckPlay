@@ -3,18 +3,76 @@
 What changed in each release of WestPlay. The newest release's notes are what the app shows when it offers the
 update.
 
-## 2.3.0-domestic.2 国内定制版 / Domestic Edition (2026-11-16)
-- 新增电台 App：喜马拉雅真实电台目录、地区与类型筛选、分页、本地收藏，以及北京时间昨天/今天/明天节目表。
-- 电台与喜马拉雅点播共用音频宿主、媒体元素和音效链路；支持 HLS 直播、循环切台、断流有限重连和过期请求隔离，继续参与全局媒体互斥、游戏暂停及断电停止。
-- 修复连接中自动暂停引发的递归调用，以及游戏已暂停时手动播放电台无响应；更新喜马拉雅浏览、专辑详情、节目列表和播放界面。
-- 整合全屏导航、路线进度与北向概览、双卡货运 HUD 及中文本地化，补全新增车型与大屏平板适配。
-- Adds live radio with a shared Ximalaya audio session, refreshed Ximalaya browsing, playback fixes, and the latest navigation, freight HUD and screen support. Upgrade manually; existing user data is preserved.
+## 2.4.0-domestic.1 国内定制版 / Domestic Edition (2026-11-17)
+- 同步上游 2.4.0：客车 DLC 屏幕与扬声器、倒车影像输入阻断、亮度快捷键、侧栏和地图渲染优化、收费站及边境路径修正、D3D Hook 稳定性与地图构建器增强。
+- 保留国内媒体平台与电台、登录态同步、媒体互斥和闲置资源回收，以及双卡货运 HUD、中文地名、信号灯倒计时、车道引导、路线概览、物理距离导航和 ATS 屏幕适配。
+- 地图格式更新后会重新构建一次。国内版在线更新关闭，升级需使用国内定制版渠道；既有账号、设置与用户数据保留。
+- Includes upstream 2.4.0 while retaining domestic media, navigation, freight HUD and ATS support. Maps are rebuilt once for the updated format; upgrade manually through the domestic channel.
 
-## 2.3.0-domestic.1 国内定制版 / Domestic Edition (2026-11-12)
-- 同步上游 2.3.0：Safari、全屏亮度、卡车收费通道与称重站导航、主页与平板适配、键盘与视频显示、图形工具兼容及引擎生命周期修复。
-- 保留国内平台、货运 HUD、信号灯倒计时、车道引导、全程路线概览和 30 秒闲置资源回收；Safari 参与播放互斥与游戏暂停，沿用上游标签恢复机制。
-- 版本统一添加 domestic.1 标识；仅保留中英双语，原版在线更新继续关闭，现有用户数据保持不变。
-- Includes upstream 2.3.0 while retaining domestic integrations. Domestic revisions increment domestic.N; a new upstream version starts at domestic.1. Upgrade manually through the domestic channel.
+## 2.4.0 (2026-11-13)
+- The Coaches DLC: WestPlay on the screens of the Scania Touring and the MAN Lion's Coach, shaped to each and drawn
+  sharp. The game's parking camera shows over WestPlay, as on the game's own screen, and WestPlay under it takes no
+  clicks while it shows. The Volvo 9700 keeps the game's navigation (its real one has no CarPlay); the WestPlay tablet
+  in its dashboard shows WestPlay.
+- The coaches play through their own speakers, from the moment you get in: the MAN Lion's Coach and the Scania
+  Touring (both lengths each) and the Volvo 9700. The driver's pair, or every speaker over the passengers' seats,
+  heard from the driver's seat: a choice in the companion (Truck Screen › Coach speakers), greyed out in a truck. In a
+  coach it says how many speakers that coach's passengers' set plays at once, which a weak processor can feel.
+- The screen's brightness on keys: Alt+4 darker, Alt+5 brighter (with WestPlay's key), shown at the top of the screen
+  as the volume is. Both can be changed in the companion's Controls; a key you had already put another keybind on
+  stays yours.
+- Holding Volume up or Volume down changes the song after one second (it took two).
+- The sidebar laid out as CarPlay's: its apps in the very middle of it on every screen, the clock at the top, the truck
+  and Home/Dashboard buttons together at the bottom (a gap of most of a button stood between the two). Its buttons are
+  larger, about half an app icon as on CarPlay (the tablet's stay as they were). The Scania 7" shows three apps (it
+  had two).
+- The map's speed limit sign keeps its figures inside its red ring at every Text Size, three-digit limits too (they
+  grew with the Text Size and ran through the ring).
+- Swiping the Home screen's pages no longer sticks when the mouse is let go at the screen's edge.
+- Maps (and the Dashboard's map) move smoothly at 60 frames a second on every display: on displays faster than 60 Hz
+  the game was handed as few as 45 new map frames a second (36 at 144 Hz), the map holding still up to 40 ms at a
+  time, "moving like steps" whatever the graphics card. The map is now drawn evenly, so each of the 60 frames a second
+  the game takes is a new one.
+- Through every toll plaza and border crossing the route runs through the booth or gate the game's route drives
+  through, wherever it stands: on many it ran straight through between the booths (south of Innsbruck), and where
+  a booth or gate stood off the plaza's middle, beside it. On ETS2's map the line now passes through the booth on
+  all 449 ways through toll plazas (252 before) and the gate on all 181 through border crossings (95 before).
+- The game no longer crashes a while after it starts when the Steam overlay's code is in it (even switched off in Steam)
+  and something makes another swap chain, as Trucky's app does as it connects: where the overlay had hooked the
+  game's picture before WestPlay, the two called each other round until the game's stack ran out. WestPlay now leaves
+  the overlay nothing to hook again.
+- WestPlay starts its cab's browser again if it doesn't start the first time (up to three tries), instead of stopping
+  with "WestPlay engine stopped: … the timeout period expired". When it does stop, app.log now says why.
+- Every map is prepared again once with this update.
+- A map with a map mod made of older models (Oyuncuyusbis map) no longer fails to prepare: an older model's parts
+  were read as the game's current ones, and the build asked for 13 GB at once. Models in the game's three older
+  formats are now read as they are, so their buildings, stations and roads are on the map too (on the Oyuncuyusbis
+  map, 702 of its 4,523 models).
+- Map mods whose definitions are written scrambled, encrypted or binary (as the game reads them) are read: their
+  roads' looks, junctions and water were left out without a word. Whatever still can't be read is named in app.log.
+- A map mod with damaged map files is left out and named, instead of the whole map failing to prepare or the
+  preparation sitting still (a zip cut short, damaged sectors, junctions or models, a road of impossible length,
+  ground placed nowhere; where a mod's sector doesn't fit the game's own, that mod is left out). A damaged or
+  protected archive can no longer make a preparation ask for gigabytes at once ("memory allocation of … bytes
+  failed").
+- A map whose parts lie far apart (map mods across the world's oceans, or a DLC far from the rest: one player's
+  spans 1,561 x 1,389 km) no longer needs tens of gigabytes of memory, or hundreds of thousands of files of open
+  sea on disk, and its sea comes out right. Small lakes and islands far from the map's middle are drawn the right
+  way (a lake could come out as land, an island as a hole).
+- Prepare Maps Faster no longer runs out of memory on PCs where other programs use a good part of it (a laptop of
+  16 GB failed with "memory allocation ... failed"): it now counts everything the PC uses. Preparing a map also
+  takes less memory and less time on its own.
+- Starting the game while a map is being prepared stops the preparation, and the companion says so: it went on
+  under the game, taking the PC's memory and processor from it. It starts again from the beginning once the game
+  is closed.
+- The map bar moves the whole way through, at the pace the work really goes ("stuck at 92%" for minutes), and gives
+  each map an equal share however many profiles play it.
+- A map that fails ends with what went wrong, and the next profile's map is prepared: it could sit still at a
+  percentage for ever. A failed map says the fault itself, not "a scoped thread panicked", and one that couldn't
+  get the memory it needed says how much it asked for.
+- A preparation that's stopped or fails no longer leaves gigabytes of unfinished files behind.
+- Maps prepared by an older WestPlay are prepared again when the map builder changes: a map prepared by 2.2.0 that
+  left no mod out was taken as up to date, so ATS's start at San Francisco (2.2.1) never reached it.
 
 ## 2.3.0 (2026-11-11)
 - Safari: the web in the cab, in iPad Safari's look (iPadOS 26). Tabs in a tab bar of their own, or Compact, in the
@@ -61,12 +119,6 @@ update.
   it: the same map was prepared twice at once, and the game's weather and route read twice.
 - When the game crashes, plugin.log says which error ended it and the calls that led to it, and whose code each of
   WestPlay's hooks went into: a crash with an upscaler or another tool in the game can now be found from the log.
-
-## 2.2.2 国内定制版 / Domestic Edition (2026-11-11)
-- 整合上游 2.2.2：独立地图构建进程、可选加速构建、指定地图重新准备、音频与地图显示修复，以及崩溃诊断与日志轮转。
-- 保留 B站、网易云音乐、喜马拉雅、抖音、红果短剧、信号灯倒计时、货运 HUD 和中英双语定制；不恢复 Spotify 或 YouTube Music。
-- 暂停在线更新，避免原版安装包覆盖定制功能；请手动安装国内定制版升级包，现有数据目录保持不变。
-- Includes upstream 2.2.2 while retaining domestic integrations. Online updates are disabled; upgrade manually with a domestic installer.
 
 ## 2.2.2 (2026-11-06)
 - Prepare Maps Faster, for strong PCs: a switch on the companion's Map page, and a step of its own before WestPlay

@@ -146,6 +146,7 @@ mod tests {
             length: 20.0,
             next: Vec::new(),
             trucks: true,
+            semaphore: None,
         }
     }
     fn fork() -> Prefab {

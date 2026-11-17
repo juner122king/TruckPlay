@@ -55,3 +55,8 @@ kenworth-t680-2022 ui/dashboard/kenworth_t680_2022_gps.sii
 # ATS Western Star 57X: its 1440 x 540 GPS script; the GPS model piece maps the full texture tile to a 2.493:1
 # display. Keep new layouts last.
 western-star-57x ui/dashboard/westernstar_57x_gps.sii
+# The Coaches DLC's Scania Touring and MAN Lion's Coach (2024), whose real ones have CarPlay (owner 2026-11-12;
+# the Volvo 9700's hasn't: the game keeps its screen): each its own script in every interior (computers.sui), on a
+# 512 x 256 surface the mod draws at 1024 x 512, of which their displays show the whole.
+scania-touring    ui/dashboard/scania_touring_23_gps.sii
+man-lions-24      ui/dashboard/man_lions_24_gps.sii

@@ -50,6 +50,8 @@ fn run(wants: &[Want], dir: &Path, settings: &SharedSettings, control: &Control)
         settings,
         control,
         &mut HashMap::new(),
+        &mut HashSet::new(),
+        &LeftOuts::default(),
     )
 }
 

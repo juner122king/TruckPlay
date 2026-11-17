@@ -1448,6 +1448,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "iced-x86"
+version = "1.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c447cff8c7f384a7d4f741cfcff32f75f3ad02b406432e8d6c878d56b1edf6b"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "ico"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1812,6 +1821,12 @@ dependencies = [
  "bitflags 2.13.2",
  "serde",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
 name = "libappindicator"
@@ -4147,7 +4162,7 @@ checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 
 [[package]]
 name = "westplay-app"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -4160,7 +4175,7 @@ dependencies = [
 
 [[package]]
 name = "westplay-host"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "base64 0.22.1",
  "image",
@@ -4180,7 +4195,7 @@ dependencies = [
 
 [[package]]
 name = "westplay-mapdata"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "aes",
  "cbc",
@@ -4194,7 +4209,7 @@ dependencies = [
 
 [[package]]
 name = "westplay-maps"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "mimalloc",
  "serde_json",
@@ -4206,8 +4221,9 @@ dependencies = [
 
 [[package]]
 name = "westplay-plugin"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
+ "iced-x86",
  "minhook",
  "westplay-shared",
  "windows",
@@ -4215,7 +4231,7 @@ dependencies = [
 
 [[package]]
 name = "westplay-probe"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "westplay-shared",
  "windows",
@@ -4223,7 +4239,7 @@ dependencies = [
 
 [[package]]
 name = "westplay-setup"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "flate2",
  "png 0.18.1",
@@ -4237,7 +4253,7 @@ dependencies = [
 
 [[package]]
 name = "westplay-shared"
-version = "2.3.0-domestic.2"
+version = "2.4.0-domestic.1"
 dependencies = [
  "serde",
  "windows",

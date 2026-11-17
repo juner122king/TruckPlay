@@ -11,7 +11,7 @@ import { call } from './bridge'
 
 vi.mock('./bridge', () => ({ call: vi.fn(), on: vi.fn() }))
 
-describe('2.3.0-domestic.2 domestic edition integration', () => {
+describe('2.4.0-domestic.1 domestic edition integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -44,6 +44,10 @@ describe('2.3.0-domestic.2 domestic edition integration', () => {
     for (const code of companionLanguages()) {
       const words = companionWords(code)
       expect(words.map.fast).toBeTruthy()
+      expect(words.screen.coachSpeakers).toBeTruthy()
+      expect(words.controls.brightnessDown).toBeTruthy()
+      expect(words.controls.brightnessUp).toBeTruthy()
+      expect(words.map.gameStopped.text).toBeTruthy()
       expect(words.update.manualOnly).toBeTruthy()
     }
     expect(companionWords('zh_cn').about.title).toContain('国内定制版')
@@ -55,13 +59,13 @@ describe('2.3.0-domestic.2 domestic edition integration', () => {
     const release = JSON.parse(releaseConfig)
     const ui = JSON.parse(uiPackage)
     expect(config.identifier).toBe('app.westplay')
-    expect(config.version).toBe('2.3.0-domestic.2')
+    expect(config.version).toBe('2.4.0-domestic.1')
     expect(ui.version).toBe(config.version)
     const lockfile = JSON.parse(uiLockfile)
     expect(lockfile.version).toBe(config.version)
     expect(lockfile.packages[''].version).toBe(config.version)
     expect(__WESTPLAY_VERSION__).toBe(config.version)
-    expect(`${companionWords('zh_cn').about.title} ${config.version}`).toBe('WestPlay 国内定制版 2.3.0-domestic.2')
+    expect(`${companionWords('zh_cn').about.title} ${config.version}`).toBe('WestPlay 国内定制版 2.4.0-domestic.1')
     expect(config.app.windows[0]).toMatchObject({ resizable: true, maximizable: true, width: 780, height: 520 })
     expect(config.plugins?.updater).toBeUndefined()
     expect(release.bundle.createUpdaterArtifacts).toBe(false)

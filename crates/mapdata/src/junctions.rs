@@ -16,7 +16,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 use crate::files::{FileError, GameFiles};
-use crate::geometry::{self, Point, PrefabPlacement};
+use crate::geometry::{self, Point, PrefabPlacement, distance};
 use crate::lane_guidance::{self, LaneHint};
 use crate::lanes::{self, Carriageways};
 use crate::prefab::Prefab;
@@ -161,8 +161,10 @@ impl Junctions {
             .collect();
         let mut lane_hints = Vec::new();
         let mut junctions = Vec::new();
-        // The junctions where trucks are kept to lanes of their own (a toll plaza's booths): their way is those lanes.
-        let mut trucks_apart = BTreeSet::new();
+        // The junctions whose way is its lanes, never the road's line, and where along the way (a share of its length,
+        // first and last) the line is exactly on them: where it passes a barrier (a toll booth, a border gate: the one it
+        // drives through), there; where trucks are kept to lanes of their own with no barrier on them, the middle.
+        let mut on_lanes: HashMap<usize, [f32; 2]> = HashMap::new();
         for (span, pair) in nodes.windows(2).enumerate() {
             let (from, to) = (pair[0], pair[1]);
             let Some(items) = prefabs_at.get(&from.uid) else { continue };
@@ -180,8 +182,7 @@ impl Junctions {
                 else {
                     continue;
                 };
-                // The item lists its nodes from the prefab's origin node on (geometry::prefab_world_node).
-                let own = |world: usize| (world + *origin as usize) % count;
+                let own = |world: usize| geometry::prefab_own_node(world, *origin as usize, count);
                 let Some(path) = prefab.path(own(a), own(b)) else { continue };
                 let placement = PrefabPlacement::new(origin_node, first);
                 let placed: Vec<Point> = path.iter().map(|&p| placement.place(p)).collect();
@@ -224,8 +225,13 @@ impl Junctions {
                         lane_hints.push(LaneHint { node: span, start, end: span + 1, lanes });
                     }
                 }
-                if prefab.trucks_kept_apart(own(a), own(b)) {
-                    trucks_apart.insert(span);
+                let barriers = prefab
+                    .lanes(own(a), own(b))
+                    .and_then(|(chain, _)| barriers_along(prefab, &chain, &path, &self.definitions.barriers));
+                if let Some(along) = barriers {
+                    on_lanes.insert(span, along);
+                } else if prefab.trucks_kept_apart(own(a), own(b)) {
+                    on_lanes.insert(span, [0.5, 0.5]);
                 }
                 junctions.push(Junction { span, path: placed, maneuver: maneuver(prefab, own(a), own(b)) });
                 break;
@@ -246,19 +252,18 @@ impl Junctions {
         };
         for junction in &mut junctions {
             let (start, end) = (shifted[junction.span], shifted[junction.span + 1]);
+            // Through a toll plaza or a border, turning or not: on its lanes at the booth or gate it drives through
+            // (owner 2026-11-11: the game's route went to a gate on the right, ours straight through between the booths,
+            // at Edirne, then south of Innsbruck, where no booth is the trucks' own: the barrier on the way tells it).
+            if let Some(&along) = on_lanes.get(&junction.span) {
+                junction.path = onto_ends_from_lanes(&junction.path, at(junction.span), at(junction.span + 1), along);
+                continue;
+            }
             junction.path = match (junction.maneuver, start, end) {
                 // Straight on (no turn to make: on along a motorway past its exit, through a lane closing),
                 // between roads: on along them, as the road would run, not along whichever lane the
-                // junction's way takes (a lane leaning towards the exit and back). Not where trucks are kept to
-                // lanes of their own: through a toll plaza the game's GPS takes the truck's booth, to the side (owner
-                // 2026-11-11: the game's route went to a gate on the right, ours straight through the cars').
-                (None, Some((from, _, leaving)), Some((to, _, arriving))) if !trucks_apart.contains(&junction.span) => {
-                    hermite(from, leaving, to, arriving)
-                }
-                // Straight through a toll plaza on the truck's own lanes: on them at its booths, its middle.
-                (None, _, _) if trucks_apart.contains(&junction.span) => {
-                    onto_ends_from_lanes(&junction.path, at(junction.span), at(junction.span + 1))
-                }
+                // junction's way takes (a lane leaning towards the exit and back).
+                (None, Some((from, _, leaving)), Some((to, _, arriving))) => hermite(from, leaving, to, arriving),
                 _ => onto_ends(&junction.path, at(junction.span), at(junction.span + 1)),
             };
         }
@@ -486,17 +491,7 @@ const SAME_LANE: f32 = 1.0;
 fn hermite(from: Point, leaving: Point, to: Point, arriving: Point) -> Vec<Point> {
     let length = distance(from, to);
     let segments = (length / 8.0).ceil().clamp(1.0, 64.0) as usize;
-    (0..=segments)
-        .map(|i| {
-            let s = i as f32 / segments as f32;
-            let (s2, s3) = (s * s, s * s * s);
-            let (h00, h10, h01, h11) = (2.0 * s3 - 3.0 * s2 + 1.0, s3 - 2.0 * s2 + s, -2.0 * s3 + 3.0 * s2, s3 - s2);
-            let along = |axis: usize| {
-                h00 * from[axis] + h10 * leaving[axis] * length + h01 * to[axis] + h11 * arriving[axis] * length
-            };
-            [along(0), along(1)]
-        })
-        .collect()
+    (0..=segments).map(|i| geometry::hermite(from, leaving, to, arriving, length, i as f32 / segments as f32)).collect()
 }
 
 /// Below this (degrees, either way), a way out of a junction goes on straight.
@@ -613,28 +608,56 @@ fn onto_ends(path: &[Point], start: Point, end: Point) -> Vec<Point> {
         .collect()
 }
 
-/// `path` moved to start at `start` and end at `end` as [`onto_ends`], each end's gap easing out by the middle of
-/// it: on its own lanes there (a toll plaza's truck booths, which the game keeps trucks to).
-fn onto_ends_from_lanes(path: &[Point], start: Point, end: Point) -> Vec<Point> {
+/// `path` moved to start at `start` and end at `end` as [`onto_ends`], each end's gap easing out on the way to
+/// `on[0]` of its length and in from `on[1]` (shares of it, 0 to 1): on its own lanes from the one to the other (a toll
+/// booth or a border gate it drives through, a toll plaza's truck lanes in its middle).
+fn onto_ends_from_lanes(path: &[Point], start: Point, end: Point, on: [f32; 2]) -> Vec<Point> {
     let (Some(&first), Some(&last)) = (path.first(), path.last()) else { return Vec::new() };
     let (from, to) = ([start[0] - first[0], start[1] - first[1]], [end[0] - last[0], end[1] - last[1]]);
-    let mut along = vec![0.0];
-    for pair in path.windows(2) {
-        along.push(along.last().unwrap() + distance(pair[0], pair[1]));
-    }
-    let total = along.last().copied().unwrap_or(0.0).max(f32::EPSILON);
+    let shares = shares_along(path);
+    let [on_from, on_to] = [on[0].clamp(0.0, 1.0), on[1].clamp(0.0, 1.0)];
     path.iter()
-        .zip(&along)
-        .map(|(p, &at)| {
-            let t = at / total;
-            let (a, b) = ((1.0 - 2.0 * t).max(0.0), (2.0 * t - 1.0).max(0.0));
+        .zip(&shares)
+        .map(|(p, &t)| {
+            let a = if t < on_from { 1.0 - t / on_from } else { 0.0 };
+            let b = if t > on_to { (t - on_to) / (1.0 - on_to) } else { 0.0 };
             [p[0] + from[0] * a + to[0] * b, p[1] + from[1] * a + to[1] * b]
         })
         .collect()
 }
 
-fn distance(a: Point, b: Point) -> f32 {
-    (b[0] - a[0]).hypot(b[1] - a[1])
+/// How far along `path` each of its points is, as a share of its length (0 at the first, 1 at the last).
+fn shares_along(path: &[Point]) -> Vec<f32> {
+    let mut along = vec![0.0];
+    for pair in path.windows(2) {
+        along.push(along.last().unwrap() + distance(pair[0], pair[1]));
+    }
+    let total = along.last().copied().unwrap_or(0.0).max(f32::EPSILON);
+    along.iter().map(|at| at / total).collect()
+}
+
+/// Where along the way of `chain` (its points `path`, in the prefab's own space) it passes barriers ([`Prefab::
+/// passes_barrier`]), first and last, as shares of its length: each barrier's lane at its middle, at the point of the
+/// way nearest it. `None` where it passes none.
+fn barriers_along(
+    prefab: &Prefab,
+    chain: &[usize],
+    path: &[Point],
+    barriers: &std::collections::HashSet<u64>,
+) -> Option<[f32; 2]> {
+    let shares = shares_along(path);
+    let mut found: Option<[f32; 2]> = None;
+    for curve in chain.iter().filter_map(|&curve| prefab.curves.get(curve)) {
+        if !curve.semaphore.is_some_and(|profile| barriers.contains(&profile)) {
+            continue;
+        }
+        let middle = curve.points(2)[1].0;
+        let nearest =
+            (0..path.len()).min_by(|&a, &b| distance(path[a], middle).total_cmp(&distance(path[b], middle)))?;
+        let share = shares[nearest];
+        found = Some(found.map_or([share, share], |[first, last]| [first.min(share), last.max(share)]));
+    }
+    found
 }
 
 #[cfg(test)]
@@ -752,6 +775,7 @@ mod tests {
                     length,
                     next: next.clone(),
                     trucks: true,
+                    semaphore: None,
                 }
             })
             .collect();
@@ -841,10 +865,15 @@ mod tests {
         // The truck's booth 12 m right of the road's middle, its lanes there from 10 m to 30 m; the road's middle at
         // either end, the lanes in and out 2 m beside it.
         let lanes = [[0.0, 2.0], [10.0, 12.0], [20.0, 12.0], [30.0, 12.0], [40.0, 2.0]];
-        let path = onto_ends_from_lanes(&lanes, [0.0, 0.0], [40.0, 0.0]);
+        let path = onto_ends_from_lanes(&lanes, [0.0, 0.0], [40.0, 0.0], [0.5, 0.5]);
         assert_eq!((path[0], path[4]), ([0.0, 0.0], [40.0, 0.0]));
         // At the booth (the middle), on the truck's lane; on the way to it, the gap easing out.
         assert_eq!(path[2], [20.0, 12.0]);
         assert!(path[1][1] > 10.0 && path[1][1] < 12.0 && path[3][1] > 10.0 && path[3][1] < 12.0);
+        // A booth off the middle (a quarter along: its lane from 10 m on): on the lane there, and on it till the
+        // gate three quarters along, the gaps easing in and out before and after.
+        let path = onto_ends_from_lanes(&lanes, [0.0, 0.0], [40.0, 0.0], [0.25, 0.75]);
+        assert_eq!((path[1], path[2], path[3]), ([10.0, 12.0], [20.0, 12.0], [30.0, 12.0]));
+        assert_eq!((path[0], path[4]), ([0.0, 0.0], [40.0, 0.0]));
     }
 }

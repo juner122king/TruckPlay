@@ -218,20 +218,26 @@
   font-variant-numeric: tabular-nums;
 }
 .speed-limit {
+  --sign: 90px;
   box-sizing: border-box;
-  width: 90px;
-  height: 90px;
+  width: var(--sign);
+  height: var(--sign);
   display: grid;
   place-content: center;
   border: 7px solid #ee302b;
   border-radius: 50%;
   background: #fff;
   color: #101112;
-  font-size: calc(42px * var(--text-scale, 1));
+  font-size: calc(var(--sign) * 0.4667);
   font-weight: 750;
   letter-spacing: -0.04em;
   line-height: 1;
   box-shadow: 0 0 0 2px #141517;
+}
+/* Keep three-digit limits inside the ring, independent of the text-size setting. */
+.speed-limit.three-digits {
+  font-size: calc(var(--sign) * 0.38);
+  letter-spacing: -0.06em;
 }
 .speed-stack.american {
   padding-left: 7px;
@@ -242,9 +248,12 @@
   border-radius: 5px;
   border: 2px solid #111;
   outline: 2px solid #fff;
-  font-size: calc(39px * var(--text-scale, 1));
+  font-size: 39px;
   gap: 2px;
   text-align: center;
+}
+.american .speed-limit.three-digits {
+  font-size: 32px;
 }
 .speed-limit-heading {
   font-size: 11px;

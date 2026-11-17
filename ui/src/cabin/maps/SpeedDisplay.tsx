@@ -37,7 +37,7 @@ export function SpeedDisplayView({
   return (
     <div className={`speed-stack${american ? ' american' : ''}`}>
       {limit > 0 && (
-        <div className="speed-limit" aria-label={limitLabel}>
+        <div className={`speed-limit${limit >= 100 ? ' three-digits' : ''}`} aria-label={limitLabel}>
           {american && (
             <span className="speed-limit-heading" aria-hidden="true">
               SPEED

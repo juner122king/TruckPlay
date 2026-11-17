@@ -2,14 +2,13 @@ import type { MapStage } from '../../useHostStatus'
 import type { KeyPreset } from '../../useSettings'
 
 /**
- * The onboarding's words, in each of the game's 43 languages (by the game's own codes: `locale/<code>` in
+ * The onboarding's words, in English and Simplified Chinese (by the game's codes: `locale/<code>` in
  * its archives). It speaks the game's language, as WestPlay does in the cab; before the game was ever
  * started, Windows' ([`languageOf`]); English for a language the game doesn't have. Where the onboarding
  * names something in the game (its Mod Manager, its question about advanced SDK features, its OK button),
  * it uses the game's own words for it in that language, from the game's `localization.sui`
  * (`mod_browser_t`, `sdk_warning`, `ok`).
  *
- * The translations other than English and Turkish were written without a native speaker's review yet.
  */
 
 /** A note: its first words in bold, then the rest. Also a banner on the screen: its title, then a line. */
