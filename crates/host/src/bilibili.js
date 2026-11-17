@@ -13,12 +13,31 @@
     location.pathname.includes('/bangumi/play/')
   let isPlaying = wantedPlaying
   let isEnded = false
-  let isDanmakuOn = false
+  const readStoredDanmaku = () => {
+    try {
+      return sessionStorage.getItem('westplay_danmaku_on') === '1'
+    } catch {
+      return false
+    }
+  }
+  const writeStoredDanmaku = (on) => {
+    try {
+      sessionStorage.setItem('westplay_danmaku_on', on ? '1' : '0')
+    } catch {}
+  }
+
+  let isBuffering = false
+  let isDanmakuOn = readStoredDanmaku()
+  let lastDanmakuSyncAt = 0
   let currentQuality = 64 // 720P default
   let currentRate = 1.0
   let currentPage = 1
   let currentPages = []
   let dynamicOffset = ''
+
+  if (isDanmakuOn) {
+    document.documentElement.classList.add('westplay-danmaku-on')
+  }
 
   const apiFetch = (url, options = {}) => {
     return fetch(url, {
@@ -127,28 +146,13 @@
     html.westplay-crop #wp-bilibili-video {
       object-fit: cover !important;
     }
-    .bpx-player-dm-wrap {
+    .bpx-player-dm-wrap,
+    .bpx-player-row-dm-wrap,
+    .bili-danmaku-x-container,
+    .danmaku-wrap,
+    .danmaku-canvas-box {
       display: none !important;
       visibility: hidden !important;
-    }
-    html.westplay-danmaku-on canvas,
-    html.westplay-danmaku-on .bpx-player-dm-wrap,
-    html.westplay-danmaku-on .bpx-player-dm-wrap *,
-    html.westplay-danmaku-on .web-player-danmaku,
-    html.westplay-danmaku-on .web-player-danmaku *,
-    html.westplay-danmaku-on .danmaku-canvas-box {
-      display: block !important;
-      visibility: visible !important;
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      left: 0 !important;
-      top: 0 !important;
-      background: transparent !important;
-      object-fit: contain !important;
-      pointer-events: none !important;
-      z-index: 2147483646 !important;
     }
     .video-cover,
     .web-player-mask,
@@ -195,6 +199,69 @@
       opacity: 0 !important;
       pointer-events: none !important;
     }
+    html.westplay-danmaku-on .bpx-player-dm-wrap,
+    html.westplay-danmaku-on .bpx-player-row-dm-wrap,
+    html.westplay-danmaku-on .bili-danmaku-x-container,
+    html.westplay-danmaku-on .web-player-danmaku,
+    html.westplay-danmaku-on .danmaku-wrap,
+    html.westplay-danmaku-on .danmaku-canvas-box {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      left: 0 !important;
+      top: 0 !important;
+      background: transparent !important;
+      pointer-events: none !important;
+      overflow: hidden !important;
+      z-index: 2147483646 !important;
+    }
+    html.westplay-danmaku-on .bpx-player-dm-wrap *,
+    html.westplay-danmaku-on .bpx-player-row-dm-wrap *,
+    html.westplay-danmaku-on .bili-danmaku-x-container *,
+    html.westplay-danmaku-on .web-player-danmaku *,
+    html.westplay-danmaku-on .danmaku-wrap *,
+    html.westplay-danmaku-on .danmaku-canvas-box * {
+      visibility: visible !important;
+      pointer-events: none !important;
+    }
+    html.westplay-danmaku-on .bpx-player-dm-wrap canvas,
+    html.westplay-danmaku-on .bpx-player-row-dm-wrap canvas,
+    html.westplay-danmaku-on .web-player-danmaku canvas,
+    html.westplay-danmaku-on .danmaku-wrap canvas,
+    html.westplay-danmaku-on .danmaku-canvas-box canvas {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      left: 0 !important;
+      top: 0 !important;
+      background: transparent !important;
+      object-fit: contain !important;
+      pointer-events: none !important;
+      z-index: 2147483646 !important;
+    }
+    .bpx-player-dm-root,
+    .bpx-player-sending-bar,
+    .bpx-player-sending-area,
+    .bpx-player-dm-hint,
+    .bpx-player-dm-setting,
+    .bpx-player-dm-switch,
+    .bpx-player-dm-input,
+    .bpx-player-dm-btn-send,
+    .web-player-danmaku-input,
+    .danmaku-sender {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
   `
 
   const addStyle = () => {
@@ -209,6 +276,7 @@
   const hookMedia = (el) => {
     if (!el || el === currentMedia) return
     currentMedia = el
+    isBuffering = el.readyState < 2
     if (window.westplayCabSound) {
       sound = window.westplayCabSound(el, (bars) => {
         post({ type: 'spectrum', bars })
@@ -220,6 +288,7 @@
     if (!el.paused && !el.ended) {
       isPlaying = true
       isEnded = false
+      if (el.readyState >= 2) isBuffering = false
       sendPlayback()
     }
     el.addEventListener('play', () => {
@@ -230,7 +299,26 @@
     el.addEventListener('playing', () => {
       isPlaying = true
       isEnded = false
+      isBuffering = false
       sendPlayback()
+    })
+    el.addEventListener('canplay', () => {
+      isBuffering = false
+      sendPlayback()
+    })
+    el.addEventListener('loadeddata', () => {
+      if (el.readyState >= 2) isBuffering = false
+      sendPlayback()
+    })
+    el.addEventListener('waiting', () => {
+      isBuffering = true
+      sendPlayback()
+    })
+    el.addEventListener('stalled', () => {
+      if (el.readyState < 3) {
+        isBuffering = true
+        sendPlayback()
+      }
     })
     el.addEventListener('pause', () => {
       const othersPlaying = Array.from(document.querySelectorAll('video, audio')).some(
@@ -238,6 +326,7 @@
       )
       if (!othersPlaying) {
         isPlaying = false
+        isBuffering = false
         sendPlayback()
       }
     })
@@ -248,6 +337,9 @@
       )
       if (!el.paused && !el.ended && !isPlaying) {
         isPlaying = true
+      }
+      if (!el.paused && el.readyState >= 2) {
+        isBuffering = false
       }
       if (isLive) {
         sendPlayback()
@@ -628,6 +720,69 @@
     }
   }
 
+  const syncDanmakuProfile = (on) => {
+    try {
+      const profile = JSON.parse(localStorage.getItem('bpx_player_profile') || '{}')
+      profile.dmSetting = profile.dmSetting || {}
+      if (profile.dmSetting.status !== on) {
+        profile.dmSetting.status = on
+        localStorage.setItem('bpx_player_profile', JSON.stringify(profile))
+      }
+    } catch {}
+  }
+
+  const syncDanmakuDomSwitch = (on, force = false) => {
+    const now = Date.now()
+    if (!force && now - lastDanmakuSyncAt < 800) return
+
+    try {
+      const input = document.querySelector(
+        '.bpx-player-dm-switch input[type="checkbox"], .bpx-player-dm-input, .bui-danmaku-switch-input'
+      )
+      if (input && typeof input.checked === 'boolean' && input.checked !== on) {
+        lastDanmakuSyncAt = now
+        input.click()
+        return
+      }
+
+      if (location.hostname.includes('live.bilibili.com')) {
+        const liveBtn = document.querySelector(
+          '.web-player-controller-wrap .danmaku-control, .web-player-icon-danmaku, [data-title*="弹幕"]'
+        )
+        if (liveBtn) {
+          const title = liveBtn.getAttribute('title') || liveBtn.getAttribute('data-title') || ''
+          const ariaChecked = liveBtn.getAttribute('aria-checked')
+          const isCurrentlyOff =
+            ariaChecked === 'false' ||
+            liveBtn.classList.contains('disabled') ||
+            liveBtn.classList.contains('off') ||
+            title.includes('开启弹幕') ||
+            title.includes('打开弹幕')
+          const isCurrentlyOn =
+            ariaChecked === 'true' ||
+            liveBtn.classList.contains('active') ||
+            title.includes('关闭弹幕')
+          if ((on && isCurrentlyOff) || (!on && isCurrentlyOn)) {
+            lastDanmakuSyncAt = now
+            if (typeof liveBtn.click === 'function') liveBtn.click()
+          }
+        }
+      }
+    } catch {}
+  }
+
+  const applyDanmaku = (on, forceSwitch = false) => {
+    isDanmakuOn = Boolean(on)
+    writeStoredDanmaku(isDanmakuOn)
+    document.documentElement.classList.toggle('westplay-danmaku-on', isDanmakuOn)
+    syncDanmakuProfile(isDanmakuOn)
+    syncDanmakuDomSwitch(isDanmakuOn, forceSwitch)
+  }
+
+  if (isDanmakuOn) {
+    syncDanmakuProfile(true)
+  }
+
   setInterval(() => {
     addStyle()
     const videos = document.querySelectorAll('video, audio')
@@ -635,6 +790,7 @@
     syncMediaPlayingState()
     extractActiveInfo()
     ensurePlaying()
+    syncDanmakuDomSwitch(isDanmakuOn, false)
     checkStatus()
   }, 1000)
 
@@ -882,6 +1038,8 @@
   }
 
   let lastSignedIn = null
+  let lastProfileKey = ''
+  let currentProfile = null
   let isCheckingNav = false
   let lastNavCheck = 0
 
@@ -891,9 +1049,12 @@
       lastSignedIn = true
       post({
         type: 'state',
-        state: { signedIn: true, playing: isPlaying },
+        state: {
+          signedIn: true,
+          playing: isPlaying,
+          ...(currentProfile || {}),
+        },
       })
-      return
     }
 
     const now = Date.now()
@@ -907,11 +1068,24 @@
         updateWbiKeys(data.data.wbi_img)
       }
       const signedIn = Boolean(data?.data?.isLogin)
-      if (signedIn !== lastSignedIn) {
+      if (signedIn && data?.data) {
+        const name = cleanText(data.data.uname || '') || null
+        const avatar = formatPic(data.data.face) || null
+        currentProfile = { name, avatar }
+      } else {
+        currentProfile = null
+      }
+      const profileKey = currentProfile ? `${currentProfile.name || ''}|${currentProfile.avatar || ''}` : ''
+      if (signedIn !== lastSignedIn || profileKey !== lastProfileKey) {
         lastSignedIn = signedIn
+        lastProfileKey = profileKey
         post({
           type: 'state',
-          state: { signedIn, playing: isPlaying },
+          state: {
+            signedIn,
+            playing: isPlaying,
+            ...(currentProfile || {}),
+          },
         })
       }
     } catch {
@@ -942,6 +1116,11 @@
     const status = isLive
       ? (isPlaying ? 'playing' : 'paused')
       : (isEnded ? 'ended' : isPlaying ? 'playing' : 'paused')
+    const ready = Boolean(
+      currentMedia &&
+      currentMedia.readyState >= 2 &&
+      (currentMedia.currentTime > 0 || !currentMedia.paused || isEnded)
+    )
 
     post({
       type: 'playback',
@@ -954,6 +1133,8 @@
         duration: dur,
         position: pos,
         status,
+        ready,
+        buffering: isBuffering,
         quality: currentQuality,
         qualities: getAvailableQualities(),
         rate: currentMedia && Number.isFinite(currentMedia.playbackRate) ? currentMedia.playbackRate : currentRate,
@@ -1175,12 +1356,7 @@
         sendPlayback()
       }
     } else if (action === 'danmaku') {
-      isDanmakuOn = Boolean(cmd.on)
-      if (isDanmakuOn) {
-        document.documentElement.classList.add('westplay-danmaku-on')
-      } else {
-        document.documentElement.classList.remove('westplay-danmaku-on')
-      }
+      applyDanmaku(Boolean(cmd.on), true)
       sendPlayback()
     } else if (action === 'ask') {
       handleAsk(cmd.id, cmd.question)
@@ -1268,7 +1444,8 @@
         post({ type: 'answer', answer: { id, suggestions } })
       } else if (question.ask === 'popular') {
         const page = question.page || 1
-        const res = await apiFetch(`https://api.bilibili.com/x/web-interface/popular?ps=20&pn=${page}`)
+        const pn = page + (question.freshIdx ? question.freshIdx % 5 : 0)
+        const res = await apiFetch(`https://api.bilibili.com/x/web-interface/popular?ps=20&pn=${pn}`)
         const data = await res.json()
         const list = data?.data?.list || []
         const videos = list.map((v) => ({
@@ -1284,7 +1461,8 @@
         post({ type: 'answer', answer: { id, videos, hasMore: list.length >= 20 } })
       } else if (question.ask === 'recommend') {
         const page = question.page || 1
-        const res = await apiFetch(`https://api.bilibili.com/x/web-interface/index/top/feed/rcmd?ps=20&fresh_idx=${page}`)
+        const freshIdx = (question.freshIdx ? question.freshIdx * 10 : 0) + page
+        const res = await apiFetch(`https://api.bilibili.com/x/web-interface/index/top/feed/rcmd?ps=20&fresh_idx=${freshIdx}`)
         const data = await res.json()
         const list = data?.data?.item || []
         const videos = list.map((v) => ({
@@ -1406,7 +1584,8 @@
             },
           })
         } else if (which === 'popular') {
-          const res = await apiFetch(`https://api.bilibili.com/x/web-interface/popular?ps=20&pn=${page}`)
+          const pn = page + (question.freshIdx ? question.freshIdx % 5 : 0)
+          const res = await apiFetch(`https://api.bilibili.com/x/web-interface/popular?ps=20&pn=${pn}`)
           const data = await res.json()
           const list = data?.data?.list || []
           const videos = list.map((v) => ({

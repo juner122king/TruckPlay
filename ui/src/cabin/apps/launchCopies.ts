@@ -24,8 +24,9 @@ export function isCopied(app: AppId): boolean {
 }
 
 /** The copies' layout version: a change to how they're made or shown leaves the old ones unread (1: built
- * apart, signed out; 2: saved at any opening, with its content; 4: redesigned CarPlay Radio UI). */
-const VERSION = 4
+ * apart, signed out; 2: saved at any opening, with its content; 4: redesigned CarPlay Radio UI;
+ * 5: refactored CarPlay Bilibili UI). */
+const VERSION = 5
 
 // The copies of an older layout, gone (they'd only take room).
 try {

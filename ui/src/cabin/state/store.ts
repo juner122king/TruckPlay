@@ -679,7 +679,7 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         receiveMapFolder(message.folder, message.built)
         break
       case 'bilibili':
-        receiveBilibiliState(message.signedIn, message.playing, message.signingIn)
+        receiveBilibiliState(message.signedIn, message.playing, message.signingIn, message.name, message.avatar)
         break
       case 'bilibiliAnswer': {
         const { type: _, id, ...answer } = message

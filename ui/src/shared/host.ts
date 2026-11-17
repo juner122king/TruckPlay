@@ -246,7 +246,14 @@ export type HostMessage =
   | { type: 'map'; folder: string | null; built: number | null }
   | { type: 'mapPreparation'; state: { state: string }; cached: boolean }
   /** Bilibili: whether it's signed in and playing, and whether its sign-in QR window is open. */
-  | { type: 'bilibili'; signedIn: boolean | null; playing: boolean | null; signingIn: boolean }
+  | {
+      type: 'bilibili'
+      signedIn: boolean | null
+      playing: boolean | null
+      signingIn: boolean
+      name?: string | null
+      avatar?: string | null
+    }
   | ({ type: 'bilibiliAnswer'; id: number; failed?: boolean; error?: string } & Partial<BilibiliAnswers>)
   | { type: 'bilibiliPlayback'; playback: BilibiliPlayback | null }
   /** Ximalaya: whether it's signed in and playing, and whether its sign-in QR window is open. */
@@ -658,6 +665,8 @@ export interface BilibiliPlayback {
   roomId?: number
   seasonId?: number
   epId?: number
+  ready?: boolean
+  buffering?: boolean
 }
 
 export interface BilibiliAnswers {

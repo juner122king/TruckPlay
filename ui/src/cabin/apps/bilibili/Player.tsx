@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { isInHost } from '../../../shared/host'
 import { useCabin } from '../../state/store'
 import {
   BackGlyph,
@@ -17,6 +18,7 @@ import {
   ask,
   closePlayer,
   followArea,
+  formatClock,
   leavePlayer,
   openChannel,
   play,
@@ -35,6 +37,8 @@ import {
   toggleMute,
   useBilibili,
 } from './bilibili'
+import { DanmakuGlyph, MicGlyph, TvGlyph } from './glyphs'
+import { BiliImage } from './shared'
 import './bilibili.css'
 
 const CONTROLS_MS = 3000
@@ -58,34 +62,31 @@ export function BilibiliPlayer() {
   return open ? <OpenPlayer /> : null
 }
 
-function formatClock(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
-  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`)
-  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`
-  return `${m}:${pad(s)}`
-}
+function useBilibiliPosition(): { time: number; duration: number } {
+  const playback = useBilibili((s) => s.playback)
+  const playing = useBilibili((s) => s.playing)
+  const [now, setNow] = useState(() => performance.now())
+  const active = Boolean(playing || playback?.status === 'playing')
 
-export function DanmakuGlyph({ on }: { on?: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22" fill="none" stroke="currentColor">
-      <rect x="3" y="4.5" width="18" height="13" rx="3" strokeWidth="2" fill={on ? 'currentColor' : 'none'} />
-      <path
-        d="M7 8.5h5M7 12.5h10M14 8.5h3"
-        stroke={on ? '#000' : 'currentColor'}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
+  useEffect(() => {
+    if (!active) return
+    let frame = requestAnimationFrame(function tick() {
+      setNow(performance.now())
+      frame = requestAnimationFrame(tick)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [active])
+
+  const time = positionOf(playback, active ? now : (playback?.at ?? now))
+  return { time, duration: playback?.duration || 0 }
 }
 
 function OpenPlayer() {
   const current = useBilibili((store) => store.current)
   const playback = useBilibili((store) => store.playback)
   const playing = useBilibili((store) => store.playing)
+  const hostReady = useBilibili((store) => store.hostReady)
+  const buffering = useBilibili((store) => store.buffering)
   const queue = useBilibili((store) => store.queue)
   const related = useBilibili((store) => store.related)
   const danmaku = useBilibili((store) => store.danmaku)
@@ -95,22 +96,21 @@ function OpenPlayer() {
   const [controls, setControls] = useState(true)
   const [showDrawer, setShowDrawer] = useState(false)
   const [menu, setMenu] = useState<'settings' | null>(null)
-  const [dismissEndedOverlay, setDismissEndedOverlay] = useState(false)
+  const endedKey = `${current?.bvid ?? ''}:${queue?.page ?? 1}`
+  const [dismissedForKey, setDismissedForKey] = useState<string | null>(null)
+  const dismissEndedOverlay = dismissedForKey === endedKey
   const touched = useRef(0)
+  const settingsBtnRef = useRef<HTMLButtonElement>(null)
+  const drawerBtnRef = useRef<HTMLButtonElement>(null)
 
   const isLive = Boolean(current?.isLive || playback?.isLive || playback?.bvid?.startsWith('live:'))
   const isPlaybackPlaying = Boolean(
     playing || playback?.status === 'playing' || (isLive && playback?.status !== 'paused'),
   )
-
   const ended =
     !isLive &&
     (playback?.status === 'ended' ||
       Boolean(playback && playback.duration > 3 && positionNow() >= playback.duration - 0.5))
-
-  useEffect(() => {
-    setDismissEndedOverlay(false)
-  }, [current?.bvid, queue?.page])
 
   useEffect(() => {
     if (ended && (!related || related.length === 0) && (current?.bvid || playback?.bvid)) {
@@ -122,6 +122,23 @@ function OpenPlayer() {
       }
     }
   }, [ended, related, current?.bvid, playback?.bvid])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (menu) {
+        e.stopPropagation()
+        setMenu(null)
+        settingsBtnRef.current?.focus()
+      } else if (showDrawer) {
+        e.stopPropagation()
+        setShowDrawer(false)
+        drawerBtnRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [menu, showDrawer])
 
   const lastTap = useRef<{ at: number; side: Side | null; single?: ReturnType<typeof setTimeout> }>({
     at: -Infinity,
@@ -148,7 +165,6 @@ function OpenPlayer() {
     return () => clearTimeout(timer)
   }, [controls, isPlaybackPlaying, showDrawer, menu, ended])
 
-  // Place the video over the CarPlay area in frame pixels; update if resized
   useEffect(() => {
     const place = () => {
       const area = document.querySelector('.carplay')?.getBoundingClientRect()
@@ -187,19 +203,27 @@ function OpenPlayer() {
 
   const mid = current?.mid || playback?.mid
   const roomId = current?.roomId || playback?.roomId
+  const artwork = current?.artwork || playback?.artwork
+  const inHost = isInHost()
+  const showCover = inHost && !hostReady && !ended
 
   return (
     <div
       className={`bili-player${controls ? ' controls' : ''}`}
       onPointerDown={(event) => {
-        if (event.target !== event.currentTarget) return
+        const hit = event.target as HTMLElement | null
+        if (
+          hit?.closest('.bili-player-top, .bili-player-bottom, .bili-menu, .bili-ended-overlay, .bili-drawer-backdrop')
+        ) {
+          return
+        }
         if (menu) {
           setMenu(null)
           touch()
           return
         }
         if (ended && dismissEndedOverlay) {
-          setDismissEndedOverlay(false)
+          setDismissedForKey(null)
           touch()
           return
         }
@@ -210,8 +234,8 @@ function OpenPlayer() {
         }
 
         const box = event.currentTarget.getBoundingClientRect()
-        const across = (event.clientX - box.left) / box.width
-        const side: Side | null = across < 1 / 3 ? 'back' : across > 2 / 3 ? 'forward' : null
+        const across = (event.clientX - box.left) / Math.max(box.width, 1)
+        const side: Side | null = isLive ? null : across < 1 / 3 ? 'back' : across > 2 / 3 ? 'forward' : null
         const now = performance.now()
         const last = lastTap.current
         const skipping = side !== null && skipInd?.side === side && now - skipInd.at < SKIP_MS
@@ -230,15 +254,46 @@ function OpenPlayer() {
       }}
       onPointerMove={() => controls && touch()}
     >
+      {/* Non-host browser preview stage */}
+      {!inHost && (
+        <div className="bili-player-dev-stage" aria-hidden="true">
+          <BiliImage className="bili-player-dev-blur" src={artwork} fallback={null} />
+          <BiliImage
+            className="bili-player-dev-frame"
+            src={artwork}
+            fallback={
+              <div className="bili-player-dev-blank">
+                <TvGlyph />
+              </div>
+            }
+          />
+        </div>
+      )}
+
+      {/* Initial loading cover until WebView2 video renders frames */}
+      {showCover && (
+        <div className="bili-cover" aria-hidden="true">
+          <BiliImage src={artwork} fallback={null} />
+          <div className="bili-spinner large" role="progressbar" aria-label="正在加载视频" />
+        </div>
+      )}
+
+      {/* Mid-playback buffering indicator */}
+      {inHost && hostReady && buffering && !ended && (
+        <div className="bili-spinner large floating" role="progressbar" aria-label="正在缓冲" />
+      )}
+
       {skipInd && (
         <div key={skipInd.at} className={`bili-skip ${skipInd.side}`} aria-live="polite">
-          <span className="bili-skip-arrows">{skipInd.side === 'back' ? '◀◀' : '▶▶'}</span>
+          <span className="bili-skip-arrows" aria-hidden="true">
+            {skipInd.side === 'back' ? '◀◀' : '▶▶'}
+          </span>
           <span>{skipInd.seconds} 秒</span>
         </div>
       )}
 
-      {/* Top Header Bar */}
-      <div className={`bili-player-top${isLive ? ' live' : ''}`}>
+      {/* Top HUD */}
+      <div className={`bili-player-top${isLive ? ' live' : ''}`} inert={showDrawer || undefined}>
         <button type="button" className="bili-glass bili-round big" aria-label="返回" onClick={closePlayer}>
           <BackGlyph />
         </button>
@@ -247,8 +302,8 @@ function OpenPlayer() {
           <div className="bili-player-title live">
             <div className="bili-live-title-row">
               <span className="bili-live-player-badge">
-                <span className="bili-live-pulse-dot" />
-                <span className="bili-live-badge-label">LIVE 直播</span>
+                <span className="bili-live-pulse-dot" aria-hidden="true" />
+                <span>LIVE 直播</span>
               </span>
               {roomId ? (
                 <span className="bili-live-room-pill">
@@ -269,14 +324,20 @@ function OpenPlayer() {
                     openChannel({ mid, name: authorName })
                   }}
                 >
-                  <span className="bili-live-anchor-icon">🎙️</span>
+                  <span className="bili-live-anchor-icon" aria-hidden="true">
+                    <MicGlyph />
+                  </span>
                   <span className="bili-live-anchor-label">主播:</span>
                   <span className="bili-live-anchor-name">{authorName}</span>
-                  <span className="bili-live-anchor-arrow">›</span>
+                  <span className="bili-live-anchor-arrow" aria-hidden="true">
+                    ›
+                  </span>
                 </button>
               ) : (
                 <span className="bili-live-anchor-tag">
-                  <span className="bili-live-anchor-icon">🎙️</span>
+                  <span className="bili-live-anchor-icon" aria-hidden="true">
+                    <MicGlyph />
+                  </span>
                   <span className="bili-live-anchor-label">主播:</span>
                   <span className="bili-live-anchor-name">{authorName}</span>
                 </span>
@@ -307,7 +368,7 @@ function OpenPlayer() {
           <button
             type="button"
             className="bili-glass bili-pill bili-ended-pill-btn"
-            onClick={() => setDismissEndedOverlay(false)}
+            onClick={() => setDismissedForKey(null)}
           >
             <ReplayGlyph />
             <span>相关推荐 / 重播</span>
@@ -315,13 +376,13 @@ function OpenPlayer() {
         )}
       </div>
 
-      {/* Ended Overlay: 播放结束重播与相关视频推荐 */}
+      {/* Ended Overlay */}
       {ended && !dismissEndedOverlay && !showDrawer && (
-        <div className="bili-ended-overlay">
+        <div className="bili-ended-overlay" role="dialog" aria-label="播放结束">
           <div className="bili-ended-card">
             <div className="bili-ended-top-row">
               <div className="bili-ended-status">
-                <span className="bili-ended-status-dot" />
+                <span className="bili-ended-status-dot" aria-hidden="true" />
                 <span className="bili-ended-status-text">播放已结束</span>
               </div>
               <div className="bili-ended-actions">
@@ -352,7 +413,7 @@ function OpenPlayer() {
                   type="button"
                   className="bili-btn-dismiss"
                   aria-label="收起推荐"
-                  onClick={() => setDismissEndedOverlay(true)}
+                  onClick={() => setDismissedForKey(endedKey)}
                 >
                   <CloseGlyph />
                 </button>
@@ -368,29 +429,26 @@ function OpenPlayer() {
               <div className="bili-ended-shelf">
                 {related && related.length > 0 ? (
                   related.map((v) => (
-                    <div
-                      key={v.bvid}
-                      className="bili-ended-video-card"
-                      onClick={() => play(v, true)}
-                      role="button"
-                      tabIndex={0}
-                    >
+                    <button key={v.bvid} type="button" className="bili-ended-video-card" onClick={() => play(v, true)}>
                       <div className="bili-ended-thumb">
-                        {v.artwork ? (
-                          <img src={v.artwork} alt="" referrerPolicy="no-referrer" />
-                        ) : (
-                          <span className="bili-thumb-blank" />
-                        )}
+                        <BiliImage
+                          src={v.artwork}
+                          fallback={
+                            <span className="bili-thumb-blank" aria-hidden="true">
+                              <TvGlyph />
+                            </span>
+                          }
+                        />
                         {v.duration ? <span className="bili-badge">{formatClock(v.duration)}</span> : null}
                       </div>
                       <div className="bili-ended-video-info">
                         <span className="bili-title">{v.title}</span>
                         <span className="bili-sub">
                           {v.author}
-                          {v.playCount ? ` · ▶ ${v.playCount}` : ''}
+                          {v.playCount ? ` · ${v.playCount}播放` : ''}
                         </span>
                       </div>
-                    </div>
+                    </button>
                   ))
                 ) : (
                   <div className="bili-ended-loading">
@@ -405,69 +463,100 @@ function OpenPlayer() {
 
       {/* Drawer: 分P选集 / 相关推荐 */}
       {showDrawer ? (
-        <div className="bili-drawer">
-          <div className="bili-drawer-header">
-            <h3>{queue && queue.pages.length > 1 ? '分P选集与推荐' : '相关推荐'}</h3>
-            <button type="button" className="bili-glass bili-round" onClick={() => setShowDrawer(false)}>
-              <CloseGlyph />
-            </button>
-          </div>
+        <div
+          className="bili-drawer-backdrop"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDrawer(false)
+              drawerBtnRef.current?.focus()
+            }
+          }}
+        >
+          <div
+            className="bili-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={queue && queue.pages.length > 1 ? '分P选集与推荐' : '相关推荐'}
+          >
+            <div className="bili-drawer-header">
+              <h3>{queue && queue.pages.length > 1 ? '分P选集与推荐' : '相关推荐'}</h3>
+              <button
+                type="button"
+                className="bili-glass bili-round"
+                aria-label="关闭抽屉"
+                onClick={() => {
+                  setShowDrawer(false)
+                  drawerBtnRef.current?.focus()
+                }}
+              >
+                <CloseGlyph />
+              </button>
+            </div>
 
-          <div className="bili-drawer-body">
-            {queue && queue.pages.length > 1 && (
-              <section className="bili-drawer-section">
-                <h4>选集 ({queue.pages.length}P)</h4>
-                <div className="bili-pages-grid">
-                  {queue.pages.map((p) => (
-                    <button
-                      key={p.page}
-                      type="button"
-                      className={`bili-page-chip${queue.page === p.page ? ' active' : ''}`}
-                      onClick={() => {
-                        play(undefined, true, p.page)
-                        setShowDrawer(false)
-                      }}
-                    >
-                      <span className="bili-page-num">P{p.page}</span>
-                      <span className="bili-page-name">{p.part}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )}
+            <div className="bili-drawer-body">
+              {queue && queue.pages.length > 1 && (
+                <section className="bili-drawer-section">
+                  <h4>选集 ({queue.pages.length}P)</h4>
+                  <div className="bili-pages-grid">
+                    {queue.pages.map((p) => (
+                      <button
+                        key={p.page}
+                        type="button"
+                        className={`bili-page-chip${queue.page === p.page ? ' active' : ''}`}
+                        aria-current={queue.page === p.page ? 'true' : undefined}
+                        onClick={() => {
+                          play(undefined, true, p.page)
+                          setShowDrawer(false)
+                        }}
+                      >
+                        <span className="bili-page-num">P{p.page}</span>
+                        <span className="bili-page-name">{p.part}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-            {related && related.length > 0 && (
-              <section className="bili-drawer-section">
-                <h4>相关推荐</h4>
-                <div className="bili-related-list">
-                  {related.map((v) => (
-                    <div
-                      key={v.bvid}
-                      className="bili-related-card"
-                      onClick={() => {
-                        play(v, true)
-                        setShowDrawer(false)
-                      }}
-                    >
-                      <div className="bili-related-thumb">
-                        {v.artwork ? <img src={v.artwork} alt="" /> : <span className="bili-thumb-blank" />}
-                        {v.duration && <span className="bili-badge">{formatClock(v.duration)}</span>}
-                      </div>
-                      <div className="bili-related-info">
-                        <span className="bili-title">{v.title}</span>
-                        <span className="bili-sub">{v.author}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+              {related && related.length > 0 && (
+                <section className="bili-drawer-section">
+                  <h4>相关推荐</h4>
+                  <div className="bili-related-list">
+                    {related.map((v) => (
+                      <button
+                        key={v.bvid}
+                        type="button"
+                        className="bili-related-card"
+                        onClick={() => {
+                          play(v, true)
+                          setShowDrawer(false)
+                        }}
+                      >
+                        <div className="bili-related-thumb">
+                          <BiliImage
+                            src={v.artwork}
+                            fallback={
+                              <span className="bili-thumb-blank" aria-hidden="true">
+                                <TvGlyph />
+                              </span>
+                            }
+                          />
+                          {v.duration ? <span className="bili-badge">{formatClock(v.duration)}</span> : null}
+                        </div>
+                        <div className="bili-related-info">
+                          <span className="bili-title">{v.title}</span>
+                          <span className="bili-sub">{v.author}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
           </div>
         </div>
       ) : (
-        /* Bottom Controls Bar */
         <div className="bili-player-bottom">
-          {!isLive && <ProgressBar />}
+          {!isLive && <ProgressBar onTouch={touch} />}
           <div className="bili-controls">
             {!isLive && (
               <button
@@ -489,11 +578,8 @@ function OpenPlayer() {
               aria-label={ended ? '重播' : isPlaybackPlaying ? '暂停' : '播放'}
               onClick={() => {
                 touch()
-                if (ended) {
-                  replay()
-                } else {
-                  playOrPause()
-                }
+                if (ended) replay()
+                else playOrPause()
               }}
             >
               {ended ? <ReplayGlyph /> : isPlaybackPlaying ? <PauseGlyph /> : <PlayGlyph />}
@@ -506,11 +592,8 @@ function OpenPlayer() {
                 aria-label="刷新线路"
                 onClick={() => {
                   touch()
-                  if (current) {
-                    play(current, true)
-                  } else {
-                    send({ action: 'seek', seconds: 0 })
-                  }
+                  if (current) play(current, true)
+                  else send({ action: 'seek', seconds: 0 })
                 }}
               >
                 <ReplayGlyph />
@@ -542,11 +625,11 @@ function OpenPlayer() {
 
             <span className="bili-spacer" />
 
-            {/* Danmaku Toggle */}
             <button
               type="button"
               className={`bili-glass bili-pill bili-danmaku-btn${danmaku ? ' on' : ''}`}
-              aria-label="弹幕开关"
+              aria-label={danmaku ? '关闭弹幕' : '开启弹幕'}
+              aria-pressed={danmaku}
               onClick={() => {
                 touch()
                 toggleDanmaku()
@@ -556,11 +639,13 @@ function OpenPlayer() {
               <span className="bili-pill-text">{danmaku ? '弹幕开' : '弹幕关'}</span>
             </button>
 
-            {/* Settings (Quality & Speed) */}
             <button
+              ref={settingsBtnRef}
               type="button"
               className={`bili-glass bili-pill${menu === 'settings' ? ' on' : ''}`}
               aria-label={isLive ? '直播画质' : '画质与倍速'}
+              aria-haspopup="menu"
+              aria-expanded={menu === 'settings'}
               onClick={() => {
                 touch()
                 setMenu(menu === 'settings' ? null : 'settings')
@@ -570,9 +655,9 @@ function OpenPlayer() {
               <span className="bili-quality-tag">{qualityLabel(currentQuality, isLive)}</span>
             </button>
 
-            {/* Drawer / 选集 Button (VOD only) */}
             {!isLive && (
               <button
+                ref={drawerBtnRef}
                 type="button"
                 className="bili-glass bili-pill"
                 aria-label="选集与推荐"
@@ -587,16 +672,16 @@ function OpenPlayer() {
               </button>
             )}
           </div>
-
-          {menu === 'settings' && (
-            <SettingsMenu
-              currentQuality={currentQuality}
-              currentRate={currentRate}
-              isLive={isLive}
-              onClose={() => setMenu(null)}
-            />
-          )}
         </div>
+      )}
+
+      {controls && !showDrawer && menu === 'settings' && (
+        <SettingsMenu
+          currentQuality={currentQuality}
+          currentRate={currentRate}
+          isLive={isLive}
+          onClose={() => setMenu(null)}
+        />
       )}
     </div>
   )
@@ -629,7 +714,8 @@ function SettingsMenu({
   isLive?: boolean
   onClose: () => void
 }) {
-  const qualities = isLive
+  const hostQualities = useBilibili((s) => s.playback?.qualities)
+  const defaultQualities = isLive
     ? [
         { quality: 10000, label: '原画 (超高清)' },
         { quality: 400, label: '蓝光 (高码率)' },
@@ -644,10 +730,15 @@ function SettingsMenu({
         { quality: 32, label: '480P 清晰' },
         { quality: 16, label: '360P 流畅' },
       ]
+  const qualities = !isLive && hostQualities && hostQualities.length > 0 ? hostQualities : defaultQualities
   const rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
 
   return (
-    <div className={`bili-menu${isLive ? ' live' : ''}`} role="menu">
+    <div
+      className={`bili-menu${isLive ? ' live' : ''}`}
+      role="menu"
+      aria-label={isLive ? '直播画质设置' : '画质与倍速设置'}
+    >
       <div className="bili-menu-section">
         <span className="bili-menu-title">{isLive ? '直播画质' : '播放画质'}</span>
         <div className="bili-menu-items">
@@ -655,6 +746,8 @@ function SettingsMenu({
             <button
               key={item.quality}
               type="button"
+              role="menuitemradio"
+              aria-checked={currentQuality === item.quality}
               className={currentQuality === item.quality ? 'bili-menu-item on' : 'bili-menu-item'}
               onClick={() => {
                 setQuality(item.quality)
@@ -676,6 +769,8 @@ function SettingsMenu({
               <button
                 key={r}
                 type="button"
+                role="menuitemradio"
+                aria-checked={currentRate === r}
                 className={currentRate === r ? 'bili-menu-item on' : 'bili-menu-item'}
                 onClick={() => {
                   setRate(r)
@@ -693,36 +788,60 @@ function SettingsMenu({
   )
 }
 
-function ProgressBar() {
-  const current = useBilibili((s) => s.current)
-  const playback = useBilibili((s) => s.playback)
-  const playing = useBilibili((s) => s.playing)
-  const isLive = Boolean(current?.isLive || playback?.isLive || playback?.bvid?.startsWith('live:'))
-  const [pos, setPos] = useState(0)
+export function ProgressBar({ onTouch }: { onTouch: () => void }) {
+  const { time, duration } = useBilibiliPosition()
+  const [draggingPos, setDraggingPos] = useState<number | null>(null)
+  const shownPos = draggingPos ?? time
+  const safeDuration = duration || 1
+  const pct = Math.min(100, Math.max(0, (shownPos / safeDuration) * 100))
 
-  useEffect(() => {
-    if (isLive) return
-    const update = () => {
-      setPos(positionOf(playback, performance.now()))
-    }
-    update()
-    if (!playing) return
-    const id = setInterval(update, 250)
-    return () => clearInterval(id)
-  }, [playback, playing, isLive])
-
-  if (isLive) return null
-
-  const duration = playback?.duration || 1
-  const pct = Math.min(100, Math.max(0, (pos / duration) * 100))
+  const calcSeconds = (bar: HTMLElement, clientX: number) => {
+    const rect = bar.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(rect.width, 1)))
+    return ratio * safeDuration
+  }
 
   return (
     <div
-      className="bili-bar"
+      className={`bili-bar${draggingPos !== null ? ' dragging' : ''}`}
+      role="slider"
+      tabIndex={0}
+      data-own-drag=""
+      aria-label="播放进度"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(duration)}
+      aria-valuenow={Math.round(shownPos)}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          onTouch()
+          seekBy(SKIP_SECONDS)
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          onTouch()
+          seekBy(-SKIP_SECONDS)
+        }
+      }}
       onPointerDown={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        const clickPct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
-        seek(clickPct * duration)
+        const bar = e.currentTarget
+        onTouch()
+        let latest = calcSeconds(bar, e.clientX)
+        setDraggingPos(latest)
+        const onMove = (move: PointerEvent) => {
+          latest = calcSeconds(bar, move.clientX)
+          setDraggingPos(latest)
+          onTouch()
+        }
+        const onEnd = () => {
+          setDraggingPos(null)
+          seek(latest)
+          window.removeEventListener('pointermove', onMove)
+          window.removeEventListener('pointerup', onEnd)
+          window.removeEventListener('pointercancel', onEnd)
+        }
+        window.addEventListener('pointermove', onMove)
+        window.addEventListener('pointerup', onEnd)
+        window.addEventListener('pointercancel', onEnd)
       }}
     >
       <span className="bili-bar-played" style={{ width: `${pct}%` }} />
@@ -732,29 +851,10 @@ function ProgressBar() {
 }
 
 function TimeDisplay() {
-  const current = useBilibili((s) => s.current)
-  const playback = useBilibili((s) => s.playback)
-  const playing = useBilibili((s) => s.playing)
-  const isLive = Boolean(current?.isLive || playback?.isLive || playback?.bvid?.startsWith('live:'))
-  const [pos, setPos] = useState(0)
-
-  useEffect(() => {
-    if (isLive) return
-    const update = () => {
-      setPos(positionOf(playback, performance.now()))
-    }
-    update()
-    if (!playing) return
-    const id = setInterval(update, 250)
-    return () => clearInterval(id)
-  }, [playback, playing, isLive])
-
-  if (isLive) return null
-
-  const duration = playback?.duration || 0
+  const { time, duration } = useBilibiliPosition()
   return (
     <span>
-      {formatClock(pos)} / {formatClock(duration)}
+      {formatClock(time)} / {formatClock(duration)}
     </span>
   )
 }
@@ -766,14 +866,14 @@ function VolumeControl({ onTouch }: { onTouch: () => void }) {
 
   const at = (slider: HTMLElement, x: number) => {
     const box = slider.getBoundingClientRect()
-    return Math.min(1, Math.max(0, (x - box.left) / box.width)) * 100
+    return Math.min(1, Math.max(0, (x - box.left) / Math.max(box.width, 1))) * 100
   }
 
   return (
     <div className="bili-glass bili-pill bili-volume">
       <button
         type="button"
-        aria-label="音量"
+        aria-label={shown === 0 ? '取消静音' : '静音'}
         onClick={() => {
           onTouch()
           toggleMute()
@@ -784,17 +884,28 @@ function VolumeControl({ onTouch }: { onTouch: () => void }) {
       <span
         className="bili-volume-slider"
         role="slider"
+        tabIndex={0}
         aria-label="音量调节"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={shown}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            onTouch()
+            sendVolume(shown + 5)
+          } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            onTouch()
+            sendVolume(shown - 5)
+          }
+        }}
         onPointerDown={(event) => {
           const slider = event.currentTarget
           onTouch()
           sendVolume(at(slider, event.clientX))
           const drag = (move: PointerEvent) => {
-            const next = Math.round(at(slider, move.clientX))
-            sendVolume(next)
+            sendVolume(Math.round(at(slider, move.clientX)))
             onTouch()
           }
           const release = () => {

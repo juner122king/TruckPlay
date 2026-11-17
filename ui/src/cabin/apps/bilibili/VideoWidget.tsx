@@ -47,7 +47,7 @@ export function BilibiliVideoWidget() {
               <div className="yt-widget-controls">
                 <button
                   type="button"
-                  aria-label="Previous"
+                  aria-label="上一集/快退"
                   onClick={() => {
                     touch()
                     skip(-1)
@@ -58,7 +58,7 @@ export function BilibiliVideoWidget() {
                 <button
                   type="button"
                   className="main"
-                  aria-label={ended ? 'Replay' : isPlayingNow ? 'Pause' : 'Play'}
+                  aria-label={ended ? '重播' : isPlayingNow ? '暂停' : '播放'}
                   onClick={() => {
                     touch()
                     playOrPause()
@@ -68,7 +68,7 @@ export function BilibiliVideoWidget() {
                 </button>
                 <button
                   type="button"
-                  aria-label="Next"
+                  aria-label="下一集/快进"
                   onClick={() => {
                     touch()
                     skip(1)

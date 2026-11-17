@@ -10,6 +10,10 @@ use crate::webview::{self, OffscreenWebView, PageSize, Stage};
 
 pub const HOME: &str = "https://www.bilibili.com/";
 
+fn default_feed_which() -> String {
+    "recommend".to_string()
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "action", rename_all = "camelCase")]
 pub enum Command {
@@ -72,18 +76,28 @@ pub enum Question {
     Suggest {
         query: String,
     },
+    #[serde(rename_all = "camelCase")]
     Feed {
+        #[serde(default = "default_feed_which")]
         which: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         page: Option<u32>,
+        #[serde(default, alias = "fresh_idx", skip_serializing_if = "Option::is_none")]
+        fresh_idx: Option<u32>,
     },
+    #[serde(rename_all = "camelCase")]
     Popular {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         page: Option<u32>,
+        #[serde(default, alias = "fresh_idx", skip_serializing_if = "Option::is_none")]
+        fresh_idx: Option<u32>,
     },
+    #[serde(rename_all = "camelCase")]
     Recommend {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         page: Option<u32>,
+        #[serde(default, alias = "fresh_idx", skip_serializing_if = "Option::is_none")]
+        fresh_idx: Option<u32>,
     },
     Channel {
         mid: String,
@@ -351,6 +365,10 @@ pub struct Playback {
     pub season_id: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ep_id: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ready: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buffering: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -358,6 +376,10 @@ pub struct Playback {
 pub struct State {
     pub signed_in: bool,
     pub playing: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -468,7 +490,11 @@ impl Bilibili {
             Command::SignOut => {
                 let _ = self.view.delete_cookies();
                 let _ = self.view.navigate(HOME);
-                self.pending.borrow_mut().push(Report::State(State { signed_in: false, playing: false }));
+                self.pending.borrow_mut().push(Report::State(State {
+                    signed_in: false,
+                    playing: false,
+                    ..Default::default()
+                }));
                 Ok(())
             }
             other => self.pass(other),
@@ -507,7 +533,7 @@ impl Bilibili {
             self.checked_initial_cookie.set(true);
             let signed_in = self.view.has_cookie(HOME, &["DedeUserID", "bili_jct", "SESSDATA"]);
             if signed_in {
-                reports.push(Report::State(State { signed_in: true, playing: false }));
+                reports.push(Report::State(State { signed_in: true, playing: false, ..Default::default() }));
             }
         }
 
@@ -518,7 +544,7 @@ impl Bilibili {
             let _ = self.view.navigate(HOME);
             let signed_in =
                 p == Progress::SignedIn || self.view.has_cookie(HOME, &["DedeUserID", "bili_jct", "SESSDATA"]);
-            reports.push(Report::State(State { signed_in, playing: false }));
+            reports.push(Report::State(State { signed_in, playing: false, ..Default::default() }));
         }
 
         for message in self.view.take_page_messages() {
@@ -594,13 +620,21 @@ impl Bilibili {
 pub fn state_message(state: Option<&State>, signing_in: bool) -> String {
     let signed_in = state.map(|s| s.signed_in);
     let playing = state.map(|s| s.playing);
-    serde_json::json!({
+    let mut val = serde_json::json!({
         "type": "bilibili",
         "signedIn": signed_in,
         "playing": playing,
         "signingIn": signing_in,
-    })
-    .to_string()
+    });
+    if let (Some(st), Some(map)) = (state, val.as_object_mut()) {
+        if let Some(name) = &st.name {
+            map.insert("name".to_string(), serde_json::Value::String(name.clone()));
+        }
+        if let Some(avatar) = &st.avatar {
+            map.insert("avatar".to_string(), serde_json::Value::String(avatar.clone()));
+        }
+    }
+    val.to_string()
 }
 
 pub fn playback_message(playback: Option<&Playback>) -> String {
@@ -646,11 +680,38 @@ mod tests {
         let stop_json = r#"{"action":"stop"}"#;
         let cmd: Command = serde_json::from_str(stop_json).expect("should parse stop command");
         assert_eq!(cmd, Command::Stop);
+
+        let dm_json = r#"{"action":"danmaku","on":true}"#;
+        let dm_cmd: Command = serde_json::from_str(dm_json).expect("should parse danmaku command");
+        assert_eq!(dm_cmd, Command::Danmaku { on: true });
     }
 
     #[test]
     fn formats_playback_null() {
         let msg = playback_message(None);
         assert_eq!(msg, r#"{"playback":null,"type":"bilibiliPlayback"}"#);
+    }
+
+    #[test]
+    fn round_trips_fresh_idx_and_state_profile() {
+        let feed_json = r#"{"ask":"feed","which":"recommend","page":1,"freshIdx":3}"#;
+        let q: Question = serde_json::from_str(feed_json).expect("should parse feed with freshIdx");
+        assert_eq!(q, Question::Feed { which: "recommend".into(), page: Some(1), fresh_idx: Some(3) });
+        assert!(serde_json::to_string(&q).unwrap().contains("\"freshIdx\":3"));
+
+        let pop_json = r#"{"ask":"popular","page":1,"freshIdx":2}"#;
+        let q_pop: Question = serde_json::from_str(pop_json).expect("should parse popular with freshIdx");
+        assert_eq!(q_pop, Question::Popular { page: Some(1), fresh_idx: Some(2) });
+        assert!(serde_json::to_string(&q_pop).unwrap().contains("\"freshIdx\":2"));
+
+        let st = State {
+            signed_in: true,
+            playing: false,
+            name: Some("车友".into()),
+            avatar: Some("https://i0.hdslb.com/a.jpg".into()),
+        };
+        let encoded = state_message(Some(&st), false);
+        assert!(encoded.contains("\"name\":\"车友\""));
+        assert!(encoded.contains("\"avatar\":\"https://i0.hdslb.com/a.jpg\""));
     }
 }
