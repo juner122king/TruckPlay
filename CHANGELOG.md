@@ -3,6 +3,11 @@
 What changed in each release of WestPlay. The newest release's notes are what the app shows when it offers the
 update.
 
+## 2.4.0-domestic.2 国内定制版 / Domestic Edition (2026-11-17)
+- 重构 Bilibili 车机端 UI 与交互体验：整合精选（推荐/热门榜）、动态、直播、影视四大主分页，统一 CarPlay × B站明暗视觉 Token、字体缩放与响应式网格布局，全量替换为矢量图标与断图降级组件。
+- 修复 Bilibili 弹幕播放显示层与开关状态同步，仅展示视频弹幕内容并屏蔽网页输入条。
+- 增强 Bilibili 宿主通信：支持 `freshIdx` 刷新分页、用户头像/昵称解析以及播放器缓冲与首帧状态同步。
+
 ## 2.4.0-domestic.1 国内定制版 / Domestic Edition (2026-11-17)
 - 同步上游 2.4.0：客车 DLC 屏幕与扬声器、倒车影像输入阻断、亮度快捷键、侧栏和地图渲染优化、收费站及边境路径修正、D3D Hook 稳定性与地图构建器增强。
 - 保留国内媒体平台与电台、登录态同步、媒体互斥和闲置资源回收，以及双卡货运 HUD、中文地名、信号灯倒计时、车道引导、路线概览、物理距离导航和 ATS 屏幕适配。
