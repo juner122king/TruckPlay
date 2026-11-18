@@ -14,16 +14,19 @@ afterEach(() => {
 })
 
 describe('domestic companion preview', () => {
-  it('does not offer upstream updates even with the legacy update query parameter', async () => {
+  it('simulates domestic update offers when the ?update query parameter is present', async () => {
     const preview = await import('./preview')
+    const found = vi.fn()
+    const stop = preview.subscribe('update-found', found)
     const enabled = preview.answer('online_updates_enabled')
     const offer = preview.answer('update_offer')
     const lookup = preview.answer('look_for_update')
-    await vi.advanceTimersByTimeAsync(300)
-    expect(await enabled).toBe(false)
-    expect(await offer).toBeNull()
-    expect(await lookup).toBeNull()
-    await expect(preview.answer('install_update')).rejects.toThrow('定制版暂不支持在线更新')
+    await vi.advanceTimersByTimeAsync(800)
+    expect(await enabled).toBe(true)
+    expect(await offer).toMatchObject({ version: '2.4.0-domestic.2' })
+    expect(await lookup).toMatchObject({ version: '2.4.0-domestic.2' })
+    expect(found).toHaveBeenCalledWith(expect.objectContaining({ version: '2.4.0-domestic.2' }))
+    stop()
   })
 
   it('provides domestic account fields alongside the new map folder fields and defaults', async () => {

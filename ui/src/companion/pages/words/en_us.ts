@@ -329,6 +329,8 @@ export const words: CompanionWords = {
   },
   update: {
     row: 'Software Update',
+    checking: 'Checking for updates…',
+    checkFailed: 'Couldn’t check for updates. Click to retry.',
     upToDate: 'Up to date',
     manualOnly: 'Domestic edition: online updates are disabled. Install upgrades manually.',
     available: '{version} available',

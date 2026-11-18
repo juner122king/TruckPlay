@@ -328,6 +328,8 @@ export const words: CompanionWords = {
   },
   update: {
     row: '软件更新',
+    checking: '正在检查更新…',
+    checkFailed: '检查更新失败，点击重试',
     upToDate: '已是最新版本',
     manualOnly: '国内定制版，在线更新已停用，请手动安装升级',
     available: '{version} 可用',

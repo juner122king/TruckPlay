@@ -64,12 +64,12 @@ export function useUpdateOffer(): Offer | null {
   return offer
 }
 
-/** No update lookup is sent when the domestic edition policy disables it. */
+/** Only check or install updates when the backend reports the updater is configured. */
 export async function lookForUpdate(): Promise<Offer | null> {
   return (await onlineUpdatesEnabled()) ? call('look_for_update') : null
 }
 
-/** Defense in depth; the backend also rejects direct invocations. */
+/** Defense in depth; the backend also rejects direct invocations when unconfigured. */
 export async function installUpdate(): Promise<void> {
   if (!(await onlineUpdatesEnabled())) throw new Error('定制版暂不支持在线更新，请手动安装升级')
   return call('install_update')

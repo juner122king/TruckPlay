@@ -260,6 +260,8 @@ fn main() {
     let open_request = Arc::new(OpenRequest::default());
     let accounts = Arc::new(AccountRequests::default());
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(update::Updates::default())
         .manage(WestplayOpen(open_request.clone()))
         .manage(Accounts(accounts.clone()))
         .register_asynchronous_uri_scheme_protocol(maps::SCHEME, maps::serve)
@@ -351,6 +353,7 @@ fn main() {
             app.manage(SettingsStore { file, shared });
             app.manage(setup);
             app.manage(std::sync::Mutex::new(host));
+            update::watch(app.handle());
             Ok(())
         })
         .build(tauri::generate_context!())

@@ -252,6 +252,8 @@ export interface CompanionWords {
    * (its plugin and mod into the game). `{version}`: the update's. */
   update: {
     row: string
+    checking: string
+    checkFailed: string
     upToDate: string
     manualOnly: string
     available: string

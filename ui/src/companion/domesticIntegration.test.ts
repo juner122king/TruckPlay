@@ -11,7 +11,7 @@ import { call } from './bridge'
 
 vi.mock('./bridge', () => ({ call: vi.fn(), on: vi.fn() }))
 
-describe('2.4.0-domestic.1 domestic edition integration', () => {
+describe('domestic edition integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -48,21 +48,29 @@ describe('2.4.0-domestic.1 domestic edition integration', () => {
     expect(companionWords('zh_cn').update.manualOnly).toContain('请手动安装升级')
   })
 
-  it('keeps the app identity, resizable window and ships all native resources without an updater', () => {
+  it('keeps the app identity, resizable window, ships all native resources, and configures the domestic updater', () => {
     const config = JSON.parse(appConfig)
     const release = JSON.parse(releaseConfig)
     const ui = JSON.parse(uiPackage)
     expect(config.identifier).toBe('app.westplay')
-    expect(config.version).toBe('2.4.0-domestic.1')
+    expect(config.version).toMatch(/^\d+\.\d+\.\d+-domestic\.\d+$/)
     expect(ui.version).toBe(config.version)
     const lockfile = JSON.parse(uiLockfile)
     expect(lockfile.version).toBe(config.version)
     expect(lockfile.packages[''].version).toBe(config.version)
     expect(__WESTPLAY_VERSION__).toBe(config.version)
-    expect(`${companionWords('zh_cn').about.title} ${config.version}`).toBe('WestPlay 国内定制版 2.4.0-domestic.1')
+    expect(`${companionWords('zh_cn').about.title} ${config.version}`).toBe(`WestPlay 国内定制版 ${config.version}`)
     expect(config.app.windows[0]).toMatchObject({ resizable: true, maximizable: true, width: 780, height: 520 })
-    expect(config.plugins?.updater).toBeUndefined()
-    expect(release.bundle.createUpdaterArtifacts).toBe(false)
+    expect(config.plugins?.updater).toMatchObject({
+      endpoints: ['https://github.com/juner122king/WestPlay/releases/latest/download/latest.json'],
+      requireSignedVersion: true,
+      windows: { installMode: 'passive' },
+    })
+    expect(config.plugins?.updater?.pubkey).toBeTruthy()
+    expect(config.plugins?.updater?.pubkey).not.toBe(
+      'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2OTc1ODBDNjdDNTc3Q0UKUldUT2Q4Vm5ERmlYVnQvV0dLdVVNUWtlcjlpKzB3MVVNeVJVeHhXNHFGVUNaU2xpVDNNVjhkWmEK',
+    )
+    expect(release.bundle.createUpdaterArtifacts).toBe(true)
     expect(release.bundle.resources['../target/release/westplay.dll']).toBe('westplay.dll')
     expect(release.bundle.resources['../target/release/westplay-maps.exe']).toBe('westplay-maps.exe')
     expect(release.bundle.resources['../target/release/westplay-probe.exe']).toBe('westplay-probe.exe')

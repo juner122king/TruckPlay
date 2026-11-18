@@ -89,4 +89,29 @@ describe('domestic online update policy', () => {
     expect(on).not.toHaveBeenCalled()
     expect(call).toHaveBeenCalledTimes(1)
   })
+
+  it('subscribes, looks up, and installs updates when enabled by backend policy', async () => {
+    const offer = { version: '2.4.0-domestic.2', notes: '- Fix', date: '2026-11-17' }
+    const unlisten = vi.fn()
+    vi.mocked(on).mockReturnValue(unlisten)
+    vi.mocked(call).mockImplementation(async (command) => {
+      if (command === 'online_updates_enabled') return true
+      if (command === 'update_offer') return null
+      if (command === 'look_for_update') return offer
+      if (command === 'install_update') return undefined
+      return null
+    })
+    const take = vi.fn()
+    const stop = subscribeToUpdateOffers(take)
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(on).toHaveBeenCalledWith('update-found', expect.any(Function))
+    expect(take).toHaveBeenCalledWith(offer)
+    stop()
+    expect(unlisten).toHaveBeenCalledTimes(1)
+
+    await expect(lookForUpdate()).resolves.toEqual(offer)
+    await expect(installUpdate()).resolves.toBeUndefined()
+  })
 })

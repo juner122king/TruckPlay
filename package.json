@@ -10,7 +10,9 @@
     "postinstall": "npm --prefix ui install",
     "build:resources": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_resources.ps1",
     "prebuild:release": "npm run build:resources",
-    "build:release": "tauri build --config app/tauri.release.conf.json"
+    "build:release": "tauri build --config app/tauri.release.conf.json",
+    "release": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1",
+    "release:dry": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/release.ps1 -DryRun"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.1"

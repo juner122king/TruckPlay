@@ -40,7 +40,7 @@
     "copyright": "Copyright © 2026 WestPlay. Licensed under the GPL-3.0-or-later.",
     "category": "Game",
     "shortDescription": "国内定制版 CarPlay for Euro Truck Simulator 2 and American Truck Simulator",
-    "longDescription": "WestPlay 国内定制版 brings in-cabin maps, traffic lights, freight information, Apple Music, YouTube, Bilibili, NetEase Cloud Music, Ximalaya, Douyin, Hongguo and local playback to ETS2 and ATS. Online updates are disabled; install upgrades manually.",
+    "longDescription": "WestPlay 国内定制版 brings in-cabin maps, traffic lights, freight information, Apple Music, YouTube, Bilibili, NetEase Cloud Music, Ximalaya, Douyin, Hongguo and local playback to ETS2 and ATS.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -52,5 +52,16 @@
       "../target/release/westplay.dll": "westplay.dll"
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMwMDhGMEUzQzFBMzNBQzQKUldURU9xUEI0L0FJd0tMOUJHcDJTQ1NCSGtoUllVUnVOL25SejZHdC9iVmFYdlBtZ1daR0doZzcK",
+      "endpoints": [
+        "https://github.com/juner122king/WestPlay/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
 }

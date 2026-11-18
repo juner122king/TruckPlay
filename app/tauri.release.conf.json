@@ -3,7 +3,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "resources": {
       "../target/release/westplay.dll": "westplay.dll",
       "../target/release/westplay-probe.exe": "westplay-probe.exe",

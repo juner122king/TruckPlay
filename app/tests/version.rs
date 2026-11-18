@@ -36,9 +36,13 @@ fn the_changelog_has_this_version_or_whats_to_come() {
 
 #[test]
 fn the_domestic_version_is_accepted_by_tauris_config_and_has_a_revision() {
-    let config: tauri::utils::config::Config = serde_json::from_str(&read("tauri.conf.json")).unwrap();
+    let config: tauri_utils::config::Config = serde_json::from_str(&read("tauri.conf.json")).unwrap();
     assert_eq!(config.version.as_deref(), Some(VERSION));
     let (base, revision) = VERSION.split_once("-domestic.").expect("the domestic version identifier");
-    assert_eq!(base, "2.4.0");
+    let mut parts = base.split('.');
+    assert!(
+        parts.clone().count() == 3 && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit())),
+        "base version `{base}` must be X.Y.Z"
+    );
     assert!(revision.parse::<u32>().is_ok_and(|revision| revision > 0));
 }

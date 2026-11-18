@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { appVersion } from '../bridge'
 import { Button, Group, Panel, Row } from '../room/parts'
 import { banner } from '../room/room'
@@ -12,31 +12,34 @@ import { type PageProps, screenState } from './page'
 const COPIED_MS = 3200
 
 /**
- * WestPlay itself: its domestic edition version, manual-upgrade policy, and live details for when something isn't
- * right, with a report of them to copy for whoever helps, and where the logs are (app.log in WestPlay's own
- * folder where Documents refused it). On the room's screen, the Dashboard; a banner says when the report's
- * copied.
+ * WestPlay itself: its domestic edition version, automatic update status, and live details for when
+ * something isn't right, with a report of them to copy for whoever helps, and where the logs are (app.log
+ * in WestPlay's own folder where Documents refused it). On the room's screen, the Dashboard; a banner says
+ * when the report's copied.
  */
 export function About({ status, setup, cw, update, showUpdate }: PageProps) {
   const w = cw.about
   const updatesEnabled = useOnlineUpdatesEnabled()
   const [version, setVersion] = useState('')
   const [copied, setCopied] = useState(false)
-  // Whether there's an update: the one found, or none after looking again.
-  const [looked, setLooked] = useState(false)
+  const [checkState, setCheckState] = useState<'idle' | 'checking' | 'done' | 'error'>('idle')
   // Where this run's app.log is; null if it couldn't be made anywhere.
   const [appLog, setAppLog] = useState<string | null>(null)
+  const checkNow = useCallback(() => {
+    setCheckState('checking')
+    lookForUpdate().then(
+      () => setCheckState('done'),
+      () => setCheckState('error'),
+    )
+  }, [])
   useEffect(() => {
     appVersion().then(setVersion, () => setVersion(''))
     appLogPlace().then(setAppLog, () => setAppLog(null))
   }, [])
   useEffect(() => {
     if (!updatesEnabled) return
-    lookForUpdate().then(
-      () => setLooked(true),
-      () => setLooked(true),
-    )
-  }, [updatesEnabled])
+    checkNow()
+  }, [updatesEnabled, checkNow])
   useEffect(() => {
     if (!copied) return
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS)
@@ -75,7 +78,19 @@ export function About({ status, setup, cw, update, showUpdate }: PageProps) {
             onClick={showUpdate}
           />
         ) : (
-          <Row title={cw.update.row} value={looked ? cw.update.upToDate : undefined} />
+          <Row
+            title={cw.update.row}
+            value={
+              checkState === 'checking'
+                ? cw.update.checking
+                : checkState === 'error'
+                  ? cw.update.checkFailed
+                  : checkState === 'done'
+                    ? cw.update.upToDate
+                    : undefined
+            }
+            onClick={checkState === 'checking' ? undefined : checkNow}
+          />
         )}
       </Group>
       <Group title={w.diagnostics} place={5}>

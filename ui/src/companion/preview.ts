@@ -1,6 +1,7 @@
 import type { GameCheck, GameInfo, InstallReport, SetupState } from './setup'
 import type { Customizations } from '../shared/customize'
 import type { Added } from './customize'
+import type { Offer } from './update'
 import type { HostStatus, MapStatus } from './useHostStatus'
 import type { Settings } from './useSettings'
 
@@ -15,7 +16,7 @@ import type { Settings } from './useSettings'
  *   the player in a truck WestPlay doesn't show in.
  * - `?map=building|ready|waiting|stopped|memory|failed`: the map's state (`building` runs to `ready`; `stopped`: its
  *   preparation ended by the game starting).
- * Online updates are disabled in the domestic edition, including browser previews.
+ * - `?update`: an update found (its sheet offers it; installing it downloads, then stays installing).
  * - `?custom`: some wallpapers and an icon set of the player's (adding gives more, with a file left out).
  * - `?leftOut`: the played profile's map made without a map mod it couldn't read.
  * - `?elevated`: the game run as administrator (WestPlay can't read its route, guidance or weather).
@@ -45,6 +46,18 @@ const ATS: GameInfo = {
   dlcs: 51,
 }
 const GAMES = query.has('ats') ? [GAME, ATS] : [GAME]
+
+const UPDATE: Offer | null = query.has('update')
+  ? {
+      version: '2.4.0-domestic.2',
+      notes: [
+        '- 支持国内定制版自动检查更新与静默安装升级。',
+        '- 修复部分路线导航与电台播放体验。',
+        '- **Fixed:** automatic update verification for domestic builds.',
+      ].join('\n'),
+      date: '2026-11-17',
+    }
+  : null
 
 // A first run has no game set up until the onboarding installs into it.
 const setup: SetupState = {
@@ -528,12 +541,21 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
       if (settings.look.iconSet === args?.name) setLook({ iconSet: null })
       return later(undefined)
     case 'online_updates_enabled':
-      return later(false)
+      return later(true)
     case 'update_offer':
+      return later(UPDATE)
     case 'look_for_update':
-      return later(null)
-    case 'install_update':
-      return Promise.reject(new Error('定制版暂不支持在线更新，请手动安装升级'))
+      if (UPDATE) emit('update-found', UPDATE)
+      return later(UPDATE, 700)
+    case 'install_update': {
+      if (!UPDATE) return Promise.reject(new Error('noUpdate'))
+      const total = 48_000_000
+      for (let step = 1; step <= 20; step++) {
+        setTimeout(() => emit('update-progress', { done: (total * step) / 20, total }), step * 150)
+      }
+      // The app quits for the installer: nothing comes back.
+      return new Promise(() => {})
+    }
     default:
       return Promise.reject(new Error(`preview: no answer for ${command}`))
   }
