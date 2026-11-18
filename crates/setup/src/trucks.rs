@@ -265,7 +265,9 @@ mod tests {
     use westplay_mapdata::files::Mount;
 
     fn game_with(trucks: &[&str]) -> (GameFiles, std::path::PathBuf) {
-        let root = std::env::temp_dir().join(format!("westplay-trucks-{}-{}", std::process::id(), trucks.len()));
+        static NEXT_FIXTURE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let id = NEXT_FIXTURE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!("westplay-trucks-{}-{id}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for id in trucks {
             let dir = root.join("def/vehicle/truck").join(id);
