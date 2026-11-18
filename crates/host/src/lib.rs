@@ -494,6 +494,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut ximalaya_state: Option<ximalaya::State> = None;
     let (mut ximalaya_window_open, ximalaya_confirming) = (false, false);
     let mut ximalaya_playback: Option<String> = None;
+    let mut ximalaya_last_error: Option<String> = None;
     // Douyin's web player.
     let mut douyin: Option<douyin::Douyin> = None;
     let mut douyin_state: Option<douyin::State> = None;
@@ -1636,16 +1637,24 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     }
                     ximalaya::Report::Playback(playback) => {
                         let heard = playback.as_ref().map(|pb| play_log::Heard {
-                            doing: if pb.status == "playing" {
-                                play_log::Doing::Playing
-                            } else {
-                                play_log::Doing::Paused
+                            doing: match pb.status.as_str() {
+                                "playing" => play_log::Doing::Playing,
+                                "loading" => play_log::Doing::Loading,
+                                _ => play_log::Doing::Paused,
                             },
                             track: Some(pb.title.as_str()),
                             position: pb.position,
                         });
                         if let Some(line) = ximalaya_log.heard(heard) {
                             log!("{line}");
+                        }
+                        let next_error = playback.as_ref().and_then(|pb| pb.error.as_deref()).map(str::to_owned);
+                        if next_error != ximalaya_last_error {
+                            if let Some(err) = &next_error {
+                                let state = playback.as_ref().map_or("unknown", |pb| pb.status.as_str());
+                                log!("[ximalaya] {state}: {err}");
+                            }
+                            ximalaya_last_error = next_error;
                         }
                         let message = ximalaya::playback_message(playback.as_ref());
                         let _ = webview.post_json(&message);
@@ -2020,6 +2029,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         }
                         ximalaya_state = None;
                         ximalaya_playback = None;
+                        ximalaya_last_error = None;
                         let _ = ximalaya_log.heard(None);
                     }
                     resources::App::Douyin => {

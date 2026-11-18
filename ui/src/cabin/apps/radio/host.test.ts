@@ -227,26 +227,27 @@ describe('the single Ximalaya audio host', () => {
     h.requests[0].resolve(h.detail(1))
     await start
     for (let n = 0; n < 10; n++) await Promise.resolve()
-    for (let i = 0; i < 3; i++) {
+    const delays = [2000, 4000, 8000, 15000, 30000]
+    for (let i = 0; i <= delays.length; i++) {
       h.Hls.instances[i].emit('error', { fatal: true, details: 'offline' })
-      if (i < 2) {
-        await vi.advanceTimersByTimeAsync((i + 1) * 2000)
+      if (i < delays.length) {
+        await vi.advanceTimersByTimeAsync(delays[i])
         h.requests[i + 1].resolve(h.detail(1))
         for (let n = 0; n < 10; n++) await Promise.resolve()
       }
     }
     expect(h.last()).toMatchObject({ status: 'failed', error: 'offline' })
-    await vi.advanceTimersByTimeAsync(30000)
-    expect(h.requests).toHaveLength(3)
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(h.requests).toHaveLength(6)
     const retry = h.command({ action: 'play', requestId: 2 })
-    h.requests[3].resolve(h.detail(1))
+    h.requests[6].resolve(h.detail(1))
     await retry
     await Promise.resolve()
     await Promise.resolve()
     h.Hls.instances.at(-1)!.emit('error', { fatal: true, details: 'again' })
     await h.command({ action: 'pause', requestId: 3 })
     await vi.advanceTimersByTimeAsync(5000)
-    expect(h.requests).toHaveLength(4)
+    expect(h.requests).toHaveLength(7)
     expect(h.last().status).toBe('paused')
   })
   it('prefers native HLS and reconnects at the live edge, while forwarding cab settings once', async () => {
@@ -273,6 +274,10 @@ describe('the single Ximalaya audio host', () => {
     expect(h.last().status).toBe('playing')
     expect(h.sound.equalizer).toHaveBeenCalledWith({ bass: 4 })
     expect(h.sound.outside).toHaveBeenCalledWith(true, 5)
+    expect(h.makeSound).toHaveBeenCalledTimes(1)
+    const [getter] = h.makeSound.mock.calls[0] as unknown as [() => unknown, unknown]
+    expect(typeof getter).toBe('function')
+    expect(getter()).toBe(h.elements[0])
     await h.command({ action: 'pause', requestId: 2 })
     const resumed = h.command({ action: 'play', requestId: 3 })
     await Promise.resolve()
@@ -284,5 +289,68 @@ describe('the single Ximalaya audio host', () => {
     expect(h.requests).toHaveLength(2)
     expect(h.elements[0].playbackRate).toBe(1)
     expect(h.makeSound).toHaveBeenCalledTimes(1)
+  })
+  it('auto-recovers from unexpected audio pause events and escalates repeated bursts to reconnect', async () => {
+    const h = harness()
+    const start = h.command({ action: 'play', requestId: 1, track: radio(1) })
+    await Promise.resolve()
+    await Promise.resolve()
+    h.requests[0].resolve(h.detail(1))
+    await start
+    for (let n = 0; n < 10; n++) await Promise.resolve()
+    h.Hls.instances[0].emit('manifest')
+    await Promise.resolve()
+    h.elements[0].emit('playing')
+    expect(h.last().status).toBe('playing')
+    h.elements[0].play.mockClear()
+
+    // Simulate an unsolicited pause (e.g. WebView2/audio focus glitch): resumes automatically.
+    h.elements[0].pause()
+    expect(h.last()).toMatchObject({ status: 'loading', error: 'Unexpected audio pause' })
+    expect(h.elements[0].play).toHaveBeenCalledTimes(1)
+    h.elements[0].emit('playing')
+    expect(h.last()).toMatchObject({ status: 'playing', error: null })
+
+    // A burst of unexpected pauses escalates to a clean HLS reconnect.
+    h.elements[0].pause()
+    h.elements[0].emit('playing')
+    h.elements[0].pause()
+    expect(h.requests).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(h.requests).toHaveLength(2)
+  })
+  it('resets retry budget after sustained stable playback across long radio sessions', async () => {
+    const h = harness()
+    const start = h.command({ action: 'play', requestId: 1, track: radio(1) })
+    await Promise.resolve()
+    await Promise.resolve()
+    h.requests[0].resolve(h.detail(1))
+    await start
+    for (let n = 0; n < 10; n++) await Promise.resolve()
+    h.Hls.instances[0].emit('manifest')
+    await Promise.resolve()
+    h.elements[0].emit('playing')
+
+    // Exhaust 4 retries, then recover on the 5th attempt.
+    const delays = [2000, 4000, 8000, 15000]
+    for (let i = 0; i < delays.length; i++) {
+      h.Hls.instances[i].emit('error', { fatal: true, details: 'blip' })
+      await vi.advanceTimersByTimeAsync(delays[i])
+      h.requests[i + 1].resolve(h.detail(1))
+      for (let n = 0; n < 10; n++) await Promise.resolve()
+    }
+    h.Hls.instances[4].emit('manifest')
+    await Promise.resolve()
+    h.elements[0].emit('playing')
+    expect(h.last().status).toBe('playing')
+
+    // Stay playing for 10s so the retry budget resets.
+    await vi.advanceTimersByTimeAsync(10000)
+
+    // A later transient error starts from the initial 2s retry delay again instead of failing at limit.
+    h.Hls.instances[4].emit('error', { fatal: true, details: 'later-blip' })
+    expect(h.last().status).toBe('loading')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(h.requests).toHaveLength(6)
   })
 })

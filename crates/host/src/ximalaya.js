@@ -14,7 +14,10 @@
   let controller = null
   let retryTimer = null
   let watchdog = null
+  let stableTimer = null
   let retries = 0
+  let unexpectedPauses = 0
+  let lastUnexpectedPauseAt = 0
   let wanted = false
   let status = 'paused'
   let error = null
@@ -22,6 +25,10 @@
   let volume = 1
   let speed = 1
   let cab = null
+  const RADIO_RETRY_DELAYS = [2000, 4000, 8000, 15000, 30000]
+  const STABLE_PLAYBACK_MS = 10000
+  const PAUSE_BURST_WINDOW_MS = 5000
+  const MAX_UNEXPECTED_PAUSES = 2
   const finite = (value) => (Number.isFinite(value) ? value : 0)
   const radioRoot = 'https://mobile.ximalaya.com/radio-first-page-app'
   const radioJson = async (path, signal) => {
@@ -251,7 +258,7 @@
   const hookAudio = (el) => {
     if (currentAudio) return
     currentAudio = el
-    if (window.westplayCabSound) sound = window.westplayCabSound(el, (bars) => post({ type: 'spectrum', bars }))
+    if (window.westplayCabSound) sound = window.westplayCabSound(() => currentAudio, post)
     applyCab()
     el.addEventListener('playing', () => {
       if (!wanted || el.paused) {
@@ -259,6 +266,16 @@
         return
       }
       clearTimeout(watchdog)
+      clearTimeout(stableTimer)
+      const seq = playAttemptSeq,
+        track = currentTrack
+      stableTimer = setTimeout(() => {
+        stableTimer = null
+        if (valid(seq, track) && status === 'playing') {
+          retries = 0
+          unexpectedPauses = 0
+        }
+      }, STABLE_PLAYBACK_MS)
       status = 'playing'
       error = null
       isPlaying = true
@@ -267,13 +284,36 @@
     })
     el.addEventListener('pause', () => {
       if (!wanted || status !== 'playing') return
+      clearTimeout(stableTimer)
+      stableTimer = null
+      if (el.error) {
+        failed(playAttemptSeq, currentTrack, 'Media error ' + el.error.code)
+        return
+      }
+      const now = Date.now()
+      if (now - lastUnexpectedPauseAt > PAUSE_BURST_WINDOW_MS) unexpectedPauses = 0
+      lastUnexpectedPauseAt = now
+      unexpectedPauses++
+      if (unexpectedPauses > MAX_UNEXPECTED_PAUSES) {
+        failed(playAttemptSeq, currentTrack, 'Unexpected audio pause')
+        return
+      }
+      const seq = playAttemptSeq,
+        track = currentTrack
       isPlaying = false
-      status = 'paused'
+      status = 'loading'
+      error = 'Unexpected audio pause'
       sendPlayback()
       checkStatus()
+      armWatchdog(seq, track)
+      Promise.resolve(el.play()).catch((e) => {
+        if (valid(seq, track)) failed(seq, track, String(e?.message || e || 'Unexpected audio pause'))
+      })
     })
     el.addEventListener('waiting', () => {
       if (!wanted) return
+      clearTimeout(stableTimer)
+      stableTimer = null
       isPlaying = false
       status = 'loading'
       sendPlayback()
@@ -281,7 +321,7 @@
       armWatchdog(playAttemptSeq, currentTrack)
     })
     el.addEventListener('timeupdate', () => {
-      if (wanted) sendPlayback()
+      if (wanted && !currentTrack?.radio) sendPlayback()
     })
     el.addEventListener('error', () => {
       if (wanted && el.error) failed(playAttemptSeq, currentTrack, 'Media error ' + el.error.code)
@@ -537,6 +577,8 @@
     clearTimeout(retryTimer)
     retryTimer = null
     clearTimeout(watchdog)
+    clearTimeout(stableTimer)
+    stableTimer = null
     stopHls()
     if (currentAudio) {
       currentAudio.pause()
@@ -553,18 +595,20 @@
   const failed = (seq, track, message) => {
     if (!valid(seq, track) || retryTimer) return
     clearTimeout(watchdog)
+    clearTimeout(stableTimer)
+    stableTimer = null
     isPlaying = false
     status = 'loading'
     error = message
     controller?.abort()
     stopHls()
     currentAudio?.pause()
-    if (track.radio && retries < 2) {
-      retries++
+    if (track.radio && retries < RADIO_RETRY_DELAYS.length) {
+      const delay = RADIO_RETRY_DELAYS[retries++]
       retryTimer = setTimeout(() => {
         retryTimer = null
         if (valid(seq, track)) connect(seq, track)
-      }, retries * 2000)
+      }, delay)
     } else {
       wanted = false
       status = 'failed'
@@ -604,9 +648,10 @@
           if (!PlayerHls?.isSupported()) throw new Error('HLS is not supported')
           const instance = new PlayerHls({
             enableWorker: false,
-            manifestLoadingMaxRetry: 1,
-            levelLoadingMaxRetry: 1,
-            fragLoadingMaxRetry: 1,
+            manifestLoadingMaxRetry: 4,
+            levelLoadingMaxRetry: 4,
+            fragLoadingMaxRetry: 4,
+            backBufferLength: 30,
           })
           stopHls()
           hls = instance
@@ -645,6 +690,8 @@
     status = 'loading'
     error = null
     retries = 0
+    unexpectedPauses = 0
+    lastUnexpectedPauseAt = 0
     sendPlayback()
     checkStatus()
     await connect(playAttemptSeq, track)
