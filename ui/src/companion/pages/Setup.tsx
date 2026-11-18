@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Button, Checking, Group, Note, Panel, Row, Status, Tick } from '../room/parts'
+import { useEffect, useMemo, useState } from 'react'
+import { Button, Checking, Group, Note, Panel, Row, Status, Switch, Tick } from '../room/parts'
 import { banner, explain, gameSummary, useGameRunning, useWords } from '../room/room'
 import { ownName } from '../languages'
+import { encodeQr, qrSvgPath } from '../qr'
 import { GLOW, useScreen, useScreenAt } from '../room/screen'
 import { checkGame, GAME_KINDS, GAME_NAMES, type GameInfo, type InstallReport, installIntoGame } from '../setup'
 import { allChecked, type PageProps, useGameCheck } from './page'
@@ -99,18 +100,19 @@ export function Setup(props: PageProps) {
         )
       }
     >
+      <MobileWebUi status={props.status} settings={settings} cw={cw} />
       {games.map((game, at) => (
         <GameSetUp
           key={game.dir}
           game={game}
           titled={games.length + notSetUp.length > 1}
-          place={4 + at}
+          place={5 + at}
           {...props}
           error={error}
         />
       ))}
       {notSetUp.map((game, at) => (
-        <Group key={game.dir} title={GAME_NAMES[game.kind]} place={4 + games.length + at}>
+        <Group key={game.dir} title={GAME_NAMES[game.kind]} place={5 + games.length + at}>
           <Row title={w.folder} detail={game.dir} />
           <Row
             title={words.install.install}
@@ -150,7 +152,7 @@ export function Setup(props: PageProps) {
         </Note>
       )}
       {(installError ?? error) && <Note tone="bad">{installError ?? error}</Note>}
-      <Group place={4 + games.length + notSetUp.length}>
+      <Group place={5 + games.length + notSetUp.length}>
         <Row
           title={w.language}
           value={settings.settings?.language ? ownName(settings.settings.language) : w.languageAutomatic}
@@ -161,6 +163,77 @@ export function Setup(props: PageProps) {
         <Row title={cw.uninstall.row} danger onClick={uninstall} />
       </Group>
     </Panel>
+  )
+}
+
+function MobileWebUi({ status, settings: state, cw }: Pick<PageProps, 'status' | 'settings' | 'cw'>) {
+  const { settings, update, error } = state
+  const w = cw.setup.mobileWebUi
+  const [copiedUrl, setCopiedUrl] = useState('')
+  const [copyFailedUrl, setCopyFailedUrl] = useState('')
+  if (!settings) return null
+  const enabled = settings.mobileWebUi
+  const service = status?.mobileWebUi
+  const running = enabled && service?.state === 'running'
+  const url = running ? service.pairingUrl : null
+  const busy = enabled && (!service || service.state === 'off')
+  return (
+    <Group place={4}>
+      <Row
+        title={w.title}
+        detail={w.detail}
+        wrap
+        accessory={
+          <Switch on={enabled} label={w.title} change={(on) => void update({ ...settings, mobileWebUi: on })} />
+        }
+      />
+      {busy && <Note>{w.starting}</Note>}
+      {enabled && service?.state === 'error' && (
+        <Note tone="bad">
+          {w.unavailable} {service.message}
+        </Note>
+      )}
+      {running && !url && <Note>{w.noAddress}</Note>}
+      {url && (
+        <>
+          <PairingQr url={url} hint={w.qrHint} label={w.qrLabel} />
+          <Row
+            title={url}
+            detail={w.copy}
+            wrap
+            onClick={() => {
+              setCopyFailedUrl('')
+              navigator.clipboard.writeText(url).then(
+                () => setCopiedUrl(url),
+                () => setCopyFailedUrl(url),
+              )
+            }}
+          />
+          {copyFailedUrl === url && (
+            <input aria-label={w.link} readOnly value={url} onFocus={(event) => event.target.select()} />
+          )}
+        </>
+      )}
+      {url && <Note>{copiedUrl === url ? w.copied : w.keepPrivate}</Note>}
+      {error && <Note tone="bad">{error}</Note>}
+    </Group>
+  )
+}
+
+function PairingQr({ url, hint, label }: { url: string; hint: string; label: string }) {
+  const qr = useMemo(() => encodeQr(url), [url])
+  const path = useMemo(() => qrSvgPath(qr, 4), [qr])
+  const box = qr.size + 8
+  return (
+    <div className="ob-row cp-lan-qr">
+      <div className="cp-lan-qr-card">
+        <svg className="cp-lan-qr-svg" viewBox={`0 0 ${box} ${box}`} role="img" aria-label={label}>
+          <rect width={box} height={box} fill="#fff" />
+          <path d={path} fill="#000" />
+        </svg>
+      </div>
+      <span className="cp-lan-qr-hint">{hint}</span>
+    </div>
   )
 }
 

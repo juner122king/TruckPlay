@@ -227,6 +227,17 @@ impl Capture {
         }
     }
 
+    /// Samples the already-composited frame when viewers are attached and content has changed.
+    pub fn mirror(&self, tap: &crate::lan::Tap) {
+        let frames = self.frames.load(Ordering::Relaxed);
+        if !self.broken()
+            && frames != 0
+            && tap.try_capture(&self.context, &self.shared, frames) == Some(Lock::Abandoned)
+        {
+            self.abandoned.store(true, Ordering::Relaxed);
+        }
+    }
+
     /// A frame went out, with `cursor` on it.
     fn sent(&self, cursor: Option<Look>, now: Instant) {
         self.bridge.bridge().host.frame_seq.fetch_add(1, Ordering::Release);

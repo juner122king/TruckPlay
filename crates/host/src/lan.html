@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#090b0e">
+<meta name="referrer" content="no-referrer">
+<title>WestPlay · LAN Mirror</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #090b0e; }
+  body { font: 14px system-ui, -apple-system, sans-serif; color: #e8ecf0; overscroll-behavior: none; }
+  #stage { position: fixed; inset: 0; width: 100dvw; height: 100dvh; overflow: hidden; background: #090b0e; }
+  html[data-rotated="1"] #stage {
+    left: 50%; top: 50%; right: auto; bottom: auto;
+    width: 100dvh; height: 100dvw;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center center;
+  }
+  #viewer { position: absolute; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #mirror { width: 100%; height: 100%; object-fit: contain; display: block; touch-action: none; -webkit-user-drag: none; }
+  #status {
+    position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: max(10px, env(safe-area-inset-top, 0px));
+    padding: 6px 11px; background: rgba(0, 0, 0, .74); border-radius: 7px; pointer-events: none; font-size: 12px;
+  }
+  #fs-btn {
+    position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: max(10px, env(safe-area-inset-top, 0px));
+    min-inline-size: 44px; min-block-size: 44px; padding: 8px 14px;
+    border: 1px solid rgba(255, 255, 255, .24); border-radius: 999px;
+    background: rgba(12, 15, 20, .72); color: #f3f6f9; font: inherit; font-size: 13px; font-weight: 600;
+    backdrop-filter: blur(8px); cursor: pointer; touch-action: manipulation;
+  }
+  #enter-gate {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background: rgba(9, 11, 14, .78); backdrop-filter: blur(8px);
+  }
+  #enter-gate[hidden], #fs-btn[hidden], #status[hidden] { display: none; }
+  #enter-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    min-inline-size: 220px; min-block-size: 56px; padding: 18px 26px;
+    border: 1px solid rgba(255, 255, 255, .26); border-radius: 18px;
+    background: rgba(25, 31, 40, .92); color: #f5f7fa; font: inherit; text-align: center;
+    cursor: pointer; touch-action: manipulation;
+  }
+  #enter-btn strong { font-size: clamp(16px, 2vw + 10px, 20px); text-wrap: balance; }
+  #enter-btn span { font-size: 12.5px; color: #aeb8c4; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="viewer"><img id="mirror" alt="WestPlay live cabin screen" draggable="false"></div>
+  <div id="status" role="status" aria-live="polite">正在连接…</div>
+  <button id="fs-btn" type="button" aria-label="进入全屏横屏" hidden>全屏横屏</button>
+  <div id="enter-gate" hidden>
+    <button id="enter-btn" type="button">
+      <strong>点击进入全屏横屏车机</strong>
+      <span>自动隐藏浏览器栏并锁定横屏操作</span>
+    </button>
+  </div>
+</div>
+<script>
+'use strict';
+const SOURCE_WIDTH = __SOURCE_WIDTH__;
+const SOURCE_HEIGHT = __SOURCE_HEIGHT__;
+const VIDEO_WIDTH = 1280;
+const VIDEO_HEIGHT = 720;
+const token = new URLSearchParams(location.search).get('token') || '';
+const root = document.documentElement;
+const viewer = document.getElementById('viewer');
+const mirror = document.getElementById('mirror');
+const status = document.getElementById('status');
+const fsBtn = document.getElementById('fs-btn');
+const enterGate = document.getElementById('enter-gate');
+const enterBtn = document.getElementById('enter-btn');
+let socket = null;
+let activePointer = null;
+let lastMove = 0;
+let wakeLock = null;
+
+function isRotated() {
+  return root.dataset?.rotated === '1';
+}
+function supportsFullscreen() {
+  return typeof root.requestFullscreen === 'function' || typeof root.webkitRequestFullscreen === 'function';
+}
+function isFullscreen() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+}
+function syncFullscreenUi() {
+  if (!fsBtn) return;
+  fsBtn.hidden = !token || !supportsFullscreen() || isFullscreen() || !enterGate?.hidden;
+}
+function updateOrientation() {
+  const rotated = window.innerHeight > window.innerWidth;
+  const prev = isRotated();
+  if (root.dataset) root.dataset.rotated = rotated ? '1' : '0';
+  if (prev !== rotated && activePointer !== null) {
+    activePointer = null;
+    send('cancel');
+  }
+  syncFullscreenUi();
+}
+async function keepAwake() {
+  try {
+    if (!wakeLock && navigator.wakeLock?.request) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock?.addEventListener?.('release', () => { wakeLock = null; });
+    }
+  } catch {}
+}
+async function enterFullscreenAndLandscape() {
+  if (enterGate) enterGate.hidden = true;
+  try {
+    if (!isFullscreen()) {
+      if (typeof root.requestFullscreen === 'function') {
+        try {
+          await root.requestFullscreen({ navigationUI: 'hide' });
+        } catch {
+          await root.requestFullscreen();
+        }
+      } else if (typeof root.webkitRequestFullscreen === 'function') {
+        root.webkitRequestFullscreen();
+      }
+    }
+  } catch {}
+  try {
+    if (screen.orientation?.lock) {
+      await screen.orientation.lock('landscape');
+    }
+  } catch {}
+  void keepAwake();
+  updateOrientation();
+}
+
+function viewerMetrics() {
+  const box = viewer.getBoundingClientRect();
+  const rotated = isRotated();
+  return {
+    box,
+    rotated,
+    width: rotated ? box.height : box.width,
+    height: rotated ? box.width : box.height
+  };
+}
+function contentRect() {
+  const { width, height } = viewerMetrics();
+  const imageScale = Math.min(width / VIDEO_WIDTH, height / VIDEO_HEIGHT);
+  const videoLeft = (width - VIDEO_WIDTH * imageScale) / 2;
+  const videoTop = (height - VIDEO_HEIGHT * imageScale) / 2;
+  const sourceScale = Math.min(VIDEO_WIDTH / SOURCE_WIDTH, VIDEO_HEIGHT / SOURCE_HEIGHT);
+  const pixelWidth = SOURCE_WIDTH * sourceScale;
+  const pixelHeight = SOURCE_HEIGHT * sourceScale;
+  return {
+    left: videoLeft + (VIDEO_WIDTH - pixelWidth) * imageScale / 2,
+    top: videoTop + (VIDEO_HEIGHT - pixelHeight) * imageScale / 2,
+    width: pixelWidth * imageScale,
+    height: pixelHeight * imageScale
+  };
+}
+function localPoint(event, box, rotated) {
+  if (!rotated) {
+    return { x: event.clientX - box.left, y: event.clientY - box.top };
+  }
+  return { x: event.clientY - box.top, y: (box.left + box.width) - event.clientX };
+}
+function coordinates(event) {
+  const { box, rotated } = viewerMetrics();
+  const rect = contentRect();
+  const local = localPoint(event, box, rotated);
+  const x = (local.x - rect.left) / rect.width;
+  const y = (local.y - rect.top) / rect.height;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+function send(type, point = { x: 0, y: 0 }) {
+  if (socket?.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ type, ...point }));
+}
+function start(event) {
+  if (activePointer !== null || event.button !== 0) return;
+  const point = coordinates(event);
+  if (!point || point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) return;
+  activePointer = event.pointerId;
+  lastMove = 0;
+  viewer.setPointerCapture(event.pointerId);
+  send('down', point);
+  event.preventDefault();
+}
+function move(event) {
+  if (activePointer !== event.pointerId) return;
+  const time = performance.now();
+  if (time - lastMove < 16) return;
+  lastMove = time;
+  const point = coordinates(event);
+  if (point) send('move', { x: Math.max(0, Math.min(1, point.x)), y: Math.max(0, Math.min(1, point.y)) });
+  event.preventDefault();
+}
+function end(event, cancel = false) {
+  if (activePointer !== event.pointerId) return;
+  const point = coordinates(event);
+  activePointer = null;
+  if (viewer.hasPointerCapture(event.pointerId)) viewer.releasePointerCapture(event.pointerId);
+  send(cancel ? 'cancel' : 'up', point ? {
+    x: Math.max(0, Math.min(1, point.x)), y: Math.max(0, Math.min(1, point.y))
+  } : { x: 0, y: 0 });
+  event.preventDefault();
+}
+
+for (const control of [enterGate, enterBtn, fsBtn]) {
+  if (!control) continue;
+  control.addEventListener('pointerdown', event => event.stopPropagation());
+  control.addEventListener('pointerup', event => event.stopPropagation());
+}
+enterGate?.addEventListener('click', () => { void enterFullscreenAndLandscape(); });
+fsBtn?.addEventListener('click', () => { void enterFullscreenAndLandscape(); });
+
+viewer.addEventListener('pointerdown', start);
+viewer.addEventListener('pointermove', move);
+viewer.addEventListener('pointerup', event => end(event));
+viewer.addEventListener('pointercancel', event => end(event, true));
+viewer.addEventListener('lostpointercapture', event => end(event, true));
+viewer.addEventListener('contextmenu', event => event.preventDefault());
+window.addEventListener('resize', updateOrientation);
+window.addEventListener('orientationchange', updateOrientation);
+document.addEventListener('fullscreenchange', updateOrientation);
+document.addEventListener('webkitfullscreenchange', updateOrientation);
+window.addEventListener('blur', () => {
+  if (activePointer !== null) { activePointer = null; send('cancel'); }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && activePointer !== null) { activePointer = null; send('cancel'); }
+  if (!document.hidden && isFullscreen()) { void keepAwake(); }
+});
+
+updateOrientation();
+if (!token) {
+  status.textContent = '缺少配对令牌，请从 Companion 复制完整配对链接';
+} else {
+  if (supportsFullscreen() && !isFullscreen() && enterGate) {
+    enterGate.hidden = false;
+  }
+  syncFullscreenUi();
+  mirror.src = '/stream?token=' + encodeURIComponent(token);
+  socket = new WebSocket('ws://' + location.host + '/ws?token=' + encodeURIComponent(token));
+  socket.onopen = () => { status.textContent = '已连接 · WestPlay 镜像'; setTimeout(() => { if (socket.readyState === WebSocket.OPEN) status.hidden = true; }, 1800); };
+  socket.onclose = () => { activePointer = null; status.hidden = false; status.textContent = '触控连接已断开，请刷新页面'; };
+  socket.onerror = () => { status.hidden = false; status.textContent = '连接失败：检查电脑防火墙与配对地址'; };
+  // The server releases held buttons if these heartbeats stop for 3 seconds.
+  setInterval(() => { if (socket.readyState === WebSocket.OPEN) send('ping'); }, 1000);
+}
+</script>
+</body>
+</html>

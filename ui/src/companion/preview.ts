@@ -72,6 +72,7 @@ const setup: SetupState = {
 }
 
 let settings: Settings = {
+  mobileWebUi: false,
   interaction: { key: 0xa4, mode: 'hold', sensitivity: 1.4 },
   keybinds: {
     volumeDown: { key: 0x31, withInteractionKey: true },
@@ -160,6 +161,9 @@ const ADAPTERS = [
 function status(): HostStatus {
   const live = gameState === 'live'
   return {
+    mobileWebUi: settings.mobileWebUi
+      ? { state: 'running', pairingUrl: 'http://192.168.1.50:8765/?token=preview' }
+      : { state: 'off' },
     webviewVersion: '141.0.3537.71',
     adapter: gameState === 'off' ? null : ADAPTERS[0].name,
     // The one chosen, or WestPlay's pick: the game's.

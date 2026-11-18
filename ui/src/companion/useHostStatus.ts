@@ -5,6 +5,7 @@ import { followRound } from './mapRound'
 
 /** Emitted by the Tauri backend about once per second (mirrors `westplay_host::Status`). */
 export interface HostStatus {
+  mobileWebUi?: { state: 'off' } | { state: 'running'; pairingUrl: string | null } | { state: 'error'; message: string }
   webviewVersion: string
   adapter: string | null
   /** The graphics card WestPlay's screen is drawn on, and the game's (`null` until the game runs). */

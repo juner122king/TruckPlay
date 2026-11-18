@@ -4545,6 +4545,7 @@ name = "westplay-host"
 version = "2.4.0-domestic.2"
 dependencies = [
  "base64 0.22.1",
+ "getrandom 0.3.4",
  "image",
  "lofty",
  "serde",

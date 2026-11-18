@@ -87,6 +87,7 @@ pub struct Pointer {
 /// screen made every click a modified one: with Left Alt, every link clicked was downloaded, as Alt-click does in a
 /// browser (owner 2026-11-08: no page could be opened from Google's results); Ctrl and Shift would open links in
 /// other tabs.
+#[derive(Clone, Copy)]
 pub struct WebArea<'a> {
     pub view: &'a OffscreenWebView,
     pub area: Rect,
@@ -175,6 +176,22 @@ impl Pointer {
         };
         let buttons = self.buttons;
         let events = self.step(input, Instant::now());
+        self.dispatch_events(events, webview, web);
+        Mouse {
+            active: self.active,
+            x: self.x,
+            y: self.y,
+            pressed: self.buttons & PointerBlock::LEFT != 0,
+            used: input.dx != 0 || input.dy != 0 || input.wheel != 0 || self.buttons != buttons,
+        }
+    }
+
+    fn dispatch_events(
+        &mut self,
+        events: Vec<(COREWEBVIEW2_MOUSE_EVENT_KIND, u32)>,
+        webview: &OffscreenWebView,
+        web: Option<WebArea<'_>>,
+    ) {
         let to_web = self.route(web.as_ref().map(|web| web.contains(self.x, self.y)));
         if to_web != self.on_web {
             // Off one, onto the other: the one left is told, as a browser tells a page the mouse left it.
@@ -219,13 +236,54 @@ impl Pointer {
             (_, None) => Some(to_web),
             (_, held) => held,
         };
-        Mouse {
-            active: self.active,
-            x: self.x,
-            y: self.y,
-            pressed: self.buttons & PointerBlock::LEFT != 0,
-            used: input.dx != 0 || input.dy != 0 || input.wheel != 0 || self.buttons != buttons,
+    }
+
+    pub fn remote_touch(
+        &mut self,
+        phase: crate::lan::Phase,
+        x: f32,
+        y: f32,
+        webview: &OffscreenWebView,
+        web: Option<WebArea<'_>>,
+    ) {
+        let events = self.touch_events(phase, x, y);
+        if !events.is_empty() {
+            self.dispatch_events(events, webview, web);
         }
+    }
+
+    /// The phone sends normalized frame coordinates. The page can be taller than the frame.
+    fn touch_events(&mut self, phase: crate::lan::Phase, x: f32, y: f32) -> Vec<(COREWEBVIEW2_MOUSE_EVENT_KIND, u32)> {
+        use crate::lan::Phase;
+        let mut events = Vec::new();
+        if phase == Phase::Cancel {
+            if self.active {
+                self.set_buttons(0, &mut events);
+                events.push((COREWEBVIEW2_MOUSE_EVENT_KIND_LEAVE, 0));
+                self.active = false;
+            }
+            return events;
+        }
+        if !x.is_finite() || !y.is_finite() || (phase != Phase::Down && !self.active) {
+            return events;
+        }
+
+        self.x = (x * self.width).clamp(0.0, self.width - 1.0);
+        self.y = (y * self.height).clamp(0.0, self.height - 1.0);
+        events.push((COREWEBVIEW2_MOUSE_EVENT_KIND_MOVE, 0));
+        match phase {
+            Phase::Down => {
+                self.active = true;
+                self.set_buttons(PointerBlock::LEFT, &mut events);
+            }
+            Phase::Up => {
+                self.set_buttons(0, &mut events);
+                self.active = false;
+            }
+            Phase::Move | Phase::Cancel => {}
+        }
+        self.slop_travel = None;
+        events
     }
 
     /// Whether the mouse's events go to the web page (`over_web`: whether the cursor is over it; `None`: none
@@ -402,6 +460,24 @@ const RIGHT_DOWN: COREWEBVIEW2_MOUSE_EVENT_KIND = COREWEBVIEW2_MOUSE_EVENT_KIND_
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn lan_touch_tracks_a_squeezed_page_and_releases_on_disconnect() {
+        use super::{Pointer, PointerBlock};
+        use crate::lan::Phase;
+
+        let mut pointer = Pointer::new(1280, 793);
+        assert!(pointer.touch_events(Phase::Move, 0.25, 0.5).is_empty());
+        let down = pointer.touch_events(Phase::Down, 0.25, 0.5);
+        assert_eq!(down.len(), 2);
+        assert_eq!((pointer.x, pointer.y), (320.0, 396.5));
+        assert_eq!(pointer.buttons, PointerBlock::LEFT);
+        pointer.touch_events(Phase::Move, 1.0, 1.0);
+        assert_eq!((pointer.x, pointer.y), (1279.0, 792.0));
+        assert_eq!(pointer.touch_events(Phase::Cancel, 0.0, 0.0).len(), 2);
+        assert_eq!(pointer.buttons, 0);
+        assert!(!pointer.active);
+    }
+
     use super::*;
 
     #[test]

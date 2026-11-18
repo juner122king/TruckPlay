@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 /** The player's settings. Mirrors `westplay_host::settings::Settings`; the app owns and saves them. */
 export interface Settings {
+  mobileWebUi: boolean
   interaction: {
     /** The key that uses the screen. */
     key: KeyCode

@@ -750,6 +750,7 @@ button.ob-row:active {
 /* A row whose title is a sentence to read whole (a box to tick): it wraps. */
 .ob-row[data-wrap] .ob-row-text b {
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .ob-row-text span {

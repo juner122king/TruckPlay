@@ -85,6 +85,12 @@ screen, used with the mouse while you hold a key.
 **The companion app** on your PC sets everything up: it finds your games, ETS2, ATS or both, installs WestPlay
 into each, builds their maps, and keeps WestPlay up to date.
 
+### Mobile WebUI (Optional LAN Mirror)
+
+Connect your phone and PC to the same trusted local network, then enable **Mobile WebUI** in the companion's **Setup** page. Click the pairing link to copy it and open it in your phone's browser to mirror WestPlay's cabin display and control it with single-finger taps and drags.
+
+The feature is off by default and persists across restarts. Turning it off disconnects clients and releases TCP port `8765`; turning it back on generates a new pairing link. Do not share the pairing link publicly or forward port `8765` to the public internet.
+
 ## How it works
 
 ```mermaid

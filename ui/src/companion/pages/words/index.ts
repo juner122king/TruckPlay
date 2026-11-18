@@ -179,6 +179,19 @@ export interface CompanionWords {
     memory: { title: string; banner: { title: string; text: string }; note: { title: string; text: string } }
   }
   setup: {
+    mobileWebUi: {
+      title: string
+      detail: string
+      starting: string
+      unavailable: string
+      noAddress: string
+      qrHint: string
+      qrLabel: string
+      copied: string
+      copy: string
+      link: string
+      keepPrivate: string
+    }
     title: string
     sub: string
     game: string

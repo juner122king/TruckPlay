@@ -15,7 +15,7 @@ undocumented_unsafe_blocks = "warn"
 missing_safety_doc = "warn"
 
 [profile.release]
-opt-level = "z"
+opt-level = 2
 lto = true
 codegen-units = 1
 debug = "line-tables-only"
@@ -29,3 +29,15 @@ debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
+
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[profile.dev.package.zune-core]
+opt-level = 3
+
+[profile.dev.package.moxcms]
+opt-level = 3
