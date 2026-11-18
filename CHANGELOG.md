@@ -3,6 +3,11 @@
 What changed in each release of WestPlay. The newest release's notes are what the app shows when it offers the
 update.
 
+## 2.4.0-domestic.3 国内定制版 / Domestic Edition (2026-11-18)
+- 修复电台（Radio）直播播放一段时间后自动暂停的问题：自动恢复非主动触发的音频暂停、连续异常时自动重建 HLS 连接、在稳定播放后重置重连预算并延长退避窗口与优化 `hls.js` 重试及缓冲配置。
+- 修复喜马拉雅/电台播放器接入车内 3D 扬声器音效（`westplayCabSound`）的参数签名错误，恢复均衡器、车外闷音与频谱分析并降低后台 CPU 占用，同时在 `app.log` 中区分 `loading`/`paused` 状态并记录播放错误原因。
+- 新增局域网手机远程控制（Mobile WebUI）：支持 Companion 设置页扫码配对与复制局域网地址、30 FPS 双缓冲 GPU 画面镜像及触控反向控制。
+
 ## 2.4.0-domestic.2 国内定制版 / Domestic Edition (2026-11-17)
 - 重构 Bilibili 车机端 UI 与交互体验：整合精选（推荐/热门榜）、动态、直播、影视四大主分页，统一 CarPlay × B站明暗视觉 Token、字体缩放与响应式网格布局，全量替换为矢量图标与断图降级组件。
 - 修复 Bilibili 弹幕播放显示层与开关状态同步，仅展示视频弹幕内容并屏蔽网页输入条。
