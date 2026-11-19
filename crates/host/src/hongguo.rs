@@ -5,7 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::path::Path;
 
 use crate::signin::{self, Progress, SignInWindow};
-use crate::speakers::{self, Equalizer, Head, Speaker};
+use crate::speakers::{self, CabCache, Equalizer, Head, Speaker};
 use crate::webview::{self, OffscreenWebView, PageSize, Stage};
 
 pub const HOME: &str = "https://hongguoduanju.com/?tab=home";
@@ -366,7 +366,7 @@ pub struct Hongguo {
     sign_in: RefCell<Option<SignInWindow>>,
     pending: RefCell<Vec<Report>>,
     checked_initial_cookie: Cell<bool>,
-    last_cab: RefCell<Option<String>>,
+    told: RefCell<CabCache>,
 }
 
 impl Hongguo {
@@ -384,7 +384,7 @@ impl Hongguo {
             sign_in: RefCell::new(None),
             pending: RefCell::new(Vec::new()),
             checked_initial_cookie: Cell::new(false),
-            last_cab: RefCell::new(None),
+            told: RefCell::default(),
         })
     }
 
@@ -426,6 +426,7 @@ impl Hongguo {
             }
             Command::SignOut => {
                 let _ = self.view.delete_cookies();
+                self.told.borrow_mut().reset();
                 let _ = self.view.navigate(HOME);
                 self.pending.borrow_mut().push(Report::State(State { signed_in: false, playing: false }));
                 Ok(())
@@ -474,6 +475,7 @@ impl Hongguo {
         if let Some(p @ (Progress::SignedIn | Progress::Closed)) = progress {
             self.sign_in.borrow_mut().take();
             reports.push(Report::SignInWindow(false));
+            self.told.borrow_mut().reset();
             let _ = self.view.navigate(HOME);
             let signed_in =
                 p == Progress::SignedIn || self.view.has_cookie(COOKIE_URL, &["sessionid", "sessionid_ss", "sid_tt"]);
@@ -533,23 +535,12 @@ impl Hongguo {
         equalizer: Equalizer,
         spectrum: bool,
     ) -> windows::core::Result<()> {
-        let message = serde_json::json!({
-            "action": "cab",
-            "speakers": speakers,
-            "head": head,
-            "outside": outside,
-            "distance": distance,
-            "equalizer": equalizer,
-            "spectrum": spectrum,
-        })
-        .to_string();
-        let mut last = self.last_cab.borrow_mut();
-        if last.as_deref() == Some(message.as_str()) {
-            return Ok(());
+        if let Some(message) =
+            self.told.borrow_mut().message_if_changed(speakers, head, outside, distance, equalizer, spectrum)
+        {
+            self.view.post_json(&message)?;
         }
-        *last = Some(message.clone());
-        drop(last);
-        self.view.post_json(&message)
+        Ok(())
     }
 }
 

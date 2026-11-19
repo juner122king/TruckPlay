@@ -1339,6 +1339,74 @@ pub fn are_sound(speakers: &[Speaker]) -> bool {
 /// The most speakers a vehicle may have: a coach's overhead units (28 in the longest bodies) and a few more.
 pub const MOST_SPEAKERS: usize = 32;
 
+/// Deduplicates per-tick `cab` audio configuration updates for players that consume `{"action":"cab", ...}` payloads.
+#[derive(Default)]
+pub struct CabCache {
+    speakers: Option<Option<Vec<Speaker>>>,
+    head: Option<Head>,
+    camera: Option<(bool, f32)>,
+    equalizer: Option<Equalizer>,
+    spectrum: Option<bool>,
+}
+
+impl CabCache {
+    /// Clears cached state so a freshly reloaded page receives the full configuration again.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Returns a serialized `{"action":"cab", ...}` JSON payload only when sound state actually changed.
+    pub fn message_if_changed(
+        &mut self,
+        speakers: Option<&[Speaker]>,
+        head: Head,
+        outside: bool,
+        distance: f32,
+        equalizer: Equalizer,
+        spectrum: bool,
+    ) -> Option<String> {
+        let mut changed = false;
+        if self.speakers.as_ref().map(Option::as_deref) != Some(speakers) {
+            self.speakers = Some(speakers.map(<[_]>::to_vec));
+            changed = true;
+        }
+        if self.head != Some(head) && head.is_sound() {
+            self.head = Some(head);
+            changed = true;
+        }
+        let camera = (outside, if outside { (distance * 4.0).round() / 4.0 } else { 0.0 });
+        if self.camera != Some(camera) && camera.1.is_finite() {
+            self.camera = Some(camera);
+            changed = true;
+        }
+        if self.equalizer != Some(equalizer) {
+            self.equalizer = Some(equalizer);
+            changed = true;
+        }
+        if self.spectrum != Some(spectrum) {
+            self.spectrum = Some(spectrum);
+            changed = true;
+        }
+        if !changed {
+            return None;
+        }
+        let head_out = self.head?;
+        let (outside_out, distance_out) = self.camera.unwrap_or((outside, 0.0));
+        Some(
+            serde_json::json!({
+                "action": "cab",
+                "speakers": self.speakers.as_ref().and_then(Option::as_deref),
+                "head": head_out,
+                "outside": outside_out,
+                "distance": distance_out,
+                "equalizer": self.equalizer.unwrap_or(equalizer),
+                "spectrum": self.spectrum.unwrap_or(spectrum),
+            })
+            .to_string(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2003,5 +2071,21 @@ mod tests {
         }
         // A right-hand-drive interior's speakers where the left-hand one has them, in the cab.
         assert_eq!(renault_t("uk/model_uk.pmd", T_HEAD_UK).len(), renault_t("model.pmd", T_HEAD).len());
+    }
+
+    #[test]
+    fn cab_cache_emits_only_when_sound_state_changes() {
+        let mut cache = CabCache::default();
+        let speakers =
+            [Speaker { band: [0.0, 0.0], level: 0.0, channel: Channel::Left, at: [-0.9, 1.0, -1.0], delay: 0.0 }];
+        let head = Head { x: -0.5, y: 1.2, z: 0.4, heading: 0.0, pitch: 0.0 };
+        let eq = Equalizer::default();
+        assert!(cache.message_if_changed(Some(&speakers), head, false, 0.0, eq, false).is_some());
+        assert!(cache.message_if_changed(Some(&speakers), head, false, 0.0, eq, false).is_none());
+        assert!(cache.message_if_changed(Some(&speakers), head, true, 5.0, eq, false).is_some());
+        assert!(cache.message_if_changed(Some(&speakers), head, true, 5.05, eq, false).is_none());
+        assert!(cache.message_if_changed(Some(&speakers), head, true, 5.3, eq, false).is_some());
+        cache.reset();
+        assert!(cache.message_if_changed(Some(&speakers), head, true, 5.3, eq, false).is_some());
     }
 }
