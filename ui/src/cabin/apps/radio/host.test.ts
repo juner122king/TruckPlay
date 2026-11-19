@@ -353,4 +353,48 @@ describe('the single Ximalaya audio host', () => {
     await vi.advanceTimersByTimeAsync(2000)
     expect(h.requests).toHaveLength(6)
   })
+  it('deduplicates unchanged cab updates and ignores micro-waiting stalls', async () => {
+    const h = harness()
+    const start = h.command({ action: 'play', requestId: 1, track: radio(1) })
+    await Promise.resolve()
+    await Promise.resolve()
+    h.requests[0].resolve(h.detail(1))
+    await start
+    for (let n = 0; n < 10; n++) await Promise.resolve()
+    h.Hls.instances[0].emit('manifest')
+    await Promise.resolve()
+    h.elements[0].emit('playing')
+    expect(h.last().status).toBe('playing')
+
+    const cab = {
+      action: 'cab',
+      speakers: [{ band: [0, 0], level: 0, channel: 'left', at: [-0.9, 1.0, -1.0], delay: 0 }],
+      head: { x: -0.5, y: 1.2, z: 0.4, heading: 0, pitch: 0 },
+      outside: false,
+      distance: 0,
+      equalizer: { bass: 0, mid: 0, treble: 0 },
+      spectrum: false,
+    }
+    await h.command(cab)
+    await h.command(JSON.parse(JSON.stringify(cab)))
+    await h.command(JSON.parse(JSON.stringify(cab)))
+    expect(h.sound.speakers).toHaveBeenCalledTimes(1)
+    expect(h.sound.head).toHaveBeenCalledTimes(1)
+    expect(h.sound.outside).toHaveBeenCalledTimes(1)
+    expect(h.sound.equalizer).toHaveBeenCalledTimes(1)
+    expect(h.sound.spectrum).toHaveBeenCalledTimes(1)
+
+    // Brief waiting under 250ms does not flicker status back to loading.
+    h.elements[0].emit('waiting')
+    await vi.advanceTimersByTimeAsync(100)
+    expect(h.last().status).toBe('playing')
+    h.elements[0].emit('playing')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(h.last().status).toBe('playing')
+
+    // Sustained waiting past 250ms transitions to loading.
+    h.elements[0].emit('waiting')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(h.last().status).toBe('loading')
+  })
 })

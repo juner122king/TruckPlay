@@ -142,12 +142,72 @@ pub enum Report {
     Spectrum(Vec<u8>),
 }
 
+#[derive(Default)]
+struct CabTold {
+    speakers: Option<Option<Vec<Speaker>>>,
+    head: Option<Head>,
+    camera: Option<(bool, f32)>,
+    equalizer: Option<Equalizer>,
+    spectrum: Option<bool>,
+}
+
+fn cab_message_if_changed(
+    told: &mut CabTold,
+    speakers: Option<&[Speaker]>,
+    head: Head,
+    outside: bool,
+    distance: f32,
+    equalizer: Equalizer,
+    spectrum: bool,
+) -> Option<String> {
+    let mut changed = false;
+    if told.speakers.as_ref().map(Option::as_deref) != Some(speakers) {
+        told.speakers = Some(speakers.map(<[_]>::to_vec));
+        changed = true;
+    }
+    if told.head != Some(head) && head.is_sound() {
+        told.head = Some(head);
+        changed = true;
+    }
+    let camera = (outside, if outside { (distance * 4.0).round() / 4.0 } else { 0.0 });
+    if told.camera != Some(camera) && camera.1.is_finite() {
+        told.camera = Some(camera);
+        changed = true;
+    }
+    if told.equalizer != Some(equalizer) {
+        told.equalizer = Some(equalizer);
+        changed = true;
+    }
+    if told.spectrum != Some(spectrum) {
+        told.spectrum = Some(spectrum);
+        changed = true;
+    }
+    if !changed {
+        return None;
+    }
+    let head_out = told.head?;
+    let (outside_out, distance_out) = told.camera.unwrap_or((outside, 0.0));
+    Some(
+        serde_json::json!({
+            "action": "cab",
+            "speakers": told.speakers.as_ref().and_then(Option::as_deref),
+            "head": head_out,
+            "outside": outside_out,
+            "distance": distance_out,
+            "equalizer": told.equalizer.unwrap_or(equalizer),
+            "spectrum": told.spectrum.unwrap_or(spectrum),
+        })
+        .to_string(),
+    )
+}
+
 pub struct Ximalaya {
     view: OffscreenWebView,
     sign_in: RefCell<Option<SignInWindow>>,
     pending: RefCell<Vec<Report>>,
     ready: Cell<bool>,
     commands: RefCell<Vec<String>>,
+    told: RefCell<CabTold>,
 }
 
 impl Ximalaya {
@@ -163,6 +223,7 @@ impl Ximalaya {
             "\n",
             include_str!("ximalaya.js")
         ))?;
+        view.serve_blank_document(HOME)?;
         view.navigate(HOME)?;
         Ok(Self {
             view,
@@ -170,6 +231,7 @@ impl Ximalaya {
             pending: RefCell::new(Vec::new()),
             ready: Cell::new(false),
             commands: RefCell::new(Vec::new()),
+            told: RefCell::default(),
         })
     }
 
@@ -195,6 +257,7 @@ impl Ximalaya {
         if matches!(command, Command::SignOut) {
             let _ = self.view.delete_cookies();
             self.ready.set(false);
+            *self.told.borrow_mut() = CabTold::default();
             let _ = self.view.navigate(HOME);
             return;
         }
@@ -297,17 +360,11 @@ impl Ximalaya {
         equalizer: Equalizer,
         spectrum: bool,
     ) -> windows::core::Result<()> {
-        let message = serde_json::json!({
-            "action": "cab",
-            "speakers": speakers,
-            "head": head,
-            "outside": outside,
-            "distance": distance,
-            "equalizer": equalizer,
-            "spectrum": spectrum,
-        })
-        .to_string();
-        self.send_or_queue(message);
+        let mut told = self.told.borrow_mut();
+        if let Some(message) = cab_message_if_changed(&mut told, speakers, head, outside, distance, equalizer, spectrum)
+        {
+            self.send_or_queue(message);
+        }
         Ok(())
     }
 }
@@ -434,6 +491,27 @@ mod tests {
         ));
         assert!(!wait(&player, 6, |report| matches!(report, Report::Playback(Some(p)) if p.status == "playing")));
         player.close(&stage);
+    }
+
+    #[test]
+    fn cab_only_emits_when_state_changes() {
+        let mut told = CabTold::default();
+        let speakers = [Speaker {
+            band: [0.0, 0.0],
+            level: 0.0,
+            channel: speakers::Channel::Left,
+            at: [-0.9, 1.0, -1.0],
+            delay: 0.0,
+        }];
+        let head = Head { x: -0.5, y: 1.2, z: 0.4, heading: 0.0, pitch: 0.0 };
+        let eq = Equalizer::default();
+        assert!(cab_message_if_changed(&mut told, Some(&speakers), head, false, 0.0, eq, false).is_some());
+        // Identical per-tick calls must not re-send cab configuration.
+        assert!(cab_message_if_changed(&mut told, Some(&speakers), head, false, 0.0, eq, false).is_none());
+        // Sub-quarter-meter outside distance jitter is ignored, matching other players.
+        assert!(cab_message_if_changed(&mut told, Some(&speakers), head, true, 5.0, eq, false).is_some());
+        assert!(cab_message_if_changed(&mut told, Some(&speakers), head, true, 5.05, eq, false).is_none());
+        assert!(cab_message_if_changed(&mut told, Some(&speakers), head, true, 5.3, eq, false).is_some());
     }
 
     #[test]

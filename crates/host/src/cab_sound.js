@@ -80,7 +80,7 @@ window.westplayCabSound = (media, say) => {
   const LOWEST = 40
   const HIGHEST = 16000
   const SPECTRUM_EVERY = 50
-  let spectrumWanted = false
+  let spectrumWanted = null
   let spectrumTimer = null
   let saidSilent = false
   const sayQuiet = () => {
@@ -168,12 +168,13 @@ window.westplayCabSound = (media, say) => {
       audio.source = source
       audio.wired = undefined
     }
-    if (audio.wired === speakers || (speakers && !head)) return
+    const wiredKey = speakers ? JSON.stringify(speakers) : null
+    if (audio.wired === wiredKey || (speakers && !head)) return
     audio.source.disconnect()
     for (const node of audio.nodes) node.disconnect()
     audio.nodes = []
     audio.meters = null
-    audio.wired = speakers
+    audio.wired = wiredKey
     const keep = (node) => (audio.nodes.push(node), node)
     // First of all, the tone.
     const bands = TONE.map(([, options]) => keep(new BiquadFilterNode(context, options)))
@@ -293,7 +294,9 @@ window.westplayCabSound = (media, say) => {
       } catch {}
     },
     spectrum(on) {
-      spectrumWanted = Boolean(on)
+      const next = Boolean(on)
+      if (spectrumWanted === next) return
+      spectrumWanted = next
       clearInterval(spectrumTimer)
       spectrumTimer = null
       saidSilent = false
@@ -304,16 +307,21 @@ window.westplayCabSound = (media, say) => {
       } catch {}
     },
     equalizer(told) {
-      equalizer = Object.fromEntries(TONE.map(([band]) => [band, Number(told?.[band]) || 0]))
+      const next = Object.fromEntries(TONE.map(([band]) => [band, Number(told?.[band]) || 0]))
+      if (TONE.every(([band]) => equalizer[band] === next[band]) && audio?.tone) return
+      equalizer = next
       setTone(false)
       try {
         wire()
       } catch {}
     },
     outside(on, far) {
-      const cut = outside !== on
-      outside = on
-      distance = far ?? 0
+      const nextOutside = Boolean(on)
+      const nextDistance = far ?? 0
+      if (outside === nextOutside && distance === nextDistance && audio?.muffle) return
+      const cut = outside !== nextOutside
+      outside = nextOutside
+      distance = nextDistance
       try {
         wire()
         muffle(cut)

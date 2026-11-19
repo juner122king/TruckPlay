@@ -15,6 +15,7 @@
   let retryTimer = null
   let watchdog = null
   let stableTimer = null
+  let waitingTimer = null
   let retries = 0
   let unexpectedPauses = 0
   let lastUnexpectedPauseAt = 0
@@ -29,6 +30,7 @@
   const STABLE_PLAYBACK_MS = 10000
   const PAUSE_BURST_WINDOW_MS = 5000
   const MAX_UNEXPECTED_PAUSES = 2
+  const WAITING_DEBOUNCE_MS = 250
   const finite = (value) => (Number.isFinite(value) ? value : 0)
   const radioRoot = 'https://mobile.ximalaya.com/radio-first-page-app'
   const radioJson = async (path, signal) => {
@@ -38,13 +40,44 @@
     if (payload.ret !== 0 && payload.ret !== '0000') throw new Error(payload.msg || 'Radio request failed')
     return payload.data ?? payload.result
   }
+  const cabSeen = {
+    speakers: undefined,
+    head: undefined,
+    outside: undefined,
+    equalizer: undefined,
+    spectrum: undefined,
+  }
   const applyCab = () => {
     if (!sound || !cab) return
-    if (cab.speakers) sound.speakers(cab.speakers)
-    if (cab.head) sound.head(cab.head)
-    sound.outside(cab.outside, cab.distance)
-    sound.equalizer(cab.equalizer)
-    sound.spectrum(cab.spectrum)
+    if (cab.speakers !== undefined) {
+      const key = JSON.stringify(cab.speakers ?? null)
+      if (key !== cabSeen.speakers) {
+        cabSeen.speakers = key
+        sound.speakers(cab.speakers)
+      }
+    }
+    if (cab.head) {
+      const key = JSON.stringify(cab.head)
+      if (key !== cabSeen.head) {
+        cabSeen.head = key
+        sound.head(cab.head)
+      }
+    }
+    const outsideKey = `${Boolean(cab.outside)}:${Number(cab.distance || 0).toFixed(2)}`
+    if (outsideKey !== cabSeen.outside) {
+      cabSeen.outside = outsideKey
+      sound.outside(cab.outside, cab.distance)
+    }
+    const eqKey = JSON.stringify(cab.equalizer ?? null)
+    if (eqKey !== cabSeen.equalizer) {
+      cabSeen.equalizer = eqKey
+      sound.equalizer(cab.equalizer)
+    }
+    const spectrumWanted = Boolean(cab.spectrum)
+    if (spectrumWanted !== cabSeen.spectrum) {
+      cabSeen.spectrum = spectrumWanted
+      sound.spectrum(spectrumWanted)
+    }
   }
 
   const toCoverUrl = (item) => {
@@ -266,6 +299,8 @@
         return
       }
       clearTimeout(watchdog)
+      clearTimeout(waitingTimer)
+      waitingTimer = null
       clearTimeout(stableTimer)
       const seq = playAttemptSeq,
         track = currentTrack
@@ -284,6 +319,8 @@
     })
     el.addEventListener('pause', () => {
       if (!wanted || status !== 'playing') return
+      clearTimeout(waitingTimer)
+      waitingTimer = null
       clearTimeout(stableTimer)
       stableTimer = null
       if (el.error) {
@@ -312,13 +349,27 @@
     })
     el.addEventListener('waiting', () => {
       if (!wanted) return
-      clearTimeout(stableTimer)
-      stableTimer = null
-      isPlaying = false
-      status = 'loading'
-      sendPlayback()
-      checkStatus()
-      armWatchdog(playAttemptSeq, currentTrack)
+      const seq = playAttemptSeq,
+        track = currentTrack
+      armWatchdog(seq, track)
+      if (status !== 'playing') {
+        isPlaying = false
+        status = 'loading'
+        sendPlayback()
+        checkStatus()
+        return
+      }
+      if (waitingTimer) return
+      waitingTimer = setTimeout(() => {
+        waitingTimer = null
+        if (!valid(seq, track) || status !== 'playing') return
+        clearTimeout(stableTimer)
+        stableTimer = null
+        isPlaying = false
+        status = 'loading'
+        sendPlayback()
+        checkStatus()
+      }, WAITING_DEBOUNCE_MS)
     })
     el.addEventListener('timeupdate', () => {
       if (wanted && !currentTrack?.radio) sendPlayback()
@@ -577,6 +628,8 @@
     clearTimeout(retryTimer)
     retryTimer = null
     clearTimeout(watchdog)
+    clearTimeout(waitingTimer)
+    waitingTimer = null
     clearTimeout(stableTimer)
     stableTimer = null
     stopHls()
@@ -595,6 +648,8 @@
   const failed = (seq, track, message) => {
     if (!valid(seq, track) || retryTimer) return
     clearTimeout(watchdog)
+    clearTimeout(waitingTimer)
+    waitingTimer = null
     clearTimeout(stableTimer)
     stableTimer = null
     isPlaying = false
@@ -647,7 +702,7 @@
         if (!native) {
           if (!PlayerHls?.isSupported()) throw new Error('HLS is not supported')
           const instance = new PlayerHls({
-            enableWorker: false,
+            enableWorker: true,
             manifestLoadingMaxRetry: 4,
             levelLoadingMaxRetry: 4,
             fragLoadingMaxRetry: 4,

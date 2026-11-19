@@ -15,15 +15,16 @@ use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_COLOR, COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW, COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS,
     COREWEBVIEW2_MOUSE_EVENT_KIND, COREWEBVIEW2_MOUSE_EVENT_VIRTUAL_KEYS, COREWEBVIEW2_PROCESS_FAILED_KIND,
     COREWEBVIEW2_PROCESS_FAILED_KIND_BROWSER_PROCESS_EXITED, COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_EXITED,
-    COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE, CreateCoreWebView2EnvironmentWithOptions,
-    ICoreWebView2, ICoreWebView2_2, ICoreWebView2_3, ICoreWebView2CompositionController, ICoreWebView2Controller,
-    ICoreWebView2Controller2, ICoreWebView2Controller3, ICoreWebView2Environment, ICoreWebView2Environment3,
-    ICoreWebView2EnvironmentOptions, ICoreWebView2Settings5, ICoreWebView2Settings6,
+    COREWEBVIEW2_PROCESS_FAILED_KIND_RENDER_PROCESS_UNRESPONSIVE, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
+    CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2, ICoreWebView2_2, ICoreWebView2_3,
+    ICoreWebView2CompositionController, ICoreWebView2Controller, ICoreWebView2Controller2, ICoreWebView2Controller3,
+    ICoreWebView2Environment, ICoreWebView2Environment3, ICoreWebView2EnvironmentOptions, ICoreWebView2Settings5,
+    ICoreWebView2Settings6,
 };
 use webview2_com::{
     AddScriptToExecuteOnDocumentCreatedCompletedHandler, CoTaskMemPWSTR, CoreWebView2EnvironmentOptions,
     CreateCoreWebView2CompositionControllerCompletedHandler, CreateCoreWebView2EnvironmentCompletedHandler,
-    ProcessFailedEventHandler, WebMessageReceivedEventHandler,
+    ProcessFailedEventHandler, WebMessageReceivedEventHandler, WebResourceRequestedEventHandler,
 };
 use windows::System::DispatcherQueueController;
 use windows::UI::Composition::{Compositor, ContainerVisual, Visual};
@@ -33,6 +34,7 @@ use windows::Win32::System::WinRT::{
     CreateDispatcherQueueController, DQTAT_COM_STA, DQTYPE_THREAD_CURRENT, DispatcherQueueOptions,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
+use windows::Win32::UI::Shell::SHCreateMemStream;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DestroyWindow, WINDOW_EX_STYLE, WS_OVERLAPPEDWINDOW, WS_POPUP,
 };
@@ -741,6 +743,49 @@ impl OffscreenWebView {
     pub fn navigate_to_string(&self, html: &str) -> windows::core::Result<()> {
         // SAFETY: the WebView is alive as long as `self`; the page lives through the call.
         unsafe { self.webview.NavigateToString(&HSTRING::from(html)) }
+    }
+
+    /// Replaces the top-level document at `url` with a minimal blank HTML shell so same-origin
+    /// startup scripts, cookies, and `fetch` run without loading a heavy web app in the background.
+    pub fn serve_blank_document(&self, url: &str) -> windows::core::Result<()> {
+        const BLANK_HTML: &[u8] = b"<!doctype html><html><head><meta charset=\"utf-8\"></head><body></body></html>";
+        let target = url.trim_end_matches('/').to_owned();
+        let environment = self.environment.clone();
+        // SAFETY: the WebView is alive as long as `self`; the filter string lives through the call.
+        unsafe {
+            self.webview
+                .AddWebResourceRequestedFilter(&HSTRING::from(url), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT)?;
+        }
+        let handler = WebResourceRequestedEventHandler::create(Box::new(move |_webview, args| {
+            let Some(args) = args else { return Ok(()) };
+            // SAFETY: `args` is the event's, alive through the callback.
+            let request = unsafe { args.Request()? };
+            let mut uri = PWSTR::null();
+            // SAFETY: WebView2 writes a CoTaskMem string into `uri`, freed by `CoTaskMemPWSTR`.
+            unsafe { request.Uri(&mut uri)? };
+            let uri = CoTaskMemPWSTR::from(uri).to_string();
+            if uri.trim_end_matches('/') != target {
+                return Ok(());
+            }
+            // SAFETY: `BLANK_HTML` is `'static`, and `SHCreateMemStream` copies the slice into an `IStream`.
+            let stream =
+                unsafe { SHCreateMemStream(Some(BLANK_HTML)) }.ok_or_else(|| windows::core::Error::from(E_POINTER))?;
+            // SAFETY: `environment` and `stream` are valid COM objects.
+            let response = unsafe {
+                environment.CreateWebResourceResponse(
+                    &stream,
+                    200,
+                    w!("OK"),
+                    w!("Content-Type: text/html; charset=utf-8"),
+                )?
+            };
+            // SAFETY: `args` and `response` are valid COM objects.
+            unsafe { args.SetResponse(&response)? };
+            Ok(())
+        }));
+        let mut token = 0;
+        // SAFETY: the handler and token are locals for the call; WebView2 keeps its own reference.
+        unsafe { self.webview.add_WebResourceRequested(&handler, &mut token) }
     }
 
     /// Messages the page posted since the last call, oldest first.
