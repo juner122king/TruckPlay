@@ -7,12 +7,17 @@ import {
   getFallbackTracksForPlaylist,
   MOCK_RECOMMENDED_PLAYLISTS,
   play,
+  playOrPause,
   receiveAnswer,
   receivePlayback,
   receiveState,
+  seek,
   selectDiscoverChart,
   selectPlaylist,
   selectTab,
+  sendVolume,
+  setVolume,
+  skip,
   useNetease,
   togglePlayMode,
   toggleLike,
@@ -273,5 +278,308 @@ describe('netease app store & playlists', () => {
     expect(useNetease.getState().likedTrackIds).toContain(testId)
     toggleLike(testId)
     expect(useNetease.getState().likedTrackIds).not.toContain(testId)
+  })
+
+  it('auto-advances to the next track even when HTML5 audio emits pause before ended', () => {
+    const sent: unknown[] = []
+    vi.stubGlobal('window', {
+      chrome: {
+        webview: {
+          postMessage: (msg: unknown) => sent.push(msg),
+        },
+      },
+    })
+    dismissPlaybackNotice()
+    useNetease.setState({ playMode: 'loop', signedIn: true })
+
+    const q = [
+      { id: 't-1', title: '第一首', artist: '歌手A', duration: 215, fee: 8, playable: true },
+      { id: 't-2', title: '第二首', artist: '歌手B', duration: 240, fee: 8, playable: true },
+    ]
+    play(q[0], q, 0)
+
+    // Host confirms playback started (which clears playbackPendingTrackId)
+    receivePlayback({
+      title: '第一首',
+      artist: '歌手A',
+      duration: 215,
+      position: 10,
+      status: 'playing',
+      trackId: 't-1',
+    })
+    expect(useNetease.getState().playing).toBe(true)
+
+    sent.length = 0
+
+    // Simulate Chromium firing `pause` right at track end before `ended`
+    receivePlayback({
+      title: '第一首',
+      artist: '歌手A',
+      duration: 215,
+      position: 215,
+      status: 'paused',
+      trackId: 't-1',
+    })
+
+    receivePlayback({
+      title: '第一首',
+      artist: '歌手A',
+      duration: 215,
+      position: 215,
+      status: 'paused',
+      trackId: 't-1',
+      error: 'ended',
+    })
+
+    const state = useNetease.getState()
+    expect(state.playing).toBe(true)
+    expect(state.playback?.trackId).toBe('t-2')
+    expect(state.queueIndex).toBe(1)
+    expect(sent).toContainEqual({
+      type: 'netease',
+      command: { action: 'play', track: q[1] },
+    })
+  })
+
+  it('deduplicates duplicate ended events and ignores stale updates from outgoing tracks', () => {
+    dismissPlaybackNotice()
+    useNetease.setState({ playMode: 'loop', signedIn: true })
+
+    const q = [
+      { id: 's-1', title: 'Track 1', artist: 'Artist', duration: 200, playable: true },
+      { id: 's-2', title: 'Track 2', artist: 'Artist', duration: 200, playable: true },
+      { id: 's-3', title: 'Track 3', artist: 'Artist', duration: 200, playable: true },
+    ]
+    play(q[0], q, 0)
+    receivePlayback({ title: 'Track 1', artist: 'Artist', duration: 200, position: 1, status: 'playing', trackId: 's-1' })
+
+    // Duplicate ended events for s-1 should only advance once to s-2
+    receivePlayback({
+      title: 'Track 1',
+      artist: 'Artist',
+      duration: 200,
+      position: 200,
+      status: 'paused',
+      trackId: 's-1',
+      error: 'ended',
+    })
+    receivePlayback({
+      title: 'Track 1',
+      artist: 'Artist',
+      duration: 200,
+      position: 200,
+      status: 'paused',
+      trackId: 's-1',
+      error: 'ended',
+    })
+    // Stale paused timeupdate from s-1 arriving while s-2 is pending must also be ignored
+    receivePlayback({
+      title: 'Track 1',
+      artist: 'Artist',
+      duration: 200,
+      position: 199,
+      status: 'paused',
+      trackId: 's-1',
+    })
+
+    const state = useNetease.getState()
+    expect(state.playing).toBe(true)
+    expect(state.playback?.trackId).toBe('s-2')
+    expect(state.queueIndex).toBe(1)
+  })
+
+  it('replays current track on natural end in single mode, while manual skip advances normally', () => {
+    dismissPlaybackNotice()
+    useNetease.setState({ playMode: 'single', signedIn: true })
+
+    const q = [
+      { id: 'm-1', title: 'One', artist: 'Artist', duration: 180, playable: true },
+      { id: 'm-2', title: 'Two', artist: 'Artist', duration: 190, playable: true },
+    ]
+    play(q[0], q, 0)
+    receivePlayback({ title: 'One', artist: 'Artist', duration: 180, position: 1, status: 'playing', trackId: 'm-1' })
+
+    // Natural track end in single mode replays m-1
+    receivePlayback({
+      title: 'One',
+      artist: 'Artist',
+      duration: 180,
+      position: 180,
+      status: 'paused',
+      trackId: 'm-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('m-1')
+    expect(useNetease.getState().playing).toBe(true)
+
+    // Duplicate ended before replay starts is ignored
+    receivePlayback({
+      title: 'One',
+      artist: 'Artist',
+      duration: 180,
+      position: 180,
+      status: 'paused',
+      trackId: 'm-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('m-1')
+
+    // Manual skip(1) still switches to m-2, and skip(-1) goes back to m-1
+    skip(1)
+    expect(useNetease.getState().playback?.trackId).toBe('m-2')
+    expect(useNetease.getState().queueIndex).toBe(1)
+    skip(-1)
+    expect(useNetease.getState().playback?.trackId).toBe('m-1')
+    expect(useNetease.getState().queueIndex).toBe(0)
+  })
+
+  it('wraps in loop mode, handles single-track queues, advances in shuffle, and respects manual pause', () => {
+    dismissPlaybackNotice()
+    useNetease.setState({ playMode: 'loop', signedIn: true })
+
+    const q = [
+      { id: 'l-1', title: 'First', artist: 'Artist', duration: 120, playable: true },
+      { id: 'l-2', title: 'Last', artist: 'Artist', duration: 120, playable: true },
+    ]
+    play(q[1], q, 1)
+    receivePlayback({ title: 'Last', artist: 'Artist', duration: 120, position: 1, status: 'playing', trackId: 'l-2' })
+    receivePlayback({
+      title: 'Last',
+      artist: 'Artist',
+      duration: 120,
+      position: 120,
+      status: 'paused',
+      trackId: 'l-2',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('l-1')
+
+    // Single-track queue loops cleanly
+    const single = [{ id: 'only-1', title: 'Solo', artist: 'Artist', duration: 90, playable: true }]
+    play(single[0], single, 0)
+    receivePlayback({ title: 'Solo', artist: 'Artist', duration: 90, position: 1, status: 'playing', trackId: 'only-1' })
+    receivePlayback({
+      title: 'Solo',
+      artist: 'Artist',
+      duration: 90,
+      position: 90,
+      status: 'paused',
+      trackId: 'only-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('only-1')
+    expect(useNetease.getState().playing).toBe(true)
+
+    // Shuffle mode picks another playable track
+    useNetease.setState({ playMode: 'shuffle', signedIn: true })
+    play(q[0], q, 0)
+    receivePlayback({ title: 'First', artist: 'Artist', duration: 120, position: 1, status: 'playing', trackId: 'l-1' })
+    receivePlayback({
+      title: 'First',
+      artist: 'Artist',
+      duration: 120,
+      position: 120,
+      status: 'paused',
+      trackId: 'l-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('l-2')
+
+    // Manual pause prevents delayed ended from auto-resuming
+    useNetease.setState({ playMode: 'loop', signedIn: true })
+    play(q[0], q, 0)
+    receivePlayback({ title: 'First', artist: 'Artist', duration: 120, position: 20, status: 'playing', trackId: 'l-1' })
+    playOrPause()
+    expect(useNetease.getState().playing).toBe(false)
+    receivePlayback({
+      title: 'First',
+      artist: 'Artist',
+      duration: 120,
+      position: 120,
+      status: 'paused',
+      trackId: 'l-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playing).toBe(false)
+    expect(useNetease.getState().playback?.trackId).toBe('l-1')
+  })
+
+  it('preserves real userProfile without clobbering active playback on receiveState', () => {
+    const q = [{ id: 'p-1', title: 'Song', artist: 'Singer', duration: 180, playable: true }]
+    play(q[0], q, 0)
+
+    receiveState(true, false, false, '真实昵称', 'https://p1.music.126.net/avatar.jpg', 11)
+    let state = useNetease.getState()
+    expect(state.userProfile).toEqual({
+      nickname: '真实昵称',
+      avatarUrl: 'https://p1.music.126.net/avatar.jpg',
+      vipType: 11,
+    })
+    expect(state.playing).toBe(true)
+
+    receiveState(false, false, false)
+    state = useNetease.getState()
+    expect(state.userProfile).toBeNull()
+    expect(state.playing).toBe(false)
+  })
+
+  it('keeps user volume intact when sendVolume is called during fades', () => {
+    const sent: unknown[] = []
+    vi.stubGlobal('window', {
+      chrome: {
+        webview: {
+          postMessage: (msg: unknown) => sent.push(msg),
+        },
+      },
+    })
+
+    setVolume(0.7)
+    expect(useNetease.getState().volume).toBe(0.7)
+
+    sendVolume(0.2)
+    expect(useNetease.getState().volume).toBe(0.7)
+    expect(sent.at(-1)).toEqual({ type: 'netease', command: { action: 'volume', percent: 20 } })
+  })
+
+  it('allows ended to auto-advance again after resuming or seeking a previously ended track', () => {
+    dismissPlaybackNotice()
+    useNetease.setState({ playMode: 'loop', signedIn: true })
+
+    const q = [
+      { id: 'rs-1', title: 'Track 1', artist: 'Artist', duration: 120, playable: true },
+      { id: 'rs-2', title: 'Track 2', artist: 'Artist', duration: 120, playable: true },
+    ]
+    play(q[0], q, 0)
+    receivePlayback({ title: 'Track 1', artist: 'Artist', duration: 120, position: 10, status: 'playing', trackId: 'rs-1' })
+
+    // Pause first, then track ends while paused -> stays paused on Track 1
+    playOrPause()
+    receivePlayback({
+      title: 'Track 1',
+      artist: 'Artist',
+      duration: 120,
+      position: 120,
+      status: 'paused',
+      trackId: 'rs-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('rs-1')
+    expect(useNetease.getState().playing).toBe(false)
+
+    // Resume via seek + playOrPause (clears lastEndedSessionKey)
+    seek(100)
+    playOrPause()
+    receivePlayback({
+      title: 'Track 1',
+      artist: 'Artist',
+      duration: 120,
+      position: 120,
+      status: 'paused',
+      trackId: 'rs-1',
+      error: 'ended',
+    })
+    expect(useNetease.getState().playback?.trackId).toBe('rs-2')
+    expect(useNetease.getState().queueIndex).toBe(1)
+    expect(useNetease.getState().playing).toBe(true)
   })
 })

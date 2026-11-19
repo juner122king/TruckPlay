@@ -261,7 +261,15 @@ export type HostMessage =
   | ({ type: 'ximalayaAnswer'; id: number; failed?: boolean; error?: string } & Partial<XimalayaAnswers>)
   | { type: 'ximalayaPlayback'; playback: XimalayaPlayback | null }
   /** NetEase Cloud Music: whether it's signed in and playing, and whether its sign-in QR window is open. */
-  | { type: 'netease'; signedIn: boolean | null; playing: boolean | null; signingIn: boolean }
+  | {
+      type: 'netease'
+      signedIn: boolean | null
+      playing: boolean | null
+      signingIn: boolean
+      nickname?: string | null
+      avatarUrl?: string | null
+      vipType?: number | null
+    }
   | ({ type: 'neteaseAnswer'; id: number; failed?: boolean; error?: string } & Partial<NeteaseAnswers>)
   | { type: 'neteasePlayback'; playback: NeteasePlayback | null }
   /** Douyin: whether it's signed in and playing, and whether its sign-in QR window is open. */

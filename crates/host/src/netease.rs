@@ -103,6 +103,12 @@ pub struct Playback {
 pub struct State {
     pub signed_in: bool,
     pub playing: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vip_type: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -175,7 +181,9 @@ impl Netease {
         if matches!(command, Command::SignOut) {
             let _ = self.view.delete_cookies();
             let _ = self.view.navigate(HOME);
-            self.pending.borrow_mut().push(Report::State(State { signed_in: false, playing: false }));
+            self.pending
+                .borrow_mut()
+                .push(Report::State(State { signed_in: false, playing: false, ..Default::default() }));
             return;
         }
         if let Ok(json) = serde_json::to_string(command) {
@@ -208,7 +216,7 @@ impl Netease {
             self.checked_initial_cookie.set(true);
             let signed_in = self.view.has_cookie(HOME, &["MUSIC_U"]);
             if signed_in {
-                reports.push(Report::State(State { signed_in: true, playing: false }));
+                reports.push(Report::State(State { signed_in: true, playing: false, ..Default::default() }));
             }
         }
 
@@ -218,7 +226,7 @@ impl Netease {
             reports.push(Report::SignInWindow(false));
             let _ = self.view.navigate(HOME);
             let signed_in = p == Progress::SignedIn || self.view.has_cookie(HOME, &["MUSIC_U"]);
-            reports.push(Report::State(State { signed_in, playing: false }));
+            reports.push(Report::State(State { signed_in, playing: false, ..Default::default() }));
         }
 
         for message in self.view.take_page_messages() {
@@ -281,11 +289,17 @@ impl Netease {
 pub fn state_message(state: Option<&State>, signing_in: bool) -> String {
     let signed_in = state.map(|s| s.signed_in);
     let playing = state.map(|s| s.playing);
+    let nickname = state.and_then(|s| s.nickname.as_deref());
+    let avatar_url = state.and_then(|s| s.avatar_url.as_deref());
+    let vip_type = state.and_then(|s| s.vip_type);
     serde_json::json!({
         "type": "netease",
         "signedIn": signed_in,
         "playing": playing,
         "signingIn": signing_in,
+        "nickname": nickname,
+        "avatarUrl": avatar_url,
+        "vipType": vip_type,
     })
     .to_string()
 }
@@ -361,5 +375,38 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&encoded).expect("parse encoded playback message");
         assert_eq!(parsed["playback"]["trackId"], "287398");
         assert_eq!(parsed["playback"]["error"], "vip_required");
+    }
+
+    #[test]
+    fn state_message_preserves_profile_and_defaults() {
+        let with_profile: State = serde_json::from_str(
+            r#"{"signedIn":true,"playing":true,"nickname":"车友小云","avatarUrl":"https://p1.music.126.net/a.jpg","vipType":11}"#,
+        )
+        .expect("deserialize state with profile");
+        assert_eq!(with_profile.nickname.as_deref(), Some("车友小云"));
+        assert_eq!(with_profile.avatar_url.as_deref(), Some("https://p1.music.126.net/a.jpg"));
+        assert_eq!(with_profile.vip_type, Some(11));
+
+        let encoded = state_message(Some(&with_profile), false);
+        let parsed: serde_json::Value = serde_json::from_str(&encoded).expect("parse state message");
+        assert_eq!(parsed["type"], "netease");
+        assert_eq!(parsed["signedIn"], true);
+        assert_eq!(parsed["playing"], true);
+        assert_eq!(parsed["signingIn"], false);
+        assert_eq!(parsed["nickname"], "车友小云");
+        assert_eq!(parsed["avatarUrl"], "https://p1.music.126.net/a.jpg");
+        assert_eq!(parsed["vipType"], 11);
+
+        let minimal: State = serde_json::from_str(r#"{"signedIn":false,"playing":false}"#)
+            .expect("deserialize minimal state");
+        assert_eq!(minimal.nickname, None);
+        assert_eq!(minimal.avatar_url, None);
+        assert_eq!(minimal.vip_type, None);
+
+        let empty_msg: serde_json::Value =
+            serde_json::from_str(&state_message(None, true)).expect("parse empty state message");
+        assert_eq!(empty_msg["signedIn"], serde_json::Value::Null);
+        assert_eq!(empty_msg["signingIn"], true);
+        assert_eq!(empty_msg["nickname"], serde_json::Value::Null);
     }
 }

@@ -20,10 +20,32 @@
   let isPlaying = false
   let playAttemptSeq = 0
   let reportedFailureSeq = 0
+  let endedReportedSeq = 0
+  let endedFallbackTimer = null
   let switchingTrack = false
+
+  const clearEndedFallback = () => {
+    if (endedFallbackTimer !== null) {
+      clearTimeout(endedFallbackTimer)
+      endedFallbackTimer = null
+    }
+  }
+
+  const emitEnded = (attemptId) => {
+    if (switchingTrack || !currentTrack || attemptId !== playAttemptSeq || attemptId === endedReportedSeq) return
+    endedReportedSeq = attemptId
+    clearEndedFallback()
+    isPlaying = false
+    const dur =
+      Number.isFinite(currentAudio?.duration) && currentAudio.duration > 0
+        ? currentAudio.duration
+        : currentTrack.duration || 0
+    sendPlayback({ status: 'paused', duration: dur, position: dur, error: 'ended' })
+  }
 
   const reportPlaybackFailure = (attemptId, track, reason) => {
     if (!track || attemptId !== playAttemptSeq || attemptId === reportedFailureSeq) return
+    clearEndedFallback()
     reportedFailureSeq = attemptId
     isPlaying = false
     if (currentAudio && !currentAudio.paused) {
@@ -38,7 +60,7 @@
     })
   }
 
-  // Hook into any audio element
+  // Hook our dedicated audio element
   const hookAudio = (el) => {
     if (!el || el === currentAudio) return
     currentAudio = el
@@ -48,43 +70,62 @@
       })
     }
     el.addEventListener('play', () => {
+      clearEndedFallback()
+      endedReportedSeq = 0
       switchingTrack = false
       isPlaying = true
       sendPlayback()
     })
     el.addEventListener('pause', () => {
-      isPlaying = false
-      if (!switchingTrack) {
-        sendPlayback()
+      if (switchingTrack) return
+      const dur = Number.isFinite(el.duration) ? el.duration : 0
+      const pos = Number.isFinite(el.currentTime) ? el.currentTime : 0
+      const atTrackEnd = Boolean(el.ended) || (dur > 0 && pos >= dur - 0.15)
+      if (atTrackEnd) {
+        // HTML5 <audio> fires `pause` right before `ended`. Never send a plain `paused` update
+        // here (it would clobber frontend playing state before `ended` arrives). Schedule a
+        // short fallback in case `ended` is suppressed by an audio driver.
+        const attemptId = playAttemptSeq
+        clearEndedFallback()
+        endedFallbackTimer = setTimeout(() => emitEnded(attemptId), 200)
+        return
       }
+      isPlaying = false
+      sendPlayback()
     })
     el.addEventListener('timeupdate', () => {
-      if (!switchingTrack) {
-        sendPlayback()
-      }
+      if (switchingTrack || !currentTrack || el.ended) return
+      sendPlayback()
     })
     el.addEventListener('ended', () => {
-      isPlaying = false
-      const dur = Number.isFinite(el.duration) ? el.duration : (currentTrack?.duration || 0)
-      sendPlayback({ status: 'paused', duration: dur, position: dur, error: 'ended' })
-      post({ type: 'ended' })
+      emitEnded(playAttemptSeq)
     })
     el.addEventListener('error', () => {
+      clearEndedFallback()
       if (switchingTrack || !currentTrack || !el.getAttribute('src')) return
       const reason = (currentTrack.fee === 1 || currentTrack.fee === 4) ? 'vip_required' : 'unavailable'
       reportPlaybackFailure(playAttemptSeq, currentTrack, reason)
     })
   }
 
-  // Periodic check for audio element and sign-in status
-  setInterval(() => {
-    const audios = document.querySelectorAll('audio')
-    audios.forEach(hookAudio)
-    checkStatus()
-  }, 1000)
+  const ensureAudio = () => {
+    if (currentAudio) return currentAudio
+    const created = document.createElement('audio')
+    created.id = 'wp-netease-audio'
+    document.body.appendChild(created)
+    hookAudio(created)
+    return created
+  }
 
-  let lastSignedIn = null
+  // Periodic check for sign-in status and user profile
+  setInterval(() => {
+    checkStatus()
+  }, 2000)
+
+  let lastStateKey = null
   let currentUserId = null
+  let userProfile = null
+  let profileFetched = false
   let checkingAccount = false
 
   const findUserIdInDom = () => {
@@ -111,7 +152,7 @@
       document.querySelector('.head.f-fl img')
     )
 
-    if (!signedIn && !checkingAccount) {
+    if ((!signedIn || !profileFetched) && !checkingAccount) {
       checkingAccount = true
       try {
         const res = await fetch('https://music.163.com/api/nuser/account/get', {
@@ -124,6 +165,17 @@
           if (data && data.code === 200 && data.account && data.account.id) {
             signedIn = true
             currentUserId = String(data.account.id)
+            profileFetched = true
+            const nickname = data.profile?.nickname || window.GUser?.nickname || null
+            const avatarUrl = toHttpsUrl(data.profile?.avatarUrl || window.GUser?.avatarUrl || null)
+            const rawVip = data.profile?.vipType ?? data.account?.vipType ?? 0
+            const vipType = Number.isFinite(Number(rawVip)) ? Number(rawVip) : 0
+            userProfile = { nickname, avatarUrl, vipType }
+          } else if (data && data.code === 200 && !data.account) {
+            signedIn = false
+            currentUserId = null
+            profileFetched = false
+            userProfile = null
           }
         }
       } catch (e) {
@@ -133,11 +185,30 @@
       }
     }
 
-    if (signedIn !== lastSignedIn) {
-      lastSignedIn = signedIn
+    if (!signedIn) {
+      profileFetched = false
+      userProfile = null
+    }
+
+    const statePayload = {
+      signedIn,
+      playing: isPlaying,
+      ...(signedIn && userProfile?.nickname ? { nickname: userProfile.nickname } : {}),
+      ...(signedIn && userProfile?.avatarUrl ? { avatarUrl: userProfile.avatarUrl } : {}),
+      ...(signedIn && typeof userProfile?.vipType === 'number' ? { vipType: userProfile.vipType } : {})
+    }
+    const stateKey = JSON.stringify([
+      statePayload.signedIn,
+      statePayload.nickname ?? null,
+      statePayload.avatarUrl ?? null,
+      statePayload.vipType ?? null
+    ])
+
+    if (stateKey !== lastStateKey) {
+      lastStateKey = stateKey
       post({
         type: 'state',
-        state: { signedIn, playing: isPlaying }
+        state: statePayload
       })
     }
   }
@@ -198,19 +269,16 @@
 
   const playTrack = async (track) => {
     const attemptId = ++playAttemptSeq
+    clearEndedFallback()
     currentTrack = track
-    if (!currentAudio) {
-      const created = document.createElement('audio')
-      created.id = 'wp-netease-audio'
-      document.body.appendChild(created)
-      hookAudio(created)
-    }
+    const audio = ensureAudio()
 
     switchingTrack = true
     try {
-      if (!currentAudio.paused) {
-        currentAudio.pause()
+      if (!audio.paused) {
+        audio.pause()
       }
+      audio.currentTime = 0
     } catch {}
 
     const resolved = await resolveTrackPlayback(track)
@@ -222,9 +290,12 @@
       return
     }
 
-    currentAudio.src = resolved.url
+    audio.src = resolved.url
     try {
-      await currentAudio.play()
+      audio.load()
+    } catch {}
+    try {
+      await audio.play()
       if (attemptId === playAttemptSeq) {
         switchingTrack = false
       }
@@ -263,8 +334,13 @@
       if (cmd.track) {
         await playTrack(cmd.track)
       } else if (currentAudio && currentAudio.getAttribute('src') && !currentAudio.error) {
-        const attemptId = playAttemptSeq
+        const attemptId = currentAudio.ended ? ++playAttemptSeq : playAttemptSeq
+        clearEndedFallback()
         try {
+          if (currentAudio.ended) {
+            endedReportedSeq = 0
+            currentAudio.currentTime = 0
+          }
           await currentAudio.play()
         } catch (err) {
           if (attemptId !== playAttemptSeq || err?.name === 'AbortError') return
@@ -276,10 +352,13 @@
         await playTrack(currentTrack)
       }
     } else if (action === 'pause') {
+      clearEndedFallback()
       switchingTrack = false
       if (currentAudio) currentAudio.pause()
     } else if (action === 'seek') {
       if (currentAudio && typeof cmd.seconds === 'number') {
+        clearEndedFallback()
+        endedReportedSeq = 0
         currentAudio.currentTime = cmd.seconds
       }
     } else if (action === 'volume') {

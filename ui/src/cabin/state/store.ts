@@ -719,7 +719,14 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         receiveHongguoPlayback(message.playback)
         break
       case 'netease':
-        receiveNeteaseState(message.signedIn, message.playing, message.signingIn)
+        receiveNeteaseState(
+          message.signedIn,
+          message.playing,
+          message.signingIn,
+          message.nickname,
+          message.avatarUrl,
+          message.vipType,
+        )
         break
       case 'neteaseAnswer':
         receiveNeteaseAnswer(message.id, message.failed, message.error, message.songs, message.playlists, message.lyric)
