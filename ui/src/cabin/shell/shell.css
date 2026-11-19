@@ -122,7 +122,8 @@ body,
 /* Words over a cover the look's own wouldn't read on (contrast.ts): dark over a light one, white over a dark
    one; what's behind them stays. Over Now Playing, the sidebar's too. */
 .shell .words-light,
-.shell:has(.am-now.open.words-light) .sidebar {
+.shell:has(.am-now.open.words-light) .sidebar,
+.shell:has(.ne-now.open.words-light) .sidebar {
   --text: #fff;
   --text-dim: rgb(255 255 255 / 0.68);
   --apple-label: #fff;
@@ -132,7 +133,8 @@ body,
 }
 
 .shell .words-dark,
-.shell:has(.am-now.open.words-dark) .sidebar {
+.shell:has(.am-now.open.words-dark) .sidebar,
+.shell:has(.ne-now.open.words-dark) .sidebar {
   --text: #14161a;
   --text-dim: rgb(20 22 26 / 0.62);
   --apple-label: #000;

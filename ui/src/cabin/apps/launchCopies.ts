@@ -25,8 +25,8 @@ export function isCopied(app: AppId): boolean {
 
 /** The copies' layout version: a change to how they're made or shown leaves the old ones unread (1: built
  * apart, signed out; 2: saved at any opening, with its content; 4: redesigned CarPlay Radio UI;
- * 5: refactored CarPlay Bilibili UI). */
-const VERSION = 5
+ * 5: refactored CarPlay Bilibili UI; 6: refactored CarPlay NetEase Cloud Music UI). */
+const VERSION = 6
 
 // The copies of an older layout, gone (they'd only take room).
 try {

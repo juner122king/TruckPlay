@@ -1,2160 +1,2477 @@
-/* ==========================================================================
-   NetEase Cloud Music Automotive (车载端) UI Stylesheet
-   Designed for WestPlay Cabin Screen & In-Car Truck Infotainment
-   ========================================================================== */
+/* ============================================================================
+ * WestPlay NetEase Cloud Music CarPlay / iOS 26 UI
+ * Full-width browsing + floating glass top bar & mini-player + fullscreen vinyl
+ * ============================================================================ */
 
-/* Main App Container */
-.netease-app {
+@property --ne-fade-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --ne-fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* --------------------------------------------------------------------------
+ * 1. Design Tokens & Root Container
+ * -------------------------------------------------------------------------- */
+.shell .netease-app,
+.shell .ne-now {
+  --ne-key: #ff3b4e;
+  --ne-key-strong: #e60026;
+  --ne-key-soft: rgb(230 0 38 / 0.16);
+  --ne-key-border: rgb(255 59 78 / 0.36);
+
+  --ne-label: var(--apple-label);
+  --ne-dim: var(--apple-label-secondary);
+  --ne-faint: var(--apple-label-tertiary);
+  --ne-fill: var(--apple-fill-tertiary);
+  --ne-fill-hover: var(--apple-fill-secondary);
+  --ne-pressed: var(--apple-fill);
+  --ne-rule: var(--apple-separator);
+  --ne-surface: rgb(255 255 255 / 0.05);
+  --ne-surface-hover: rgb(255 255 255 / 0.09);
+  --ne-card-bg: var(--apple-card);
+  --ne-card-raised: var(--apple-card-raised);
+
+  --ne-tile: 196px;
+  --ne-corner: 16px;
+  --ne-corner-small: 10px;
+  --ne-bar: 76px;
+  --ne-bar-inset: max(0px, calc((var(--panel-radius) - var(--ne-bar) / 2) * var(--corner-inset)));
+  --ne-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 12px);
+  --ne-gutter: 24px;
+}
+
+.shell.appearance-light .netease-app,
+.shell.appearance-light .ne-now {
+  --ne-key: #d90024;
+  --ne-key-strong: #c80021;
+  --ne-key-soft: rgb(217 0 36 / 0.11);
+  --ne-key-border: rgb(217 0 36 / 0.3);
+  --ne-surface: rgb(0 0 0 / 0.04);
+  --ne-surface-hover: rgb(0 0 0 / 0.075);
+}
+
+.shell .netease-app,
+.shell .ne-now,
+.shell .ne-bar {
+  --ne-type-title: calc(46px * var(--text-scale, 1));
+  --ne-type-section: calc(28px * var(--text-scale, 1));
+  --ne-type-name: calc(22px * var(--text-scale, 1));
+  --ne-type-sub: calc(18px * var(--text-scale, 1));
+  --ne-type-label: calc(15px * var(--text-scale, 1));
+}
+
+.shell .netease-app {
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
-  background: #111217;
-  color: #f3f4f6;
-  user-select: none;
   overflow: hidden;
-  border-radius: var(--panel-radius, 28px);
-  clip-path: inset(0 round var(--panel-radius, 28px));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  border-radius: var(--panel-radius);
+  background: var(--app-background);
+  color: var(--ne-label);
+  isolation: isolate;
+  container-type: size;
+  container-name: netease;
 }
 
-/* Hide all scrollbars across NetEase app for automotive infotainment */
-.netease-app,
-.netease-app * {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+.shell .netease-app button,
+.shell .ne-now button {
+  transition:
+    background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease),
+    color 160ms var(--motion-ease),
+    scale 150ms var(--motion-ease),
+    opacity 160ms var(--motion-ease);
 }
 
-.netease-app ::-webkit-scrollbar,
-.netease-app *::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+.shell .netease-app button.glass,
+.shell .ne-now button.glass {
+  background: var(--glass);
 }
 
-/* ==========================================================================
-   Split-Screen Automotive Layout (左侧常驻唱片机 + 右侧内容探索)
-   ========================================================================== */
-.netease-split-layout {
+.shell .netease-app :is(button, input):focus-visible,
+.shell .ne-now :is(button, input):focus-visible {
+  outline: 3px solid var(--ne-key);
+  outline-offset: 2px;
+}
+
+.shell .netease-app button:disabled,
+.shell .ne-now button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------------
+ * 2. Floating Top Navigation Bar (matching MusicApp barLayout)
+ * -------------------------------------------------------------------------- */
+.shell .ne-bar {
+  --text-scale: 1;
+  --ne-bar-inset: max(0px, calc((var(--panel-radius) - var(--ne-bar) / 2) * var(--corner-inset)));
+  position: relative;
+  z-index: 4;
+  flex: none;
+  height: var(--ne-bar);
+  margin: var(--ne-bar-inset) var(--ne-bar-inset) 0;
+}
+
+.shell .ne-bar-side {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
   display: flex;
-  width: 100%;
+  align-items: center;
   height: 100%;
+}
+
+.shell .ne-bar-side.end {
+  left: auto;
+  right: 0;
+}
+
+.shell .ne-round {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--ne-label);
+}
+
+.shell .ne-round:active {
+  scale: 0.93;
+}
+
+.shell .ne-tabs {
+  position: relative;
+  height: 100%;
+  pointer-events: none;
+}
+
+.shell .ne-tab-bar {
+  position: absolute;
+  top: 0;
+  height: var(--ne-bar);
   overflow: hidden;
-  border-radius: inherit;
+  border-radius: calc(var(--ne-bar) / 2);
+  pointer-events: auto;
 }
 
-/* Left Panel: Turntable Player */
-.netease-left-panel {
-  width: 340px;
-  min-width: 320px;
-  max-width: 380px;
-  height: 100%;
-  background: rgba(18, 19, 25, 0.95);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  z-index: 10;
-  border-top-left-radius: inherit;
-  border-bottom-left-radius: inherit;
+.shell .ne-bar:not(.ready) .ne-tab-bar,
+.shell .ne-bar:not(.ready) .ne-search {
+  visibility: hidden;
 }
 
-/* Right Panel: Content Browser */
-.netease-right-panel {
-  flex: 1;
-  min-width: 0;
+.shell .ne-bar.ready .ne-tab-bar,
+.shell .ne-bar.ready .ne-search {
+  transition:
+    transform 420ms var(--motion-ease),
+    clip-path 420ms var(--motion-ease);
+}
+
+.shell .ne-tab-list {
+  display: flex;
+  gap: 4px;
+  width: max-content;
   height: 100%;
+  padding: 6px;
+  transition: opacity 200ms var(--motion-ease);
+}
+
+.shell .ne-tabs.searching .ne-tab-list {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shell .netease-app button.ne-close-search {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: var(--ne-bar);
+  opacity: 0;
+  pointer-events: none;
+  color: var(--ne-label);
+  transition: opacity 200ms var(--motion-ease);
+}
+
+.shell .ne-tabs.searching button.ne-close-search {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 160ms;
+}
+
+.shell .ne-tab {
   display: flex;
   flex-direction: column;
-  background: radial-gradient(ellipse at 85% 15%, rgba(230, 0, 38, 0.06) 0%, transparent 65%), #14151c;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 96px;
+  height: 100%;
+  padding-inline: 18px;
+  border-radius: calc((var(--ne-bar) - 12px) / 2);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--ne-label);
+  white-space: nowrap;
+}
+
+.shell .ne-tab.on {
+  color: var(--ne-key);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.shell .ne-tab:active {
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+  scale: 0.96;
+}
+
+/* Search circle expanding to glass input field */
+.shell .ne-search {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: var(--ne-bar);
+  border-radius: calc(var(--ne-bar) / 2);
   overflow: hidden;
-  border-top-right-radius: inherit;
-  border-bottom-right-radius: inherit;
+  pointer-events: auto;
 }
 
-/* ==========================================================================
-   Turntable Player (左侧黑胶唱片机组件)
-   ========================================================================== */
-.turntable-player {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  padding: 26px 36px 34px 36px;
-  box-sizing: border-box;
-  justify-content: space-between;
+.shell .ne-search.open {
+  padding-inline: 10px;
 }
 
-/* Header & Time Greeting */
-.turntable-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2px;
-  padding: 0 4px;
-  flex-shrink: 0;
+.shell .ne-search.open .text-field {
+  animation: ne-field-in 260ms var(--motion-ease) 120ms both;
 }
 
-.turntable-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.turntable-logo-icon {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.netease-icon-svg {
-  width: 100%;
-  height: 100%;
-}
-
-.turntable-greeting {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #ffffff;
-}
-
-.turntable-fullscreen-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.65);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.turntable-fullscreen-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  transform: scale(1.05);
-}
-
-/* Turntable Stage & Vinyl Rotation */
-.turntable-stage {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  min-height: 150px;
-  max-height: 220px;
-  position: relative;
-  margin: 2px 0;
-}
-
-.turntable-assembly {
-  position: relative;
-  width: 196px;
-  height: 196px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Vinyl Body Platter */
-.turntable-vinyl-body {
-  width: 176px;
-  height: 176px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #25262c 0%, #15161b 60%, #0d0e12 100%);
-  border: 5px solid #08090b;
-  box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.6),
-    inset 0 0 10px rgba(0, 0, 0, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.turntable-disc {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.turntable-assembly.playing .turntable-disc {
-  animation: netease-spin 20s linear infinite;
-}
-
-.turntable-assembly.paused .turntable-disc {
-  animation: netease-spin 20s linear infinite;
-  animation-play-state: paused;
-}
-
-@keyframes netease-spin {
+@keyframes ne-field-in {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
   }
+}
+
+.shell .ne-search-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--ne-bar);
+  height: 100%;
+  color: var(--ne-label);
+}
+
+.shell .netease-app .text-field {
+  flex: 1;
+  height: calc(var(--ne-bar) - 16px);
+  border-radius: 999px;
+  background: transparent;
+  font-size: var(--ne-type-sub);
+}
+
+.shell .netease-app .text-field.typing {
+  box-shadow: none;
+}
+
+.shell .netease-app .text-field > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--ne-dim);
+}
+
+.shell .netease-app .text-field-caret {
+  background: var(--ne-key);
+}
+
+/* Account controls */
+.shell .ne-sign-in {
+  min-height: 58px;
+  padding-inline: 22px;
+  border-radius: 999px;
+  font-size: var(--ne-type-sub);
+  font-weight: 700;
+  color: var(--ne-key);
+  white-space: nowrap;
+}
+
+.shell .ne-signing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  font-size: var(--ne-type-label);
+  font-weight: 650;
+  color: var(--ne-key);
+  white-space: nowrap;
+}
+
+.shell .ne-spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid var(--ne-key-border);
+  border-top-color: var(--ne-key);
+  border-radius: 50%;
+  animation: ne-spin 0.8s linear infinite;
+}
+
+@keyframes ne-spin {
   to {
     transform: rotate(360deg);
   }
 }
 
-/* Vinyl Groove Sheen */
-.turntable-disc-grooves {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: repeating-radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.04) 0px,
-    rgba(255, 255, 255, 0.04) 1px,
-    transparent 2px,
-    transparent 4px
-  );
-  pointer-events: none;
-}
-
-/* Center Artwork Label */
-.turntable-disc-label {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid #1a1a20;
+.shell .ne-account {
   position: relative;
-  background: #2a2a32;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.turntable-art-img {
+.shell .netease-app button.ne-me {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--ne-dim);
+}
+
+.shell .ne-me.vip {
+  box-shadow:
+    inset 0 0 0 2px var(--ne-key),
+    var(--shadow-raised);
+}
+
+.shell .ne-me img {
   width: 100%;
   height: 100%;
+  border-radius: 50%;
   object-fit: cover;
 }
 
-.turntable-art-fallback {
-  font-size: 34px;
-  opacity: 0.7;
-}
-
-.turntable-center-spindle {
+.shell .ne-me-vip-dot {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  background: radial-gradient(circle, #f3f4f6 30%, #9ca3af 70%, #374151 100%);
+  right: -1px;
+  bottom: -1px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  background: var(--ne-key-strong);
+  color: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.45);
 }
 
-/* Mechanical Tonearm & Needle */
-.turntable-tonearm {
+.shell .ne-account-menu {
   position: absolute;
-  top: -14px;
-  right: -8px;
-  width: 86px;
-  height: 154px;
-  pointer-events: none;
-  z-index: 5;
-  transform-origin: 78% 13%;
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 20;
+  min-width: 260px;
+  padding: 10px;
+  border-radius: 24px;
+  background: var(--ne-card-raised);
+  box-shadow: var(--shadow-raised-large);
+  animation: ne-pop-in 180ms var(--motion-ease) both;
 }
 
-.turntable-tonearm.arm-playing {
-  transform: rotate(0deg);
+@keyframes ne-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
 }
 
-.turntable-tonearm.arm-paused {
-  transform: rotate(-28deg);
+.shell .ne-account-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--ne-rule);
+  margin-bottom: 6px;
 }
 
-.tonearm-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+.shell .ne-account-name {
+  font-size: var(--ne-type-sub);
+  font-weight: 700;
+  color: var(--ne-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Track Metadata */
-.turntable-meta {
+.shell .ne-account-tier {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ne-fill);
+  color: var(--ne-dim);
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 650;
+}
+
+.shell .ne-account-tier.vip {
+  background: var(--ne-key-soft);
+  color: var(--ne-key);
+}
+
+.shell .ne-account-signout {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-  margin-bottom: 6px;
-  padding: 0 4px;
-  flex-shrink: 0;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding-inline: 14px;
+  border-radius: 16px;
+  font-size: var(--ne-type-sub);
+  font-weight: 650;
+  color: var(--apple-red);
+  text-align: left;
 }
 
-.turntable-meta-main {
+.shell .ne-account-signout:hover,
+.shell .ne-account-signout:active {
+  background: var(--ne-fill);
+}
+
+/* --------------------------------------------------------------------------
+ * 3. Scrollable Main Viewport & Notices
+ * -------------------------------------------------------------------------- */
+.shell .ne-scroll {
   flex: 1;
-  overflow: hidden;
-  padding-right: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-top: calc(-1 * (var(--ne-bar) + var(--ne-bar-inset)));
+  padding: calc(var(--ne-bar) + var(--ne-bar-inset) + 20px) max(var(--ne-gutter), var(--ne-corner-clear))
+    max(48px, var(--ne-corner-clear));
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    transparent calc(var(--ne-bar-inset) + 8px),
+    #000 calc(var(--ne-bar) + var(--ne-bar-inset) + 18px)
+  );
 }
 
-.turntable-title-row {
+.shell .ne-scroll.has-mini {
+  padding-bottom: 132px;
+}
+
+.shell .ne-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .ne-qr-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--ne-key-border);
+  background: var(--ne-key-soft);
+}
+
+.shell .ne-qr-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--ne-key-soft);
+  color: var(--ne-key);
+}
+
+.shell .ne-qr-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shell .ne-qr-copy strong {
+  font-size: var(--ne-type-sub);
+  font-weight: 700;
+  color: var(--ne-label);
+}
+
+.shell .ne-qr-copy span {
+  font-size: var(--ne-type-label);
+  color: var(--ne-dim);
+}
+
+.shell .ne-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--ne-key-border);
+  background: color-mix(in srgb, var(--ne-key-strong) 18%, var(--apple-card));
+}
+
+.shell .ne-inline-notice {
+  margin-bottom: 16px;
+}
+
+.shell .ne-notice-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--ne-key);
+}
+
+.shell .ne-notice-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ne-type-label);
+  font-weight: 550;
+  line-height: 1.35;
+  color: var(--ne-label);
+}
+
+.shell .ne-notice-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 3px;
+  flex: none;
 }
 
-.turntable-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.turntable-badge-vip {
-  font-size: 10px;
-  font-weight: 700;
-  color: #ff3a3a;
-  background: rgba(230, 0, 38, 0.15);
-  border: 1px solid rgba(230, 0, 38, 0.35);
-  padding: 1px 5px;
-  border-radius: 4px;
-  line-height: 1.2;
-}
-
-.turntable-artist {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.turntable-like-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    transform 0.2s,
-    color 0.2s;
-}
-
-.turntable-like-btn:hover {
+.shell .ne-notice-signin {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--ne-key-strong);
   color: #fff;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 650;
 }
 
-.turntable-like-btn.liked {
-  color: #e60026;
-  animation: heart-pop 0.3s ease;
-}
-
-@keyframes heart-pop {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.3);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-/* Scrubber Progress Bar */
-.turntable-progress-wrap {
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 0 4px;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-
-.turntable-progress-track {
-  width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-  cursor: pointer;
-  position: relative;
-  overflow: visible;
-  touch-action: none;
-}
-
-.turntable-progress-fill {
-  height: 100%;
-  background: #e60026;
-  border-radius: 3px;
-  position: relative;
-  pointer-events: none;
-}
-
-.turntable-progress-knob {
-  position: absolute;
-  right: -5px;
-  top: -4px;
-  width: 14px;
-  height: 14px;
-  background: #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(230, 0, 38, 0.8);
-  opacity: 0.9;
-  transition: transform 0.1s;
-}
-
-.turntable-progress-track:hover .turntable-progress-knob {
-  transform: scale(1.25);
-  opacity: 1;
-}
-
-.turntable-times {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
-  margin-top: 6px;
-  font-feature-settings: 'tnum';
-}
-
-/* Control Buttons */
-.turntable-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 2px 0 2px;
-  margin-bottom: 2px;
-  flex-shrink: 0;
-}
-
-.ctrl-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.shell .ne-notice-close {
+  display: grid;
+  place-items: center;
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  position: relative;
-  transition: all 0.15s ease;
+  color: var(--ne-dim);
 }
 
-.ctrl-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+.shell .ne-notice-close:hover {
+  background: var(--ne-fill);
+  color: var(--ne-label);
 }
 
-.ctrl-btn:active {
-  transform: scale(0.92);
-}
-
-.ctrl-play-main {
-  background: #e60026;
-  color: #ffffff;
-  width: 48px;
-  height: 48px;
-  box-shadow: 0 4px 16px rgba(230, 0, 38, 0.45);
-}
-
-.ctrl-play-main:hover {
-  background: #f01438;
-  box-shadow: 0 8px 22px rgba(230, 0, 38, 0.6);
-  transform: scale(1.04);
-}
-
-.ctrl-play-main:active {
-  transform: scale(0.94);
-  background: #cb0022;
-}
-
-.ctrl-queue {
-  position: relative;
-}
-
-.queue-pill {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  background: #e60026;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 8px;
-}
-
-/* ==========================================================================
-   Right Panel Navigation & Top Bar
-   ========================================================================== */
-.netease-nav-bar {
+/* --------------------------------------------------------------------------
+ * 4. Page Headers, Hero Bento Cards, Sections & Secondary Pills
+ * -------------------------------------------------------------------------- */
+.shell .ne-page-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 26px 12px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-  gap: 12px;
-  min-width: 0;
-}
-
-.netease-tabs {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.tab-item {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 5px 2px;
-  position: relative;
-  transition: color 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.tab-item:hover {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.tab-item.active {
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 17px;
-}
-
-.tab-item.active::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 20%;
-  right: 20%;
-  height: 3px;
-  background: #e60026;
-  border-radius: 2px;
-}
-
-.tab-search-icon {
-  font-size: 13px;
-}
-
-/* Account VIP Pill / Sign-in */
-.netease-account-box {
-  display: flex;
-  align-items: center;
-  flex-shrink: 1;
-  min-width: 0;
-  justify-content: flex-end;
-}
-
-.account-vip-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(230, 0, 38, 0.35);
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  flex-shrink: 1;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.vip-icon {
-  font-size: 13px;
-  color: #ff3a3a;
-  flex-shrink: 0;
-}
-
-.vip-text {
-  color: #ffdcdc;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.account-signout-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11px;
-  cursor: pointer;
-  padding: 0 0 0 6px;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
-  flex-shrink: 0;
-}
-
-.account-signout-btn:hover {
-  color: #ff4d4d;
-}
-
-.account-signin-btn {
-  background: #e60026;
-  color: #fff;
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 16px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.account-signin-btn:hover {
-  background: #f01438;
-}
-
-.account-signin-btn.large {
-  padding: 10px 22px;
-  font-size: 15px;
-  border-radius: 22px;
-}
-
-.account-signing-in {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #ff4d4d;
-}
-
-.account-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(230, 0, 38, 0.3);
-  border-top-color: #ff3a3a;
-  border-radius: 50%;
-  animation: netease-spin 0.8s linear infinite;
-}
-
-.netease-qr-notice {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(230, 0, 38, 0.15);
-  border: 1px solid rgba(230, 0, 38, 0.4);
-  padding: 8px 16px;
-  margin: 10px 24px 0 24px;
-  border-radius: 10px;
-}
-
-.notice-icon {
-  font-size: 24px;
-}
-
-.notice-content strong {
-  display: block;
-  font-size: 13px;
-  color: #ff4d4d;
-}
-
-.notice-content span {
-  font-size: 11px;
-  color: #ffe6e6;
-}
-
-.netease-playback-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: rgba(230, 0, 38, 0.14);
-  border: 1px solid rgba(255, 77, 77, 0.32);
-  padding: 8px 14px;
-  margin: 10px 26px 0 20px;
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.playback-notice-text {
-  font-size: 12.5px;
-  color: #ffe4e6;
-  line-height: 1.4;
-  flex: 1;
-  min-width: 0;
-}
-
-.playback-notice-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.playback-notice-signin {
-  background: #e60026;
-  color: #ffffff;
-  border: none;
-  border-radius: 9999px;
-  padding: 4px 10px;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.playback-notice-close {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 6px;
-}
-
-.playback-notice-close:hover {
-  color: #ffffff;
-}
-
-.immersive-playback-notice {
-  margin: 0 auto 12px auto;
-  max-width: 680px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* ==========================================================================
-   Scrollable Content Area
-   ========================================================================== */
-.netease-content-scroll {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  padding: 16px 26px 40px 20px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.netease-content-scroll::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.section-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.section-title-row .section-heading {
-  margin-bottom: 0;
-}
-
-.detail-loading-badge {
-  font-size: 12px;
-  color: #ff3a3a;
-  margin-left: 6px;
-  font-weight: 500;
-  animation: netease-pulse 1.2s infinite ease-in-out;
-}
-
-@keyframes netease-pulse {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* Section Blocks & Headings */
-.section-block {
-  margin-bottom: 24px;
-}
-
-.section-heading {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0 0 12px 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* ==========================================================================
-   Recommendation View: Hero Mode Cards (参考图顶部四大卡片)
-   ========================================================================== */
-.hero-cards-section {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
-.hero-card {
-  height: 112px;
-  border-radius: 14px;
-  padding: 14px 16px;
-  box-sizing: border-box;
+.shell .ne-page-title {
+  margin: 0;
+  font-size: var(--ne-type-title);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+}
+
+.shell .ne-greeting-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--ne-fill);
+  color: var(--ne-dim);
+  font-size: var(--ne-type-label);
+  font-weight: 650;
+}
+
+.shell .ne-sync-badge {
+  font-size: var(--ne-type-label);
+  font-weight: 600;
+  color: var(--ne-key);
+}
+
+.shell .ne-search-go {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--ne-key-strong);
+  color: #fff;
+  font-size: var(--ne-type-label);
+  font-weight: 650;
+}
+
+/* 4 Quick-Mode Bento Cards */
+.shell .ne-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.shell .ne-hero-card {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  transition:
-    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.2s;
+  min-height: 120px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  text-align: left;
+  color: #fff;
+  box-shadow: var(--shadow-raised);
 }
 
-.hero-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.5);
+.shell .ne-hero-card:hover {
+  filter: brightness(1.06);
 }
 
-.hero-card:active {
-  transform: scale(0.97);
+.shell .ne-hero-card:active {
+  scale: 0.97;
 }
 
-/* Card Themes */
-.hero-daily {
-  background: linear-gradient(135deg, #c51c33 0%, #6e0d19 100%);
-  border: 1px solid rgba(255, 60, 80, 0.3);
+.shell .ne-hero-card.hero-daily {
+  background: linear-gradient(135deg, #d81b36 0%, #6f0d1b 100%);
 }
 
-.hero-roaming {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e1b4b 100%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.hero-heartbeat {
-  background: linear-gradient(135deg, #0d9488 0%, #064e3b 100%);
-  border: 1px solid rgba(20, 184, 166, 0.3);
-}
-
-.hero-folk {
-  background: linear-gradient(135deg, #b45309 0%, #451a03 100%);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.hero-card-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.badge-cal-icon {
-  font-size: 18px;
-}
-
-.badge-cal-num {
-  background: #ffffff;
-  color: #c51c33;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 1px 4px;
-  border-radius: 4px;
-}
-
-.badge-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.hero-card-footer {
-  margin-top: auto;
-}
-
-.hero-card-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.82);
-  line-height: 1.3;
-}
-
-/* ==========================================================================
-   Section: 最近常听 (Recently Listened Tiles)
-   ========================================================================== */
-.recent-tiles-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
-.recent-tile {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.recent-tile:hover {
-  background: rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px);
-}
-
-.recent-tile:active {
-  transform: scale(0.97);
-}
-
-.recent-tile-thumb {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 20px;
-}
-
-.heart-thumb {
-  background: linear-gradient(135deg, #e60026 0%, #7f1d1d 100%);
-}
-
-.roam-thumb {
+.shell .ne-hero-card.hero-roaming {
   background: linear-gradient(135deg, #2563eb 0%, #1e1b4b 100%);
 }
 
-.soar-thumb {
-  background: linear-gradient(135deg, #ea580c 0%, #7c2d12 100%);
+.shell .ne-hero-card.hero-heartbeat {
+  background: linear-gradient(135deg, #0d9488 0%, #064e3b 100%);
 }
 
-.recent-tile-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.shell .ne-hero-card.hero-soar {
+  background: linear-gradient(135deg, #d97706 0%, #5c2807 100%);
 }
 
-/* ==========================================================================
-   Section: 推荐歌单 (Playlists Grid)
-   ========================================================================== */
-.playlists-grid {
+.shell .ne-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shell .ne-hero-icon {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 14px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.16);
 }
 
-.pl-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.shell .ne-hero-badge {
+  font-size: var(--ne-type-sub);
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.shell .ne-hero-sub {
+  margin-top: 12px;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 550;
+  color: rgb(255 255 255 / 0.84);
+  line-height: 1.3;
+}
+
+.shell .ne-section {
+  margin-top: 28px;
+}
+
+.shell .ne-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.shell .ne-section-head h2 {
+  margin: 0;
+  font-size: var(--ne-type-section);
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+/* Single-Row Scrollable Category Pills with Registered Scroll-Driven Edge Fades */
+.shell .ne-sub-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 6px;
+  margin-bottom: 18px;
+  scrollbar-width: none;
+  scroll-snap-type: inline proximity;
+  scroll-padding-inline: 28px;
+  --fade-size: 28px;
+  mask:
+    linear-gradient(black, black) no-clip subtract,
+    linear-gradient(to right, black, transparent) 0 0 / var(--ne-fade-start) 100% no-repeat no-clip,
+    linear-gradient(to right, transparent, black) 100% 0 / var(--ne-fade-end) 100% no-repeat no-clip;
+}
+
+@supports (animation-timeline: scroll()) {
+  .shell .ne-sub-tabs {
+    animation: ne-reveal-fade-start linear both, ne-hide-fade-end linear both;
+    animation-timeline: scroll(self inline);
+    animation-range: 0 var(--fade-size), calc(100% - var(--fade-size)) 100%;
+  }
+}
+
+@keyframes ne-reveal-fade-start {
+  to {
+    --ne-fade-start: var(--fade-size);
+  }
+}
+
+@keyframes ne-hide-fade-end {
+  from {
+    --ne-fade-end: var(--fade-size);
+  }
+}
+
+.shell .ne-sub-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .ne-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: var(--ne-type-sub);
+  font-weight: 600;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  border: 1px solid transparent;
+}
+
+.shell .ne-pill.brand {
+  background: var(--ne-key-soft);
+  border-color: var(--ne-key-border);
+  color: var(--ne-key);
+}
+
+.shell .ne-pill.brand.active {
+  background: var(--ne-key-strong);
+  border-color: var(--ne-key-strong);
+  color: #fff;
+}
+
+.shell .ne-pill.genre {
+  background: var(--ne-fill);
+  color: var(--ne-label);
+}
+
+.shell .ne-pill.genre:hover {
+  background: var(--ne-fill-hover);
+}
+
+.shell .ne-pill.genre.active {
+  background: var(--ne-label);
+  color: var(--app-background);
+}
+
+.shell .ne-pill:active {
+  scale: 0.96;
+}
+
+/* --------------------------------------------------------------------------
+ * 5. Playlists Grid & Collection Detail Header
+ * -------------------------------------------------------------------------- */
+.shell .ne-playlists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--ne-tile), 1fr));
+  gap: 24px 18px;
+}
+
+.shell .ne-pl-card {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  text-align: left;
+  color: var(--ne-label);
 }
 
-.pl-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
-}
-
-.pl-card:active {
-  transform: scale(0.97);
-}
-
-.pl-card-thumb {
+.shell .ne-pl-thumb {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--ne-corner);
   overflow: hidden;
-  background: #1e1f26;
-  position: relative;
-  margin-bottom: 8px;
+  background: var(--ne-fill);
+  margin-bottom: 10px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  transition:
+    scale 180ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease);
 }
 
-.pl-card-thumb img {
+.shell.appearance-light .ne-pl-thumb {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+
+.shell .ne-pl-card:hover .ne-pl-thumb {
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .ne-pl-card:active .ne-pl-thumb {
+  scale: 0.96;
+}
+
+.shell .ne-pl-thumb img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.pl-thumb-fallback {
+.shell .ne-cover-fallback {
+  display: grid;
+  place-items: center;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  opacity: 0.6;
+  color: var(--ne-dim);
 }
 
-.pl-play-count {
+.shell .ne-pl-play-count {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 10px;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.56);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 
-.pl-card-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #ffffff;
-  line-height: 1.4;
+.shell .ne-pl-title {
+  font-size: var(--ne-type-sub);
+  font-weight: 650;
+  line-height: 1.3;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
-.pl-card-sub {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4px;
+.shell .ne-pl-sub {
+  margin-top: 3px;
+  font-size: var(--ne-type-label);
+  color: var(--ne-dim);
 }
 
-/* ==========================================================================
-   Song List (歌曲列表视图)
-   ========================================================================== */
-.song-list {
+/* Loading skeletons */
+.shell .ne-pl-skeleton {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.song-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.song-item:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.song-item.is-playing {
-  background: rgba(230, 0, 38, 0.12);
-  border-color: rgba(230, 0, 38, 0.35);
-}
-
-.song-item.is-unplayable {
-  opacity: 0.56;
-}
-
-.song-idx {
-  width: 24px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.idx-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.idx-text.rank-top {
-  color: #ff3a3a;
-  font-weight: 700;
-}
-
-.sound-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
-  justify-content: center;
-}
-
-.sound-bars .bar {
-  width: 3px;
-  background: #e60026;
-  border-radius: 1px;
-}
-
-.sound-bars .b1 {
-  height: 6px;
-}
-.sound-bars .b2 {
-  height: 12px;
-}
-.sound-bars .b3 {
-  height: 8px;
-}
-
-.sound-bars .bar.active {
-  animation: bar-wave 0.8s ease-in-out infinite alternate;
-}
-
-.sound-bars .b2.active {
-  animation-delay: 0.2s;
-}
-.sound-bars .b3.active {
-  animation-delay: 0.4s;
-}
-
-@keyframes bar-wave {
-  0% {
-    height: 4px;
-  }
-  100% {
-    height: 14px;
-  }
-}
-
-.song-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #1e1f26;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.song-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.song-thumb-fallback {
-  font-size: 20px;
-  opacity: 0.6;
-}
-
-.song-body {
-  flex: 1;
-  overflow: hidden;
-}
-
-.song-title-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 3px;
-}
-
-.song-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.song-badge-vip {
-  font-size: 9px;
-  font-weight: 700;
-  color: #ff3a3a;
-  border: 1px solid rgba(230, 0, 38, 0.4);
-  padding: 0 4px;
-  border-radius: 3px;
-  line-height: 1.2;
-  flex-shrink: 0;
-}
-
-.song-badge-muted {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  padding: 0 4px;
-  border-radius: 3px;
-  line-height: 1.2;
-  flex-shrink: 0;
-}
-
-.song-artist {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.song-play-action {
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  color: #fff;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-
-.song-item:hover .song-play-action {
-  background: #e60026;
-}
-
-.song-list-loading,
-.song-list-empty {
-  padding: 40px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   gap: 10px;
 }
 
-.list-spinner {
-  width: 18px;
+.shell .ne-pl-skel-cover {
+  aspect-ratio: 1;
+  border-radius: var(--ne-corner);
+  background: var(--ne-fill);
+  animation: ne-pulse 1.4s ease-in-out infinite alternate;
+}
+
+.shell .ne-pl-skel-line {
+  width: 78%;
   height: 18px;
-  border: 2px solid rgba(230, 0, 38, 0.3);
-  border-top-color: #e60026;
-  border-radius: 50%;
-  animation: netease-spin 0.8s linear infinite;
+  border-radius: 6px;
+  background: var(--ne-fill);
+  animation: ne-pulse 1.4s ease-in-out infinite alternate;
 }
 
-/* ==========================================================================
-   Secondary Tabs (二级Tab: 胶囊样式，参考用户设计图)
-   ========================================================================== */
-.sub-tabs-row,
-.chart-pills {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 18px;
-  overflow-x: auto;
-  padding: 4px 2px 6px 2px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.sub-tabs-row::-webkit-scrollbar,
-.chart-pills::-webkit-scrollbar {
-  display: none;
-}
-
-.sub-tab-pill,
-.chart-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 22px;
-  border-radius: 9999px;
-  font-size: 14.5px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  letter-spacing: 0.4px;
-  border: 1px solid transparent;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-sizing: border-box;
-  user-select: none;
-  flex-shrink: 0;
-}
-
-/* Red / Brand Pill (推荐、官方) */
-.sub-tab-pill.pill-brand,
-.chart-pill.pill-brand {
-  background: rgba(230, 0, 38, 0.11);
-  border-color: rgba(230, 0, 38, 0.34);
-  color: #ff3a3a;
-}
-
-.sub-tab-pill.pill-brand:hover,
-.chart-pill.pill-brand:hover {
-  background: rgba(230, 0, 38, 0.18);
-  border-color: rgba(230, 0, 38, 0.52);
-  color: #ff5252;
-  transform: translateY(-1px);
-}
-
-.sub-tab-pill.pill-brand:active,
-.chart-pill.pill-brand:active {
-  transform: scale(0.96);
-}
-
-.sub-tab-pill.pill-brand.active,
-.chart-pill.pill-brand.active {
-  background: rgba(230, 0, 38, 0.24);
-  border-color: #ff3a3a;
-  color: #ff4d4d;
-  font-weight: 600;
-  box-shadow: 0 0 12px rgba(230, 0, 38, 0.32);
-}
-
-/* White / Genre Pill (华语、欧美、流行等) */
-.sub-tab-pill.pill-genre,
-.chart-pill.pill-genre,
-.chart-pill:not(.pill-brand) {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
-}
-
-.sub-tab-pill.pill-genre:hover,
-.chart-pill.pill-genre:hover,
-.chart-pill:not(.pill-brand):hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
-.sub-tab-pill.pill-genre:active,
-.chart-pill.pill-genre:active,
-.chart-pill:not(.pill-brand):active {
-  transform: scale(0.96);
-}
-
-.sub-tab-pill.pill-genre.active,
-.chart-pill.pill-genre.active,
-.chart-pill:not(.pill-brand).active {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: #ffffff;
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-}
-
-/* ==========================================================================
-   Roaming View
-   ========================================================================== */
-.roaming-hero-banner {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.25) 0%, rgba(30, 27, 75, 0.6) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 24px;
-}
-
-.roaming-hero-icon {
-  font-size: 48px;
-}
-
-.roaming-hero-info h2 {
-  font-size: 20px;
-  margin: 0 0 6px 0;
-  color: #ffffff;
-}
-
-.roaming-hero-info p {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 14px 0;
-}
-
-.roaming-start-btn {
-  background: #2563eb;
-  color: #ffffff;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.roaming-start-btn:hover {
-  background: #3b82f6;
-  transform: translateY(-2px);
-}
-
-/* ==========================================================================
-   My View (Empty states)
-   ========================================================================== */
-.my-empty-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-}
-
-.my-empty-box .empty-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.my-empty-box h3 {
-  font-size: 18px;
-  margin: 0 0 8px 0;
-  color: #ffffff;
-}
-
-.my-empty-box p {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
-  max-width: 320px;
-  margin: 0 0 18px 0;
-  line-height: 1.5;
-}
-
-/* ==========================================================================
-   Search View
-   ========================================================================== */
-.search-bar-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.search-input-field {
-  flex: 1;
-}
-
-.search-submit-btn {
-  background: #e60026;
-  color: #ffffff;
-  border: none;
-  padding: 9px 20px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.search-submit-btn:hover {
-  background: #f01438;
-}
-
-.search-tags {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.tags-label {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.55);
-  font-weight: 500;
-}
-
-.search-tags-row {
-  margin-bottom: 0;
-  padding-bottom: 2px;
-}
-
-.search-tags-row .sub-tab-pill {
-  padding: 5px 16px;
-  font-size: 13.5px;
-}
-
-/* ==========================================================================
-   Playlist Detail View
-   ========================================================================== */
-.detail-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.detail-back-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  color: #ffffff;
-  padding: 6px 14px;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.detail-back-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.detail-pl-info {
-  flex: 1;
-}
-
-.detail-pl-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0;
-  color: #ffffff;
-}
-
-.detail-pl-count {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.detail-playall-btn {
-  background: #e60026;
-  color: #ffffff;
-  border: none;
-  padding: 7px 16px;
-  border-radius: 18px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* ==========================================================================
-   Queue Drawer (播放队列抽屉面板)
-   ========================================================================== */
-.netease-queue-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  z-index: 100;
-  display: flex;
-  justify-content: flex-end;
-  animation: fade-in 0.2s ease-out;
-  border-radius: var(--panel-radius, 28px);
-  clip-path: inset(0 round var(--panel-radius, 28px));
-}
-
-@keyframes fade-in {
+@keyframes ne-pulse {
   from {
-    opacity: 0;
+    opacity: 0.5;
   }
   to {
     opacity: 1;
   }
 }
 
-.netease-queue-drawer {
-  width: 360px;
-  max-width: 90%;
-  height: 100%;
-  background: #181920;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  animation: slide-drawer 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes slide-drawer {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-.queue-header {
+/* Collection Detail Header */
+.shell .ne-collection-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
-.queue-title-wrap {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.queue-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-}
-
-.queue-count {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.queue-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.queue-clear-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.queue-clear-btn:hover {
-  color: #ff4d4d;
-}
-
-.queue-close-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  color: #fff;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.queue-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 12px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.queue-list::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.queue-empty {
-  padding: 40px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 14px;
-}
-
-.queue-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.queue-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.queue-item.active {
-  background: rgba(230, 0, 38, 0.15);
-}
-
-.queue-item-indicator {
-  width: 20px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.queue-item-num {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.sound-wave {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 12px;
-  justify-content: center;
-}
-
-.sound-wave .bar {
-  width: 2.5px;
-  background: #e60026;
-  border-radius: 1px;
-}
-
-.sound-wave .b1 {
-  height: 4px;
-}
-.sound-wave .b2 {
-  height: 10px;
-}
-.sound-wave .b3 {
-  height: 6px;
-}
-
-.sound-wave .bar.anim {
-  animation: bar-wave 0.8s ease-in-out infinite alternate;
-}
-
-.sound-wave .b2.anim {
-  animation-delay: 0.2s;
-}
-.sound-wave .b3.anim {
-  animation-delay: 0.4s;
-}
-
-.queue-item-body {
-  flex: 1;
+.shell .ne-collection-cover {
+  flex: none;
+  width: 196px;
+  aspect-ratio: 1;
+  border-radius: var(--ne-corner);
   overflow: hidden;
+  background: var(--ne-fill);
+  box-shadow: var(--shadow-raised);
 }
 
-.queue-item-title {
+.shell .ne-collection-cover img {
   display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-item.active .queue-item-title {
-  color: #ff3a3a;
-}
-
-.queue-item-artist {
-  display: block;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-item-remove {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 6px;
-}
-
-.queue-item-remove:hover {
-  color: #fff;
-}
-
-/* ==========================================================================
-   Immersive Full-Screen Player (参考图右下角沉浸红黑胶模式)
-   ========================================================================== */
-.netease-immersive-player {
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  background: radial-gradient(circle at 50% 34%, #540d17 0%, #290409 62%, #110204 100%);
-  color: #ffffff;
-  padding: 24px 48px 34px 48px;
-  box-sizing: border-box;
-  animation: fade-in 0.25s ease-out;
-  border-radius: var(--panel-radius, 28px);
-  clip-path: inset(0 round var(--panel-radius, 28px));
-}
-
-.immersive-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-
-.immersive-back-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    transform 0.15s,
-    background 0.15s;
-}
-
-.immersive-back-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  transform: scale(1.06);
-}
-
-.immersive-header-title {
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.immersive-header-placeholder {
-  width: 44px;
-}
-
-.immersive-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.immersive-assembly {
-  position: relative;
-  width: clamp(270px, 46vh, 360px);
-  height: clamp(270px, 46vh, 360px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.immersive-vinyl-body {
-  width: clamp(250px, 43vh, 336px);
-  height: clamp(250px, 43vh, 336px);
-  border-radius: 50%;
-  background: radial-gradient(circle, #25262c 0%, #15161b 60%, #0d0e12 100%);
-  border: 8px solid #08090b;
-  box-shadow:
-    0 28px 65px rgba(0, 0, 0, 0.85),
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    inset 0 0 18px rgba(0, 0, 0, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.immersive-disc {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-.immersive-assembly.playing .immersive-disc {
-  animation: netease-spin 20s linear infinite;
-}
-
-.immersive-assembly.paused .immersive-disc {
-  animation: netease-spin 20s linear infinite;
-  animation-play-state: paused;
-}
-
-.immersive-disc-grooves {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: repeating-radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.04) 0px,
-    rgba(255, 255, 255, 0.04) 1px,
-    transparent 2px,
-    transparent 4px
-  );
-}
-
-.immersive-disc-label {
-  width: clamp(124px, 21vh, 168px);
-  height: clamp(124px, 21vh, 168px);
-  border-radius: 50%;
-  overflow: hidden;
-  border: 5px solid #1a1a20;
-  position: relative;
-  background: #2a2a32;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.immersive-art-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.immersive-art-fallback {
-  font-size: 56px;
-  opacity: 0.7;
+.shell .ne-collection-meta {
+  flex: 1;
+  min-width: 0;
 }
 
-.immersive-spindle {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  background: radial-gradient(circle, #f3f4f6 30%, #9ca3af 70%, #374151 100%);
+.shell .ne-collection-title {
+  margin: 0 0 8px;
+  font-size: calc(36px * var(--text-scale, 1));
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.shell .ne-collection-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  font-size: var(--ne-type-sub);
+  font-weight: 600;
+  color: var(--ne-dim);
+}
+
+.shell .ne-collection-actions,
+.shell .ne-roaming-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.shell .ne-btn-primary,
+.shell .ne-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: var(--ne-type-sub);
+  font-weight: 700;
+}
+
+.shell .ne-btn-primary {
+  background: var(--ne-key-strong);
+  color: #fff;
+  box-shadow: 0 6px 18px rgb(230 0 38 / 0.35);
+}
+
+.shell .ne-btn-primary.large {
+  min-height: 54px;
+  padding: 0 28px;
+  font-size: var(--ne-type-name);
+}
+
+.shell .ne-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.shell .ne-btn-secondary {
+  background: var(--ne-fill);
+  color: var(--ne-label);
+}
+
+.shell .ne-btn-secondary:hover {
+  background: var(--ne-fill-hover);
+}
+
+.shell .ne-btn-primary:active,
+.shell .ne-btn-secondary:active {
+  scale: 0.96;
+}
+
+/* Roaming & Empty States */
+.shell .ne-roaming-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 24px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgb(37 99 235 / 0.22) 0%, rgb(230 0 38 / 0.16) 100%);
+  border: 1px solid var(--ne-rule);
+}
+
+.shell .ne-roaming-badge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.12);
+  color: var(--ne-label);
+}
+
+.shell .ne-roaming-info h2 {
+  margin: 0 0 6px;
+  font-size: var(--ne-type-section);
+  font-weight: 750;
+}
+
+.shell .ne-roaming-info p {
+  margin: 0 0 16px;
+  font-size: var(--ne-type-sub);
+  color: var(--ne-dim);
+  line-height: 1.4;
+}
+
+.shell .ne-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 24px;
+  border-radius: 24px;
+  background: var(--ne-surface);
+}
+
+.shell .ne-empty-emblem {
+  margin-bottom: 14px;
+}
+
+.shell .ne-empty-card h2 {
+  margin: 0 0 8px;
+  font-size: var(--ne-type-section);
+  font-weight: 750;
+}
+
+.shell .ne-empty-card p {
+  margin: 0 0 22px;
+  max-width: 440px;
+  font-size: var(--ne-type-sub);
+  color: var(--ne-dim);
+  line-height: 1.45;
+}
+
+.shell .ne-search-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.shell .ne-tags-label {
+  font-size: var(--ne-type-label);
+  font-weight: 650;
+  color: var(--ne-dim);
+}
+
+/* --------------------------------------------------------------------------
+ * 6. CarPlay Song List (non-nested interactive buttons, >= 44px hit targets)
+ * -------------------------------------------------------------------------- */
+.shell .ne-song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shell .ne-song-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 16px;
+  transition: background-color 150ms var(--motion-ease);
+}
+
+.shell .ne-song-row:hover {
+  background: var(--ne-surface-hover);
+}
+
+.shell .ne-song-row.is-playing {
+  background: var(--ne-key-soft);
+}
+
+.shell .ne-song-row.is-unplayable {
+  opacity: 0.54;
+}
+
+.shell .ne-song-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 4px 6px;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--ne-label);
+}
+
+.shell .ne-song-idx {
+  flex: none;
+  width: 30px;
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-idx-num {
+  font-size: var(--ne-type-sub);
+  font-weight: 650;
+  color: var(--ne-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .ne-idx-num.top {
+  color: var(--ne-key);
+  font-weight: 800;
+}
+
+.shell .ne-sound-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 16px;
+}
+
+.shell .ne-sound-bars i {
+  display: block;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--ne-key);
+}
+
+.shell .ne-sound-bars i.b1 {
+  height: 7px;
+}
+.shell .ne-sound-bars i.b2 {
+  height: 14px;
+}
+.shell .ne-sound-bars i.b3 {
+  height: 9px;
+}
+
+.shell .ne-sound-bars i.anim {
+  animation: ne-bar-wave 0.75s ease-in-out infinite alternate;
+}
+
+.shell .ne-sound-bars i.b2.anim {
+  animation-delay: 0.2s;
+}
+.shell .ne-sound-bars i.b3.anim {
+  animation-delay: 0.4s;
+}
+
+@keyframes ne-bar-wave {
+  from {
+    height: 4px;
+  }
+  to {
+    height: 16px;
+  }
+}
+
+.shell .ne-song-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--ne-corner-small);
+  overflow: hidden;
+  background: var(--ne-fill);
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-song-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .ne-song-thumb-fallback {
+  color: var(--ne-dim);
+}
+
+.shell .ne-song-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .ne-song-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .ne-song-title {
+  font-size: var(--ne-type-name);
+  font-weight: 650;
+  color: var(--ne-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .ne-song-row.is-playing .ne-song-title {
+  color: var(--ne-key);
+}
+
+.shell .ne-badge-vip,
+.shell .ne-badge-muted {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.shell .ne-badge-vip {
+  color: var(--ne-key);
+  background: var(--ne-key-soft);
+  border: 1px solid var(--ne-key-border);
+}
+
+.shell .ne-badge-muted {
+  color: var(--ne-dim);
+  border: 1px solid var(--ne-rule);
+}
+
+.shell .ne-song-artist {
+  font-size: var(--ne-type-sub);
+  color: var(--ne-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .ne-song-duration {
+  flex: none;
+  margin-left: 8px;
+  font-size: var(--ne-type-label);
+  font-weight: 600;
+  color: var(--ne-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .ne-song-action {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
+  color: var(--ne-dim);
 }
 
-.immersive-tonearm {
+.shell .ne-song-action:hover {
+  background: var(--ne-fill);
+  color: var(--ne-label);
+}
+
+.shell .ne-song-like.liked {
+  color: var(--ne-key);
+}
+
+.shell .ne-song-play {
+  background: var(--ne-fill);
+  color: var(--ne-label);
+}
+
+.shell .ne-song-row:hover .ne-song-play,
+.shell .ne-song-row.is-playing .ne-song-play {
+  background: var(--ne-key-strong);
+  color: #fff;
+}
+
+.shell .ne-list-loading,
+.shell .ne-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 20px;
+  font-size: var(--ne-type-sub);
+  color: var(--ne-dim);
+}
+
+/* --------------------------------------------------------------------------
+ * 7. Floating Glass Mini Player Capsule
+ * -------------------------------------------------------------------------- */
+.shell .ne-mini {
   position: absolute;
-  top: -24px;
-  right: -16px;
-  width: clamp(112px, 19vh, 148px);
-  height: clamp(200px, 34vh, 266px);
-  pointer-events: none;
+  left: 50%;
+  bottom: 8px;
   z-index: 5;
-  transform-origin: 78% 13%;
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(760px, calc(100% - 48px));
+  height: 84px;
+  padding: 8px 14px 8px 12px;
+  overflow: hidden;
+  border-radius: 42px;
+  translate: -50% 0;
+  --mini-ink: var(--ne-label);
+  --mini-dim: var(--ne-dim);
+  color: var(--mini-ink);
+  transition:
+    translate 420ms var(--motion-ease),
+    opacity 300ms var(--motion-ease),
+    color 500ms ease;
 }
 
-.immersive-tonearm.arm-playing {
+.shell .ne-mini.on-light {
+  --mini-ink: rgb(0 0 0 / 0.88);
+  --mini-dim: rgb(0 0 0 / 0.58);
+}
+
+.shell .ne-mini.away {
+  opacity: 0;
+  translate: -50% 140%;
+  pointer-events: none;
+}
+
+.shell .ne-mini-open {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border-radius: 34px;
+  text-align: left;
+  color: inherit;
+}
+
+.shell .ne-mini-vinyl {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  padding: 7px;
+  background: radial-gradient(circle, #2a2b32 0%, #111216 70%, #050507 100%);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
+  display: grid;
+  place-items: center;
+  animation: ne-spin 16s linear infinite;
+  animation-play-state: paused;
+}
+
+.shell .ne-mini-vinyl.spinning {
+  animation-play-state: running;
+}
+
+.shell .ne-mini-vinyl img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.shell .ne-mini-art-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--ne-fill);
+  color: #fff;
+}
+
+.shell .ne-mini-spindle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  box-shadow: 0 0 3px rgb(0 0 0 / 0.7);
+}
+
+.shell .ne-mini-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .ne-mini-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .ne-mini-name {
+  overflow: hidden;
+  font-size: var(--ne-type-name);
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shell .ne-mini-by {
+  overflow: hidden;
+  font-size: var(--ne-type-sub);
+  color: var(--mini-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: color 500ms ease;
+}
+
+.shell .ne-mini-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: var(--mini-ink);
+}
+
+.shell .ne-mini-button:hover {
+  background: color-mix(in srgb, var(--mini-ink) 10%, transparent);
+}
+
+.shell .ne-mini-button:active {
+  background: color-mix(in srgb, var(--mini-ink) 20%, transparent);
+  scale: 0.92;
+}
+
+.shell .ne-mini-button.active {
+  color: var(--ne-key);
+  background: var(--ne-key-soft);
+}
+
+.shell .ne-mini-progress {
+  position: absolute;
+  inset: auto 42px 0;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--ne-key-strong);
+  clip-path: inset(0 calc((1 - var(--share, 0)) * 100%) 0 0);
+}
+
+/* --------------------------------------------------------------------------
+ * 8. Slide-In Queue Drawer (Modal Overlay inside NeteaseApp)
+ * -------------------------------------------------------------------------- */
+.shell .ne-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(0 0 0 / 0.44);
+  backdrop-filter: blur(8px);
+  animation: ne-fade-in 200ms var(--motion-ease) both;
+}
+
+@keyframes ne-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.shell .ne-drawer {
+  width: min(440px, 88%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--ne-card-bg) 92%, transparent);
+  backdrop-filter: blur(32px) saturate(160%);
+  border-left: 1px solid var(--ne-rule);
+  box-shadow: -12px 0 36px rgb(0 0 0 / 0.45);
+  animation: ne-slide-drawer 260ms var(--motion-ease) both;
+}
+
+@keyframes ne-slide-drawer {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+.shell .ne-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--ne-rule);
+  flex: none;
+}
+
+.shell .ne-drawer-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.shell .ne-drawer-title {
+  margin: 0;
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .ne-drawer-count {
+  font-size: var(--ne-type-label);
+  color: var(--ne-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .ne-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell .ne-drawer-mode-btn,
+.shell .ne-drawer-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--ne-fill);
+  color: var(--ne-label);
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .ne-drawer-clear-btn:hover {
+  color: var(--apple-red);
+}
+
+.shell .ne-drawer-close-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ne-fill);
+  color: var(--ne-label);
+}
+
+.shell .ne-drawer-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 24px;
+  scrollbar-width: none;
+}
+
+.shell .ne-drawer-list::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .ne-drawer-empty {
+  padding: 56px 20px;
+  text-align: center;
+  font-size: var(--ne-type-sub);
+  color: var(--ne-dim);
+}
+
+.shell .ne-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 12px;
+  padding: 2px 4px;
+}
+
+.shell .ne-queue-row:hover {
+  background: var(--ne-surface-hover);
+}
+
+.shell .ne-queue-row.active {
+  background: var(--ne-key-soft);
+}
+
+.shell .ne-queue-row.unplayable {
+  opacity: 0.54;
+}
+
+.shell .ne-queue-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--ne-label);
+}
+
+.shell .ne-queue-indicator {
+  flex: none;
+  width: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-queue-num {
+  font-size: var(--ne-type-label);
+  color: var(--ne-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .ne-queue-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .ne-queue-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shell .ne-queue-title {
+  font-size: var(--ne-type-sub);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .ne-queue-row.active .ne-queue-title {
+  color: var(--ne-key);
+}
+
+.shell .ne-queue-artist {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--ne-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .ne-queue-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--ne-dim);
+}
+
+.shell .ne-queue-remove:hover {
+  background: var(--ne-fill);
+  color: var(--ne-label);
+}
+
+/* --------------------------------------------------------------------------
+ * 9. Fullscreen CarPlay Vinyl Now Playing Overlay
+ * -------------------------------------------------------------------------- */
+.shell .ne-now {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  color: var(--text);
+  translate: 0 100%;
+  visibility: hidden;
+  transition:
+    translate 520ms var(--motion-ease),
+    visibility 0s 520ms;
+}
+
+.shell .ne-now.open {
+  translate: 0 0;
+  visibility: visible;
+  transition:
+    translate 520ms var(--motion-ease),
+    visibility 0s;
+}
+
+.shell .ne-now-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 34%, #4f0c16 0%, #230408 62%, #0e0204 100%);
+}
+
+.shell.appearance-light .ne-now-backdrop {
+  background: radial-gradient(circle at 50% 34%, #fce7ea 0%, #f1dce0 62%, #e6d3d7 100%);
+}
+
+.shell .ne-now-backdrop img {
+  position: absolute;
+  inset: -15%;
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  filter: blur(80px) saturate(150%);
+}
+
+.shell .ne-now-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.shell.appearance-light .ne-now-backdrop::after {
+  background: rgb(255 255 255 / 0.46);
+}
+
+.shell .ne-now-panel {
+  container-type: size;
+  container-name: netease-now;
+}
+
+.shell .ne-now-layout {
+  --ne-now-inset: max(0px, calc((var(--panel-radius) - 32px) * var(--corner-inset)));
+  position: absolute;
+  inset: var(--ne-now-inset) var(--ne-now-inset) var(--ne-now-inset) 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'header header'
+    'info art'
+    'progress progress'
+    'extras extras';
+  column-gap: 44px;
+}
+
+.shell .ne-now-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.shell .ne-corner {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.shell .ne-corner:active {
+  scale: 0.92;
+}
+
+.shell .ne-corner.ne-on {
+  background: color-mix(in srgb, var(--text) 28%, transparent);
+}
+
+.shell .ne-corner-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e60026;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .ne-now-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--text-dim);
+}
+
+.shell .ne-now-info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.shell .ne-now-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  animation: ne-now-from-right 420ms var(--motion-ease) both;
+}
+
+.shell .ne-now-text.from-left {
+  animation-name: ne-now-from-left;
+}
+
+@keyframes ne-now-from-right {
+  from {
+    opacity: 0;
+    translate: 40px 0;
+  }
+}
+
+@keyframes ne-now-from-left {
+  from {
+    opacity: 0;
+    translate: -40px 0;
+  }
+}
+
+.shell .ne-now-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.shell .ne-now-title {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: calc(40px * var(--text-scale, 1));
+  font-weight: 750;
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+}
+
+.shell .ne-now-vip {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 6px;
+  background: rgb(230 0 38 / 0.24);
+  border: 1px solid rgb(255 77 77 / 0.45);
+  color: #ff4d5a;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .ne-now-artist {
+  max-width: 100%;
+  margin: 8px 0 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(28px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shell .ne-now-album {
+  max-width: 100%;
+  margin: 4px 0 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(20px * var(--text-scale, 1));
+  font-weight: 550;
+  color: var(--text-dim);
+}
+
+.shell .ne-now-notice {
+  margin-top: 14px;
+  max-width: 100%;
+}
+
+.shell .ne-now-controls {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  margin-top: 24px;
+}
+
+.shell .ne-now-button {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.shell .ne-now-button.primary {
+  width: 108px;
+  height: 108px;
+}
+
+.shell .ne-now-button.small {
+  width: 58px;
+  height: 58px;
+  color: var(--text-dim);
+}
+
+.shell .ne-now-button:hover {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.shell .ne-now-button:active {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  scale: 0.92;
+}
+
+.shell .ne-now-button.small.active,
+.shell .ne-like-btn.liked {
+  color: var(--ne-key);
+  background: color-mix(in srgb, var(--ne-key) 20%, transparent);
+}
+
+/* Vinyl Turntable Stage (Right Column in Landscape) */
+.shell .ne-vinyl-stage {
+  grid-area: art;
+  align-self: center;
+  justify-self: end;
+  height: min(100%, 40cqw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-vinyl-assembly {
+  position: relative;
+  width: 92%;
+  height: 92%;
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-vinyl-platter {
+  width: 92%;
+  height: 92%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #25262c 0%, #15161b 60%, #0d0e12 100%);
+  border: 7px solid #08090b;
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.72),
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    inset 0 0 16px rgb(0 0 0 / 0.9);
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-vinyl-disc {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  animation: ne-spin 20s linear infinite;
+}
+
+.shell .ne-vinyl-assembly.paused .ne-vinyl-disc {
+  animation-play-state: paused;
+}
+
+.shell .ne-vinyl-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.04) 0px,
+    rgb(255 255 255 / 0.04) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.shell .ne-vinyl-label {
+  position: relative;
+  width: 52%;
+  height: 52%;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #1a1a20;
+  background: #2a2a32;
+  display: grid;
+  place-items: center;
+}
+
+.shell .ne-vinyl-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .ne-vinyl-fallback {
+  color: rgb(255 255 255 / 0.65);
+}
+
+.shell .ne-vinyl-spindle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f3f4f6 30%, #9ca3af 70%, #374151 100%);
+  box-shadow: 0 0 4px rgb(0 0 0 / 0.8);
+}
+
+.shell .ne-tonearm {
+  position: absolute;
+  top: -6%;
+  right: -4%;
+  width: 38%;
+  height: 68%;
+  pointer-events: none;
+  z-index: 2;
+  transform-origin: 78% 13%;
+  transition: transform 550ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shell .ne-tonearm.arm-playing {
   transform: rotate(0deg);
 }
 
-.immersive-tonearm.arm-paused {
+.shell .ne-tonearm.arm-paused {
   transform: rotate(-28deg);
 }
 
-.immersive-tonearm-svg {
+.shell .ne-tonearm-svg {
   width: 100%;
   height: 100%;
 }
 
-.immersive-meta {
+/* Inline Queue Panel in Now Playing */
+.shell .ne-now-queue {
+  grid-area: art;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 44cqw);
+  min-height: 0;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.shell .ne-now-queue-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  max-width: 680px;
-  margin: 0 auto 20px auto;
-  text-align: left;
-  flex-shrink: 0;
+  margin-bottom: 10px;
+  flex: none;
 }
 
-.immersive-meta-info {
+.shell .ne-now-queue-head h3 {
+  margin: 0;
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .ne-now-queue-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .ne-now-queue-clear:hover {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+}
+
+.shell .ne-now-queue-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.shell .ne-now-queue-list::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .ne-now-queue-empty {
+  margin: auto;
+  font-size: var(--ne-type-sub);
+  color: var(--text-dim);
+}
+
+.shell .ne-now-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.shell .ne-now-queue-row.active {
+  background: color-mix(in srgb, var(--ne-key) 22%, transparent);
+  border-radius: 10px;
+  border-bottom-color: transparent;
+}
+
+.shell .ne-now-queue-row.unplayable {
+  opacity: 0.52;
+}
+
+.shell .ne-now-queue-main {
   flex: 1;
   min-width: 0;
-  padding-right: 16px;
-}
-
-.immersive-title-row {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 10px;
-  margin-bottom: 6px;
+  min-height: 50px;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--text);
 }
 
-.immersive-title {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0;
-  color: #ffffff;
+.shell .ne-now-queue-idx {
+  flex: none;
+  width: 24px;
+  display: grid;
+  place-items: center;
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .ne-now-queue-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell .ne-now-queue-meta strong {
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.immersive-vip-badge {
-  font-size: 13px;
-  font-weight: 700;
-  color: #ff3a3a;
-  background: rgba(230, 0, 38, 0.22);
-  border: 1px solid rgba(230, 0, 38, 0.5);
-  padding: 2px 8px;
-  border-radius: 5px;
-  flex-shrink: 0;
-}
-
-.immersive-artist {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.72);
-  margin: 0;
+.shell .ne-now-queue-meta span {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.immersive-like-btn {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  padding: 10px;
+.shell .ne-now-queue-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
+  color: var(--text-dim);
+}
+
+.shell .ne-now-queue-remove:hover {
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  color: var(--text);
+}
+
+/* Native Accessible Progress & Volume Range Sliders */
+.shell .ne-now-progress {
+  grid-area: progress;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.shell .ne-now-time {
+  min-width: 3.4em;
+  font-size: calc(20px * var(--text-scale, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.shell .ne-now-time:last-child {
+  text-align: right;
+}
+
+.shell .ne-range {
+  --slider-track-size: 8px;
+  --slider-thumb-size: 18px;
+  --slider-track-color: color-mix(in srgb, var(--text) 24%, transparent);
+  --slider-fill-color: var(--text);
+  --slider-thumb-color: var(--text);
+  appearance: none;
+  inline-size: 100%;
+  block-size: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell .ne-seek-range {
+  --slider-fill-color: #e60026;
+  --slider-thumb-color: #ffffff;
+}
+
+.shell .ne-volume-range {
+  --slider-track-size: 6px;
+  --slider-thumb-size: 18px;
+  flex: 1;
+}
+
+.shell .ne-range::-webkit-slider-runnable-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--slider-fill-color) var(--slider-progress, 0%),
+    var(--slider-track-color) var(--slider-progress, 0%)
+  );
+}
+
+.shell .ne-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  margin-block-start: calc((var(--slider-track-size) - var(--slider-thumb-size)) / 2);
+  border: 0;
+  border-radius: 50%;
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.45);
+}
+
+.shell .ne-range::-moz-range-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: 999px;
+  background: var(--slider-track-color);
+}
+
+.shell .ne-range::-moz-range-progress {
+  block-size: var(--slider-track-size);
+  border-radius: 999px;
+  background: var(--slider-fill-color);
+}
+
+.shell .ne-range::-moz-range-thumb {
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  border: 0;
+  border-radius: 50%;
+  background: var(--slider-thumb-color);
+}
+
+/* Extras Row */
+.shell .ne-now-extras {
+  grid-area: extras;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition:
-    transform 0.15s,
-    background 0.15s,
-    color 0.15s;
+  gap: 14px;
+  margin-top: 8px;
 }
 
-.immersive-like-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  transform: scale(1.08);
+.shell .ne-now-mode-pill {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text-dim);
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 600;
 }
 
-.immersive-like-btn.liked {
-  color: #e60026;
-}
-
-.immersive-progress-wrap {
-  width: 100%;
-  max-width: 680px;
-  margin: 0 auto 22px auto;
-  flex-shrink: 0;
-}
-
-.immersive-progress-track {
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  cursor: pointer;
-  position: relative;
-}
-
-.immersive-progress-fill {
-  height: 100%;
-  background: #e60026;
-  border-radius: 4px;
-  position: relative;
-}
-
-.immersive-knob {
-  position: absolute;
-  right: -7px;
-  top: -5px;
-  width: 18px;
-  height: 18px;
-  background: #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 0 10px rgba(230, 0, 38, 0.9);
-}
-
-.immersive-times {
+.shell .ne-volume {
   display: flex;
-  justify-content: space-between;
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.65);
-  margin-top: 10px;
-  font-feature-settings: 'tnum';
-}
-
-.immersive-controls {
-  display: flex;
+  flex: 0 1 360px;
   align-items: center;
-  justify-content: center;
-  gap: 44px;
-  margin-bottom: 4px;
-  flex-shrink: 0;
+  gap: 10px;
+  margin-left: auto;
 }
 
-.imm-ctrl-btn {
-  background: none;
-  border: none;
-  color: #ffffff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  padding: 10px;
-  border-radius: 50%;
-  transition:
-    transform 0.15s,
-    background 0.15s;
+/* --------------------------------------------------------------------------
+ * 10. Container Query Responsive Adaptations (21 Cabin Screens)
+ * -------------------------------------------------------------------------- */
+@container netease (max-width: 760px) {
+  .shell .ne-hero-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shell .ne-collection-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .shell .ne-collection-cover {
+    width: 156px;
+  }
 }
 
-.imm-ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+@container netease (max-height: 520px) {
+  .shell .netease-app,
+  .shell .ne-bar,
+  .shell .ne-scroll {
+    --ne-bar: 58px;
+    --ne-bar-inset: max(0px, calc((var(--panel-radius) - 29px) * var(--corner-inset)));
+    --ne-gutter: 18px;
+    --ne-tile: 148px;
+  }
+
+  .shell .ne-round,
+  .shell .netease-app button.ne-me {
+    width: 48px;
+    height: 48px;
+  }
+
+  .shell .ne-tab {
+    min-width: 82px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+
+  .shell .ne-hero-card {
+    min-height: 98px;
+    padding: 12px 14px;
+  }
+
+  .shell .ne-scroll.has-mini {
+    padding-bottom: 104px;
+  }
+
+  .shell .ne-mini {
+    height: 70px;
+    border-radius: 35px;
+    width: min(640px, calc(100% - 36px));
+  }
+
+  .shell .ne-mini-vinyl {
+    width: 52px;
+    height: 52px;
+    padding: 5px;
+  }
+
+  .shell .ne-mini-button {
+    width: 48px;
+    height: 48px;
+  }
 }
 
-.imm-ctrl-btn:active {
-  transform: scale(0.92);
+@container netease-now (aspect-ratio < 1) {
+  .shell .ne-now-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'header'
+      'art'
+      'info'
+      'progress'
+      'extras';
+  }
+
+  .shell .ne-vinyl-stage {
+    justify-self: center;
+    height: min(32cqh, 60cqw);
+  }
+
+  .shell .ne-now-queue {
+    width: 100%;
+    max-height: 36cqh;
+  }
 }
 
-.imm-play-btn {
-  background: #e60026;
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  box-shadow: 0 10px 30px rgba(230, 0, 38, 0.55);
+@container netease-now (max-height: 520px) {
+  .shell .ne-corner {
+    width: 48px;
+    height: 48px;
+  }
+
+  .shell .ne-now-header {
+    margin-bottom: 8px;
+  }
+
+  .shell .ne-now-controls {
+    gap: 28px;
+    margin-top: 12px;
+  }
+
+  .shell .ne-now-button {
+    width: 68px;
+    height: 68px;
+  }
+
+  .shell .ne-now-button.primary {
+    width: 84px;
+    height: 84px;
+  }
+
+  .shell .ne-now-progress {
+    margin-top: 10px;
+  }
+
+  .shell .ne-now-extras {
+    margin-top: 4px;
+  }
 }
 
-.imm-play-btn:hover {
-  background: #f01438;
-  transform: scale(1.06);
-  box-shadow: 0 12px 34px rgba(230, 0, 38, 0.7);
-}
-
-/* ==========================================================================
-   Responsive Adaptations
-   ========================================================================== */
-@media (max-width: 760px) {
-  .hero-cards-section {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .recent-tiles-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .netease-left-panel {
-    width: 280px;
-    min-width: 260px;
-  }
-
-  .turntable-assembly {
-    width: 180px;
-    height: 180px;
-  }
-
-  .turntable-vinyl-body {
-    width: 160px;
-    height: 160px;
-  }
-
-  .turntable-disc-label {
-    width: 72px;
-    height: 72px;
-  }
-
-  .turntable-tonearm {
-    width: 72px;
-    height: 130px;
+@media (prefers-reduced-motion: reduce) {
+  .shell .netease-app *,
+  .shell .ne-now,
+  .shell .ne-now * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
