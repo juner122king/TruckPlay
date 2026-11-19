@@ -50,6 +50,44 @@ describe('the saved Settings choices', () => {
     expect(useCabin.getState().albumArt).toBe(true)
     expect(useCabin.getState().hours24).toBe(true)
     expect(useCabin.getState().appearanceMode).toBe('dark')
+    expect(useCabin.getState().mapAutoZoom).toBe(true)
+    expect(useCabin.getState().mapZoomIntensity).toBe('standard')
+    expect(useCabin.getState().mapJunctionZoom).toBe(true)
+  })
+
+  it('restores valid map camera preferences and rejects invalid values', async () => {
+    vi.stubGlobal(
+      'localStorage',
+      savedStorage(
+        {
+          mapAutoZoom: false,
+          mapZoomIntensity: 'dynamic',
+          mapJunctionZoom: false,
+        },
+        3,
+      ),
+    )
+    const { useCabin } = await import('./store')
+    expect(useCabin.getState().mapAutoZoom).toBe(false)
+    expect(useCabin.getState().mapZoomIntensity).toBe('dynamic')
+    expect(useCabin.getState().mapJunctionZoom).toBe(false)
+
+    vi.resetModules()
+    vi.stubGlobal(
+      'localStorage',
+      savedStorage(
+        {
+          mapAutoZoom: 'yes',
+          mapZoomIntensity: 'ultra',
+          mapJunctionZoom: 1,
+        },
+        3,
+      ),
+    )
+    const { useCabin: reloaded } = await import('./store')
+    expect(reloaded.getState().mapAutoZoom).toBe(true)
+    expect(reloaded.getState().mapZoomIntensity).toBe('standard')
+    expect(reloaded.getState().mapJunctionZoom).toBe(true)
   })
 })
 

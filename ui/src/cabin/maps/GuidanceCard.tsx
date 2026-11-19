@@ -8,7 +8,8 @@ import { guidanceFor } from './guidanceDistance'
 import { LaneRibbon } from './LaneRibbon'
 import { useLaneHint } from './useLaneHint'
 import { ManeuverGlyph } from './ManeuverGlyph'
-import { nearestTrafficLightAhead, trafficLightStateClass } from './trafficLights'
+import { TrafficLightPillView } from './TrafficLightPill'
+import { useUpcomingTrafficLight } from './useTrafficLight'
 
 /** A step as the store can compare it: the maneuver itself (the route's own object, the same from one
  * read to the next) or `'arrive'`. */
@@ -125,33 +126,28 @@ export function GuidanceCard({ variant }: { variant: 'widget' | 'banner' }) {
   const activeLanes = step?.kind === 'turn' && step.maneuver.node === lane.hint?.node ? lane.hint : null
   const current = useMemo(() => (step ? { key: keyOf(step), step, distance, then } : null), [step, distance, then])
   const { shown, leaving, closing } = useStepChange(current)
-  const thenShown = useKept(shown?.then ?? null)
-  const glyphSize = variant === 'widget' ? 62 : 70
+  const glyphSize = variant === 'widget' ? 62 : 54
+  const activeTurn = shown?.step.kind === 'turn' ? shown.step.maneuver.turn : null
 
   const card = shown && (
     <article
       className={`guidance guidance-${variant} glass${variant === 'widget' ? ' widget' : ''}${closing ? ' closing' : ''}`}
       aria-label={`${shown.distance} ${instructionFor(shown.step, text)}`}
     >
-      <div className="guidance-steps">
-        {leaving && (
-          <div key={`out:${leaving.key}`} className="guidance-step leaving" aria-hidden>
-            <StepLines shown={leaving} size={glyphSize} text={text} />
-          </div>
-        )}
-        <div key={shown.key} className={`guidance-step${leaving ? ' entering' : ''}`}>
-          <StepLines shown={shown} size={glyphSize} text={text} />
-        </div>
-      </div>
-      {!closing && activeLanes && <LaneRibbon hint={activeLanes} />}
-      <div className={`guidance-then-slot${shown.then && !closing ? ' open' : ''}`}>
-        <div className="guidance-then-clip">
-          <div className="guidance-then">
-            <span>{text.then}</span>
-            {thenShown && <ManeuverGlyph step={thenShown} size={30} />}
+      <div className="guidance-primary">
+        <div className="guidance-steps">
+          {leaving && (
+            <div key={`out:${leaving.key}`} className="guidance-step leaving" aria-hidden>
+              <StepLines shown={leaving} size={glyphSize} text={text} />
+            </div>
+          )}
+          <div key={shown.key} className={`guidance-step${leaving ? ' entering' : ''}`}>
+            <StepLines shown={shown} size={glyphSize} text={text} />
           </div>
         </div>
+        {!closing && activeLanes && <LaneRibbon hint={activeLanes} activeTurn={activeTurn} />}
       </div>
+      <GuidanceFooter thenStep={shown.then} closing={closing} variant={variant} />
     </article>
   )
   // On the Dashboard the card sits in a slot that grows into the column as it comes and shrinks as it goes.
@@ -161,39 +157,50 @@ export function GuidanceCard({ variant }: { variant: 'widget' | 'banner' }) {
   return card
 }
 
-function useUpcomingTrafficLight(): { stateClass: string; countdown: number } | null {
-  const semaphores = useLive((state) => state.semaphores)
-  const telemetry = useLive((state) => state.telemetry)
-  const route = useLive((state) => state.route)
-  const routeNext = useLive((state) => state.routeNext)
-  const nearest = useMemo(
-    () => nearestTrafficLightAhead(semaphores, telemetry, route, routeNext),
-    [semaphores, telemetry, route, routeNext],
+function GuidanceFooter({
+  thenStep,
+  closing,
+  variant,
+}: {
+  thenStep: Step | null
+  closing: boolean
+  variant: 'widget' | 'banner'
+}) {
+  const text = useText()
+  const signal = useUpcomingTrafficLight()
+  const snapshot = useMemo(
+    () => (thenStep !== null || signal !== null ? { thenStep, signal } : null),
+    [thenStep, signal],
   )
+  const kept = useKept(snapshot)
+  const active = snapshot ?? kept
+  const open = !closing && snapshot !== null
 
-  if (!nearest) return null
-
-  const s = nearest.semaphore
-  return {
-    stateClass: trafficLightStateClass(s.state),
-    countdown: Math.max(0, Math.ceil(s.countdown)),
-  }
+  return (
+    <div className={`guidance-footer-slot guidance-then-slot${open ? ' open' : ''}`}>
+      <div className="guidance-footer-clip guidance-then-clip">
+        <div className="guidance-footer">
+          {active?.thenStep && (
+            <div className="guidance-then">
+              <span>{text.then}</span>
+              <ManeuverGlyph step={active.thenStep} size={variant === 'widget' ? 22 : 24} />
+            </div>
+          )}
+          {active?.signal && <TrafficLightPillView signal={active.signal} compact={variant === 'widget'} />}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function StepLines({ shown, size, text }: { shown: Shown; size: number; text: Strings }) {
-  const signal = useUpcomingTrafficLight()
+  const isNow = shown.distance === text.now
   return (
     <>
       <ManeuverGlyph step={shown.step} size={size} />
-      <div>
-        <div className="guidance-distance-row">
-          <div className="guidance-distance">{shown.distance}</div>
-          {signal && (
-            <div className={`guidance-signal ${signal.stateClass}`}>
-              <span className="guidance-signal-dot" />
-              {signal.countdown > 0 && <span className="guidance-signal-timer">{signal.countdown}s</span>}
-            </div>
-          )}
+      <div className="guidance-copy">
+        <div className="guidance-distance" data-now={isNow || undefined}>
+          {shown.distance}
         </div>
         <div className="guidance-instruction">{instructionFor(shown.step, text)}</div>
       </div>

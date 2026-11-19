@@ -484,6 +484,14 @@ export const strings: Strings = {
     high: '高音',
     resetEqualizer: '重置',
     back: '返回',
+    off: '关闭',
+    mapDynamicView: '随车速动态视角',
+    mapDynamicViewFooter:
+      '仅在「地图」App 中生效：随车速升高自动拉远地图并抬高前瞻视角，低速时自动拉近以便观察细节；仪表板小地图保持原有缩放方式。',
+    mapJunctionZoom: '临近路口自动拉近',
+    mapZoomIntensity: '缩放幅度',
+    mapZoomIntensityFooter: '柔和变化幅度较小；标准适合日常驾驶；宽广在高速行驶时能看到更远的路线与立交。',
+    zoomIntensities: { gentle: '柔和', standard: '标准', dynamic: '宽广' },
   },
   apps: {
     maps: '地图',

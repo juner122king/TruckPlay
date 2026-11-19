@@ -2,33 +2,34 @@ import { useEffect, useState } from 'react'
 import { SearchGlyph } from '../keyboard/glyphs'
 import { useKeyboard } from '../keyboard/store'
 import { TextField } from '../keyboard/TextField'
-import { useLive } from '../state/store'
 import { useText } from '../state/text'
 import { Destinations } from './Destinations'
-import { guidanceFor } from './guidanceDistance'
-import { recentreLiveMap, useMapBrowsing } from './liveMap'
 
 /** How long the word that the game took a change stays over the map, ms. */
 const CONFIRMATION_MS = 2500
-/** Must match the panel's closing animation in maps.css: how long it takes to shrink back, ms. */
+/** Must match the panel's closing animation in maps.css: how long it takes to slide away, ms. */
 const CLOSING_MS = 280
 const FIELD = 'map-search'
 
 /**
- * Maps' search, always at hand: a button over the map's top left, where CarPlay keeps it, or its top right
- * while a route is guided (the turn-by-turn banner has the left), since a route can still take more stops
- * (the game's waypoints, put in order by the game). It opens Destinations (Destinations.tsx) under the search
- * field: the panel grows out of the button, and shrinks back into it when it closes. The keyboard comes up when
- * the field is pressed, not with the panel (owner 2026-11-03).
- * A change the game takes closes it, with a word over the map.
+ * Maps' search drawer, toggled from the bottom-right dock: opens Destinations (Destinations.tsx) on the left
+ * beside the sidebar, where offered routes are framed clearly to its right (`panelCover` in liveMap.ts).
+ * The keyboard comes up when the field is pressed, not with the panel. A change the game takes closes it,
+ * with a confirmation pill over the map.
  */
-export function MapSearch() {
+export function MapSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
   const text = useText()
-  const [phase, setPhase] = useState<'closed' | 'open' | 'closing'>('closed')
+  const [phase, setPhase] = useState<'closed' | 'open' | 'closing'>(open ? 'open' : 'closed')
   const [query, setQuery] = useState('')
   const [confirmation, setConfirmation] = useState<{ text: string; id: number } | null>(null)
   const typing = useKeyboard((state) => state.field?.id === FIELD)
-  const guided = useLive((state) => guidanceFor(state) !== null)
+
+  if (open && phase !== 'open') setPhase('open')
+  if (!open && phase === 'open') setPhase('closing')
+
+  useEffect(() => {
+    if (!open) useKeyboard.getState().detach(FIELD)
+  }, [open])
 
   useEffect(() => {
     if (!confirmation) return
@@ -47,18 +48,13 @@ export function MapSearch() {
 
   const close = () => {
     useKeyboard.getState().detach(FIELD)
-    setPhase('closing')
+    onClose()
   }
-  // Grows from where its button is: the map's top left, or top right beside the turn-by-turn banner. Open, it
-  // stays on that side: Go hands the route to the game, whose route comes, goes and comes back as it takes it
-  // (the hand-over), and the panel jumped from side to side with it (owner 2026-10-21).
-  const [openedRight, setOpenedRight] = useState(false)
-  const side = openedRight ? ' right' : ''
 
   return (
     <>
-      {phase !== 'closed' ? (
-        <div className={`map-search glass${side}${typing ? ' typing' : ''}${phase === 'closing' ? ' closing' : ''}`}>
+      {phase !== 'closed' && (
+        <div className={`map-search glass${typing ? ' typing' : ''}${phase === 'closing' ? ' closing' : ''}`}>
           <div className="map-search-top">
             <TextField
               id={FIELD}
@@ -86,19 +82,6 @@ export function MapSearch() {
             />
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          className={guided ? 'map-search-button glass guided' : 'map-search-button glass'}
-          aria-label={text.search}
-          onClick={() => {
-            if (useMapBrowsing.getState().routeOverview) recentreLiveMap()
-            setOpenedRight(guided)
-            setPhase('open')
-          }}
-        >
-          <SearchGlyph />
-        </button>
       )}
       {confirmation && (
         <div key={confirmation.id} className="map-confirmation glass" role="status">

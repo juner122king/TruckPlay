@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useText } from '../state/text'
+import { SearchGlyph } from '../keyboard/glyphs'
 import { useLive } from '../state/store'
+import { useText } from '../state/text'
 import {
   followBearing,
   northUpLiveMap,
@@ -11,47 +12,145 @@ import {
 } from './liveMap'
 
 /**
- * The Maps app's buttons over the map, like CarPlay's: zoom in and out; the compass right over the zoom pair,
- * which turns the map north up; and the arrow, once the map has been moved away from the truck or turned
- * north up, which brings the chase view back. (The wheel, dragging and right-dragging do the same with the
- * mouse.)
+ * The Maps app's bottom-right corner dock: an always-visible icon-only re-centre target button stacked above a
+ * vertical view capsule ([Compass | + | -]) and a horizontal action capsule ([Search | Route Overview]).
  */
-export function MapControls() {
+export function MapControls({
+  searchOpen = false,
+  onToggleSearch,
+}: {
+  searchOpen?: boolean
+  onToggleSearch?: () => void
+}) {
   const browsing = useMapBrowsing((state) => state.browsing)
   const text = useText()
   const overview = useMapBrowsing((state) => state.routeOverview)
+  const overviewLocked = useMapBrowsing((state) => state.routeOverviewLocked)
+  const northUp = useMapBrowsing((state) => state.northUp)
   const hasRoute = useLive((state) => state.route !== null && (state.telemetry?.navigationDistance ?? 0) > 0)
   return (
-    <div className="map-controls">
+    <MapControlsView
+      browsing={browsing}
+      overview={overview}
+      overviewLocked={overviewLocked}
+      northUp={northUp}
+      hasRoute={hasRoute}
+      searchOpen={searchOpen}
+      labels={text}
+      onRecentre={recentreLiveMap}
+      onToggleSearch={onToggleSearch}
+      onOverview={overviewLiveRoute}
+      onNorthUp={northUpLiveMap}
+      onZoom={zoomLiveMap}
+    />
+  )
+}
+
+export function MapControlsView({
+  browsing,
+  overview,
+  overviewLocked = false,
+  northUp = false,
+  hasRoute,
+  searchOpen,
+  labels,
+  onRecentre,
+  onToggleSearch,
+  onOverview,
+  onNorthUp,
+  onZoom,
+}: {
+  browsing: boolean
+  overview: boolean
+  overviewLocked?: boolean
+  northUp?: boolean
+  hasRoute: boolean
+  searchOpen: boolean
+  labels: {
+    recentre: string
+    returnToNavigation: string
+    search: string
+    routeOverview: string
+    northUp: string
+    zoomIn: string
+    zoomOut: string
+  }
+  onRecentre?: () => void
+  onToggleSearch?: () => void
+  onOverview?: () => void
+  onNorthUp?: () => void
+  onZoom?: (direction: 1 | -1) => void
+}) {
+  const recentreLabel = overview ? labels.returnToNavigation : labels.recentre
+  const centred = !browsing && !overview
+  const lockedOverview = overview && overviewLocked
+  const overviewMode = !overview ? 'off' : lockedOverview ? 'locked' : 'timed'
+  return (
+    <div className="map-controls map-dock">
       <button
         type="button"
-        className={browsing ? 'map-control map-recentre glass shown' : 'map-control map-recentre glass'}
-        aria-label={overview ? text.returnToNavigation : text.recentre}
-        aria-hidden={!browsing}
-        tabIndex={browsing ? 0 : -1}
-        onClick={recentreLiveMap}
+        className={`map-control map-recentre-btn glass${centred ? ' centred' : ' off-center'}`}
+        aria-label={recentreLabel}
+        aria-pressed={centred}
+        onClick={onRecentre}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20.5 3.5 3.8 10.6c-.8.4-.7 1.6.2 1.8l6.6 1.1 1.1 6.6c.2.9 1.4 1 1.8.2Z" fill="currentColor" />
+          <circle cx="12" cy="12" r="6.5" />
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+          <circle className="map-recentre-core" cx="12" cy="12" r="2.5" />
         </svg>
       </button>
-      {hasRoute && (
-        <button
-          type="button"
-          className={`map-control map-overview glass${overview ? ' selected' : ''}`}
-          aria-label={text.routeOverview}
-          aria-pressed={overview}
-          onClick={overviewLiveRoute}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="5" cy="18" r="2" />
-            <circle cx="19" cy="6" r="2" />
-            <path d="M5 16v-4a3 3 0 0 1 3-3h8a3 3 0 0 0 3-3" />
-          </svg>
-        </button>
-      )}
-      <MapCompass label={text.northUp} />
-      <MapZoom />
+      <div className="map-dock-row">
+        <div className="map-action-bar glass">
+          <button
+            type="button"
+            className={`map-control map-dock-search${searchOpen ? ' selected' : ''}`}
+            aria-label={labels.search}
+            aria-expanded={searchOpen}
+            onClick={onToggleSearch}
+          >
+            <SearchGlyph />
+          </button>
+          {hasRoute && (
+            <>
+              <span className="map-dock-divider-v" aria-hidden />
+              <button
+                type="button"
+                className={`map-control map-overview${overview ? ' selected' : ''}${lockedOverview ? ' locked' : ''}`}
+                data-overview-mode={overviewMode}
+                aria-label={labels.routeOverview}
+                aria-pressed={overview}
+                onClick={onOverview}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="5" cy="18" r="2" />
+                  <circle cx="19" cy="6" r="2" />
+                  <path d="M5 16v-4a3 3 0 0 1 3-3h8a3 3 0 0 0 3-3" />
+                </svg>
+                {lockedOverview && (
+                  <span className="map-overview-lock" aria-hidden="true">
+                    <svg viewBox="0 0 16 16">
+                      <rect x="3.5" y="7.5" width="9" height="6.5" rx="1.6" />
+                      <path d="M5.5 7.5V5.3a2.5 2.5 0 0 1 5 0v2.2" />
+                    </svg>
+                  </span>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+        <div className="map-view-rail glass">
+          <MapCompass
+            label={labels.northUp}
+            embedded
+            northUp={!overview && northUp}
+            disabled={overview}
+            onClick={onNorthUp}
+          />
+          <span className="map-zoom-divider" aria-hidden />
+          <MapZoomButtons zoomInLabel={labels.zoomIn} zoomOutLabel={labels.zoomOut} onZoom={onZoom} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -91,17 +190,24 @@ export function DashboardMapControls() {
   )
 }
 
-/** Zoom in and out a step, a pair of buttons in one glass. */
-function MapZoom() {
-  const text = useText()
+/** Zoom in and out a step, shared by the navigation rail and the Dashboard's standalone glass pair. */
+function MapZoomButtons({
+  zoomInLabel,
+  zoomOutLabel,
+  onZoom = zoomLiveMap,
+}: {
+  zoomInLabel: string
+  zoomOutLabel: string
+  onZoom?: (direction: 1 | -1) => void
+}) {
   return (
-    <div className="map-zoom glass">
+    <>
       <button
         type="button"
         className="map-control"
         data-control="zoom-in"
-        aria-label={text.zoomIn}
-        onClick={() => zoomLiveMap(1)}
+        aria-label={zoomInLabel}
+        onClick={() => onZoom(1)}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 5v14M5 12h14" />
@@ -112,13 +218,23 @@ function MapZoom() {
         type="button"
         className="map-control"
         data-control="zoom-out"
-        aria-label={text.zoomOut}
-        onClick={() => zoomLiveMap(-1)}
+        aria-label={zoomOutLabel}
+        onClick={() => onZoom(-1)}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M5 12h14" />
         </svg>
       </button>
+    </>
+  )
+}
+
+/** Zoom in and out a step, a pair of buttons in one glass. */
+function MapZoom() {
+  const text = useText()
+  return (
+    <div className="map-zoom glass">
+      <MapZoomButtons zoomInLabel={text.zoomIn} zoomOutLabel={text.zoomOut} />
     </div>
   )
 }
@@ -128,7 +244,19 @@ function MapZoom() {
  * map as it turns with the truck (owner 2026-10-21: the north was nowhere to be seen). Turned in place, not
  * re-rendered, every time the map turns. Tapped, the map turns north up, seen from above.
  */
-function MapCompass({ label }: { label: string }) {
+function MapCompass({
+  label,
+  embedded = false,
+  northUp = false,
+  disabled = false,
+  onClick = northUpLiveMap,
+}: {
+  label: string
+  embedded?: boolean
+  northUp?: boolean
+  disabled?: boolean
+  onClick?: () => void
+}) {
   const dial = useRef<HTMLDivElement>(null)
   useEffect(
     () =>
@@ -138,7 +266,14 @@ function MapCompass({ label }: { label: string }) {
     [],
   )
   return (
-    <button type="button" className="map-compass glass" aria-label={label} onClick={northUpLiveMap}>
+    <button
+      type="button"
+      className={`${embedded ? 'map-compass' : 'map-compass glass'}${northUp ? ' north-up' : ''}`}
+      aria-label={label}
+      aria-pressed={northUp}
+      disabled={disabled}
+      onClick={onClick}
+    >
       <div ref={dial} className="map-compass-dial">
         <svg viewBox="0 0 44 44" aria-hidden="true">
           <circle className="map-compass-ring" cx="22" cy="22" r="18" />

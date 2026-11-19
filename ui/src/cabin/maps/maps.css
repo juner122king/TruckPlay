@@ -149,36 +149,6 @@
   opacity: 0.18;
 }
 
-/* Round, and blue like the puck it brings back. */
-.map-recentre {
-  border-radius: 50%;
-  opacity: 0;
-  scale: 0.6;
-  pointer-events: none;
-  transition:
-    opacity 220ms var(--motion-ease),
-    scale 300ms var(--motion-ease),
-    background-color 160ms var(--motion-ease);
-}
-
-.map-controls .map-recentre {
-  color: #0a84ff;
-}
-
-.map-recentre.shown {
-  opacity: 1;
-  scale: 1;
-  pointer-events: auto;
-}
-
-.map-recentre.shown:active {
-  scale: 0.92;
-}
-
-.map-recentre svg {
-  stroke: none;
-}
-
 /* The compass (MapControls.tsx), right over the zoom pair as CarPlay's Maps has it, as wide and of the same
    glass: its dial turned against the map (red mark and N to the north); tapped, the map turns north up. */
 .map-compass {
@@ -191,11 +161,11 @@
 }
 
 .map-compass:hover {
-  background: rgb(255 255 255 / 0.78);
+  background: rgb(255 255 255 / 0.1);
 }
 
-.appearance-dark .map-compass:hover {
-  background: rgb(32 36 44 / 0.82);
+.appearance-light .map-compass:hover {
+  background: rgb(0 0 0 / 0.06);
 }
 
 .map-compass:active {
@@ -225,6 +195,26 @@
   font-size: 15.5px;
   font-weight: 760;
   letter-spacing: -0.02em;
+}
+
+.map-compass.north-up .map-compass-ring {
+  stroke: #0a84ff;
+  stroke-width: 1.75;
+  opacity: 0.85;
+}
+
+.map-compass.north-up text {
+  fill: #409cff;
+}
+
+.appearance-light .map-compass.north-up text {
+  fill: #007aff;
+}
+
+.map-compass:disabled {
+  opacity: 0.38;
+  pointer-events: none;
+  cursor: default;
 }
 
 /* The end of the GPS route: a red pin with a flag, as Apple's destination. */
@@ -324,6 +314,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.guidance-distance[data-now='true'] {
+  color: #b7ffec;
+  text-shadow: 0 0 12px rgb(110 231 183 / 0.35);
+}
+
 .guidance-instruction {
   font-size: calc(24px * var(--text-scale, 1));
   font-weight: 600;
@@ -331,8 +326,8 @@
   margin-top: 2px;
 }
 
-/* The step right after, close behind: under the first, as on CarPlay, opening and closing in place (a grid
-   row growing from nothing to the row's height, the row clipped while it does). */
+/* Footer strip (then step + upcoming traffic signal), opening and closing smoothly in one shared compact row. */
+.guidance-footer-slot,
 .guidance-then-slot {
   display: grid;
   grid-template-rows: 0fr;
@@ -342,51 +337,56 @@
     opacity var(--motion-spring-duration) var(--motion-ease);
 }
 
+.guidance-footer-slot.open,
 .guidance-then-slot.open {
   grid-template-rows: 1fr;
   opacity: 1;
 }
 
+.guidance-footer-clip,
 .guidance-then-clip {
   min-height: 0;
   overflow: hidden;
 }
 
+.guidance-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .guidance-then {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px solid rgb(255 255 255 / 0.2);
-  font-size: calc(21px * var(--text-scale, 1));
+  gap: 7px;
+  font-size: clamp(14px, calc(15.5px * var(--text-scale, 1)), 21px);
   font-weight: 640;
   color: rgb(235 252 250 / 0.92);
+  white-space: nowrap;
 }
 
-/* In the Maps app: a banner over the map's top left. */
+/* In the Maps app: balanced adaptive banner over the map's top left. */
 .guidance-banner {
   position: absolute;
-  left: 22px;
-  top: 22px;
-  max-width: min(520px, 56%);
-  padding: 18px 24px;
-  border-radius: 30px;
+  left: var(--content-left);
+  top: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  width: fit-content;
+  min-width: 284px;
+  max-width: min(416px, calc(100% - var(--content-left) - var(--edge) - 210px));
+  padding: 0;
+  border-radius: 24px;
+  overflow: clip;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   box-shadow:
     inset 0 1.5px 0 var(--glass-rim),
     inset 0 -1px 0 rgb(255 255 255 / 0.08),
     0 12px 32px rgb(0 0 0 / 0.32);
 }
-.map-navigation .guidance-banner {
-  left: var(--content-left);
-  top: calc(var(--edge) + var(--nav-corner-inset, 8px));
-  max-width: min(500px, calc(100% - var(--content-left) - var(--edge) - 210px));
-}
 
-/* Search (MapSearch.tsx): a round button over the map, opening the search panel. Dense glass matching map controls. */
-.map-tile .map-search-button,
+/* Search drawer (MapSearch.tsx): dense glass matching map controls, opened from the bottom-right dock. */
 .map-tile .map-search {
   position: absolute;
   color: #fff;
@@ -394,60 +394,9 @@
   backdrop-filter: blur(28px) saturate(180%);
 }
 
-.appearance-light .map-tile .map-search-button,
 .appearance-light .map-tile .map-search {
   color: #14161a;
   background: rgb(255 255 255 / 0.84);
-}
-
-.map-tile .map-search-button {
-  left: 22px;
-  top: 22px;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.22),
-    inset 0 -1px 0 rgb(255 255 255 / 0.06),
-    var(--shadow-raised-large);
-  transition:
-    background-color 160ms var(--motion-ease),
-    scale 150ms var(--motion-ease);
-}
-
-.appearance-light .map-tile .map-search-button {
-  box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.88),
-    var(--shadow-raised-large);
-}
-
-.map-tile .map-search-button.guided {
-  left: auto;
-  right: 22px;
-}
-
-.map-tile .map-search-button svg {
-  width: 30px;
-  height: 30px;
-  transition: scale 150ms var(--motion-ease);
-}
-
-.map-tile .map-search-button:hover {
-  background: rgb(32 36 44 / 0.82);
-}
-
-.appearance-light .map-tile .map-search-button:hover {
-  background: rgb(255 255 255 / 0.94);
-}
-
-.map-tile .map-search-button:active {
-  scale: 0.93;
-}
-
-.map-tile .map-search-button:active svg {
-  scale: 0.92;
 }
 
 .map-tile .map-search {
@@ -470,11 +419,15 @@
   left: var(--content-left);
   top: var(--edge);
   height: calc(100% - var(--edge) * 2);
+  width: min(460px, calc(100% - var(--content-left) - var(--edge) * 2));
 }
 
 /* Offering routes (Directions), narrower: the map shows them all beside it (liveMap.ts frames them there). */
 .map-tile .map-search:has(.directions) {
   width: 400px;
+}
+.map-navigation .map-search:has(.directions) {
+  width: min(380px, calc(100% - var(--content-left) - var(--edge) * 2));
 }
 
 .appearance-light .map-tile .map-search {
@@ -870,51 +823,30 @@
   }
 }
 
-/* Motion (Destinations): the panel grows out of its button and shrinks back into it; a deeper view slides in
-   from the right, a shallower one from the left; a press gives a little; the game's "no" arrives anew each
-   time. All on the cabin's own curve, and none where the player asks for less motion. */
+/* Motion (Destinations): the drawer slides cleanly in from the left edge beside the sidebar; a deeper view
+   slides in from the right, a shallower one from the left; a press gives a little; the game's "no" arrives
+   anew each time. All on the cabin's own curve, and none where the player asks for less motion. */
 .map-tile .map-search {
-  transform-origin: top left;
-  animation: search-panel-in 360ms var(--motion-ease) both;
-}
-
-.map-tile .map-search.right {
-  left: auto;
-  right: 16px;
-  transform-origin: top right;
-}
-.map-navigation .map-search.right {
-  left: auto;
-  right: var(--edge);
+  transform-origin: left center;
+  animation: search-drawer-in 320ms var(--motion-ease) both;
 }
 
 .map-tile .map-search.closing {
-  animation: search-panel-out 280ms var(--motion-ease) both;
+  animation: search-drawer-out 260ms var(--motion-ease) both;
   pointer-events: none;
 }
 
-@keyframes search-panel-in {
+@keyframes search-drawer-in {
   from {
     opacity: 0;
-    scale: 0.35;
+    transform: translateX(-24px) scale(0.97);
   }
 }
 
-@keyframes search-panel-out {
+@keyframes search-drawer-out {
   to {
     opacity: 0;
-    scale: 0.35;
-  }
-}
-
-.map-tile .map-search-button {
-  animation: search-button-in 320ms var(--motion-ease) both;
-}
-
-@keyframes search-button-in {
-  from {
-    opacity: 0;
-    scale: 0.6;
+    transform: translateX(-20px) scale(0.97);
   }
 }
 
@@ -998,7 +930,6 @@
 @media (prefers-reduced-motion: reduce) {
   .map-tile .map-search,
   .map-tile .map-search.closing,
-  .map-tile .map-search-button,
   .destinations-view.forward,
   .destinations-view.back,
   .destination-problem,
@@ -1019,76 +950,96 @@
   transition-duration: 900ms;
 }
 
-/* Realistic 3-hole vertical traffic light with countdown box (Apple / AutoNavi style) */
+/* Compact unified on-map traffic light capsule: root marker stays unstyled in transform so MapLibre tracks 1:1. */
 .traffic-light-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
   pointer-events: none;
   user-select: none;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  transform: translate(-50%, -50%);
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
   z-index: 10;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.65));
-}
-
-/* Left: countdown timer box */
-.traffic-light-timer-box {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  height: 38px;
-  padding: 0 9px;
-  border-radius: 9px;
-  background: rgba(16, 20, 26, 0.95);
-  border: 3px solid #34c759;
-  box-sizing: border-box;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-
-.traffic-light-timer {
-  font-size: 23px;
-  font-weight: 900;
-  line-height: 1;
-  color: #ffffff;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
-/* Right: 3-hole traffic light housing */
+.traffic-light-badge.traffic-green {
+  --signal-accent: #34c759;
+  --signal-text: #5ee394;
+}
+
+.traffic-light-badge.traffic-yellow {
+  --signal-accent: #ff9f0a;
+  --signal-text: #ffd426;
+}
+
+.traffic-light-badge.traffic-red {
+  --signal-accent: #ff3b30;
+  --signal-text: #ff6961;
+}
+
+.traffic-light-badge.traffic-red-amber {
+  --signal-accent: #ff9f0a;
+  --signal-text: #ffb340;
+}
+
+.traffic-light-pin {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 3px 9px 4px 5px;
+  border-radius: 12px;
+  background: rgb(16 20 26 / 0.93);
+  border: 1.5px solid color-mix(in srgb, var(--signal-accent, #ffffff) 62%, rgb(255 255 255 / 0.22));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 4px 12px rgb(0 0 0 / 0.45);
+  box-sizing: border-box;
+}
+
+.appearance-light .traffic-light-pin {
+  background: rgb(20 24 30 / 0.94);
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.94),
+    0 4px 12px rgb(0 0 0 / 0.26);
+}
+
+.traffic-light-badge.no-timer .traffic-light-pin {
+  padding: 4px 6px;
+}
+
+.traffic-light-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: rgb(16 20 26 / 0.94);
+  border-right: 1.5px solid color-mix(in srgb, var(--signal-accent, #ffffff) 62%, rgb(255 255 255 / 0.22));
+  border-bottom: 1.5px solid color-mix(in srgb, var(--signal-accent, #ffffff) 62%, rgb(255 255 255 / 0.22));
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.appearance-light .traffic-light-pin::after {
+  background: rgb(20 24 30 / 0.94);
+}
+
 .traffic-light-housing {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  width: 25px;
-  height: 58px;
-  padding: 5px 3.5px;
-  border-radius: 13px;
-  background: #181b20;
-  border: 3px solid #ffffff;
+  width: 14px;
+  height: 24px;
+  padding: 2px;
+  border-radius: 7px;
+  background: rgb(0 0 0 / 0.65);
+  border: 1px solid rgb(255 255 255 / 0.16);
   box-sizing: border-box;
+  flex: none;
 }
 
 .traffic-lamp {
-  width: 12px;
-  height: 12px;
+  width: 5.5px;
+  height: 5.5px;
   border-radius: 50%;
   flex-shrink: 0;
   transition:
@@ -1096,305 +1047,701 @@
     box-shadow 0.2s ease;
 }
 
-/* Idle / off states */
 .traffic-lamp.lamp-red {
-  background-color: #441818;
+  background-color: #461919;
 }
 
 .traffic-lamp.lamp-yellow {
-  background-color: #443618;
+  background-color: #483716;
 }
 
 .traffic-lamp.lamp-green {
-  background-color: #163622;
-}
-
-/* Green light */
-.traffic-green .traffic-light-timer-box {
-  border-color: #34c759;
-  box-shadow: 0 0 10px rgba(52, 199, 89, 0.65);
+  background-color: #163a24;
 }
 
 .traffic-green .lamp-green {
   background-color: #34c759;
-  box-shadow:
-    0 0 8px #34c759,
-    0 0 16px rgba(52, 199, 89, 0.95);
-}
-
-/* Yellow / Amber light */
-.traffic-yellow .traffic-light-timer-box {
-  border-color: #ff9f0a;
-  box-shadow: 0 0 10px rgba(255, 159, 10, 0.65);
+  box-shadow: 0 0 6px rgb(52 199 89 / 0.9);
 }
 
 .traffic-yellow .lamp-yellow {
   background-color: #ff9f0a;
-  box-shadow:
-    0 0 8px #ff9f0a,
-    0 0 16px rgba(255, 159, 10, 0.95);
-}
-
-/* Red light */
-.traffic-red .traffic-light-timer-box {
-  border-color: #ff3b30;
-  box-shadow: 0 0 10px rgba(255, 59, 48, 0.65);
+  box-shadow: 0 0 6px rgb(255 159 10 / 0.9);
 }
 
 .traffic-red .lamp-red {
   background-color: #ff3b30;
-  box-shadow:
-    0 0 8px #ff3b30,
-    0 0 16px rgba(255, 59, 48, 0.95);
-}
-
-/* Red + Amber */
-.traffic-red-amber .traffic-light-timer-box {
-  border-color: #ff9f0a;
-  box-shadow: 0 0 10px rgba(255, 159, 10, 0.65);
+  box-shadow: 0 0 6px rgb(255 59 48 / 0.9);
 }
 
 .traffic-red-amber .lamp-red {
   background-color: #ff3b30;
-  box-shadow: 0 0 6px #ff3b30;
+  box-shadow: 0 0 5px #ff3b30;
 }
 
 .traffic-red-amber .lamp-yellow {
   background-color: #ff9f0a;
+  box-shadow: 0 0 5px #ff9f0a;
+}
+
+.traffic-light-timer-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+}
+
+.traffic-light-timer {
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1;
+  color: var(--signal-text, #ffffff);
+  letter-spacing: -0.03em;
+}
+
+.traffic-light-progress {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--signal-accent, #34c759);
+  transform-origin: left center;
+  opacity: 0.92;
+}
+
+.traffic-light-badge.urgent .traffic-light-pin {
+  animation: traffic-pin-urgent 900ms ease-in-out infinite;
+}
+
+@keyframes traffic-pin-urgent {
+  0%,
+  100% {
+    border-color: color-mix(in srgb, var(--signal-accent, #ffffff) 62%, rgb(255 255 255 / 0.22));
+  }
+  50% {
+    border-color: var(--signal-accent, #ffffff);
+    box-shadow:
+      0 0 12px color-mix(in srgb, var(--signal-accent, #ffffff) 55%, transparent),
+      0 4px 12px rgb(0 0 0 / 0.45);
+  }
+}
+
+/* Quantized HUD traffic light pill (TrafficLightPill.tsx): shared by guidance footer and free-drive capsule. */
+.traffic-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 5px 7px;
+  border-radius: 999px;
+  overflow: clip;
+  background: rgb(8 18 22 / 0.62);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  flex: none;
+}
+
+.traffic-pill.compact {
+  padding: 3px 8px 3px 5px;
+  gap: 5px;
+}
+
+.traffic-pill.traffic-green {
+  --pill-accent: #34c759;
+  --pill-text: #5ee394;
+}
+
+.traffic-pill.traffic-yellow {
+  --pill-accent: #ff9f0a;
+  --pill-text: #ffd426;
+}
+
+.traffic-pill.traffic-red {
+  --pill-accent: #ff3b30;
+  --pill-text: #ff6961;
+}
+
+.traffic-pill.traffic-red-amber {
+  --pill-accent: #ff9f0a;
+  --pill-text: #ffb340;
+}
+
+.traffic-pill-lamps {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 4.5px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.54);
+}
+
+.traffic-pill-lamp {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.traffic-pill-lamp.lamp-red {
+  background: #461919;
+}
+
+.traffic-pill-lamp.lamp-yellow {
+  background: #483716;
+}
+
+.traffic-pill-lamp.lamp-green {
+  background: #163a24;
+}
+
+.traffic-pill.traffic-green .traffic-pill-lamp.lamp-green {
+  background: #34c759;
+  box-shadow: 0 0 7px rgb(52 199 89 / 0.9);
+}
+
+.traffic-pill.traffic-yellow .traffic-pill-lamp.lamp-yellow {
+  background: #ff9f0a;
+  box-shadow: 0 0 7px rgb(255 159 10 / 0.9);
+}
+
+.traffic-pill.traffic-red .traffic-pill-lamp.lamp-red {
+  background: #ff3b30;
+  box-shadow: 0 0 7px rgb(255 59 48 / 0.9);
+}
+
+.traffic-pill.traffic-red-amber .traffic-pill-lamp.lamp-red {
+  background: #ff3b30;
+  box-shadow: 0 0 6px #ff3b30;
+}
+
+.traffic-pill.traffic-red-amber .traffic-pill-lamp.lamp-yellow {
+  background: #ff9f0a;
   box-shadow: 0 0 6px #ff9f0a;
 }
 
-/* Guidance card traffic light badge */
-.guidance-distance-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+.traffic-pill-timer {
+  font-size: clamp(14px, calc(16px * var(--text-scale, 1)), 22px);
+  font-weight: 800;
+  color: var(--pill-text, #ffffff);
+  letter-spacing: -0.02em;
 }
 
-.guidance-signal {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 13px 5px 10px;
-  border-radius: 9999px;
-  background: rgb(8 20 24 / 0.56);
-  border: 1.5px solid rgb(255 255 255 / 0.24);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  font-size: calc(21px * var(--text-scale, 1));
-  font-weight: 780;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
+.traffic-pill.compact .traffic-pill-timer {
+  font-size: clamp(13px, calc(14px * var(--text-scale, 1)), 19px);
+}
+
+.traffic-pill-distance {
+  font-size: clamp(12px, calc(13.5px * var(--text-scale, 1)), 18px);
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.74);
+}
+
+.traffic-pill-track {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  overflow: hidden;
+}
+
+.traffic-pill-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--pill-accent, #34c759);
+  transition: width 260ms linear;
+}
+
+.traffic-pill.urgent {
+  animation: traffic-pill-urgent 900ms ease-in-out infinite;
+}
+
+@keyframes traffic-pill-urgent {
+  0%,
+  100% {
+    border-color: rgb(255 255 255 / 0.18);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--pill-accent, #ffffff) 78%, #ffffff);
+    background: color-mix(in srgb, var(--pill-accent, #000000) 20%, rgb(8 18 22 / 0.78));
+  }
+}
+
+/* Free-driving standalone traffic light HUD in top-left corner when no route guidance is active. */
+.free-drive-signal {
+  position: absolute;
+  left: var(--content-left);
+  top: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  padding: 5px;
+  border-radius: 999px;
+  background: rgb(20 23 28 / 0.84);
+  animation: guidance-open var(--motion-spring-duration) var(--motion-ease) both;
+}
+
+.appearance-light .free-drive-signal {
+  background: rgb(255 255 255 / 0.88);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.16),
-    0 4px 12px rgb(0 0 0 / 0.28);
+    inset 0 1.5px 0 rgb(255 255 255 / 0.92),
+    var(--shadow-raised-large);
 }
 
-.guidance-signal-dot {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.free-drive-signal .traffic-pill {
+  background: transparent;
+  border-color: transparent;
+  padding: 3px 9px 4px 5px;
 }
 
-.guidance-signal.traffic-green .guidance-signal-dot {
-  background-color: #34c759;
-  box-shadow:
-    0 0 8px #34c759,
-    0 0 16px rgb(52 199 89 / 0.9);
+.appearance-light .free-drive-signal .traffic-pill.traffic-green {
+  --pill-text: #0e873d;
 }
 
-.guidance-signal.traffic-yellow .guidance-signal-dot {
-  background-color: #ff9f0a;
-  box-shadow:
-    0 0 8px #ff9f0a,
-    0 0 16px rgb(255 159 10 / 0.9);
+.appearance-light .free-drive-signal .traffic-pill.traffic-yellow {
+  --pill-text: #b26200;
 }
 
-.guidance-signal.traffic-red .guidance-signal-dot {
-  background-color: #ff3b30;
-  box-shadow:
-    0 0 8px #ff3b30,
-    0 0 16px rgb(255 59 48 / 0.9);
+.appearance-light .free-drive-signal .traffic-pill.traffic-red {
+  --pill-text: #d12c22;
 }
 
-.guidance-signal.traffic-red-amber .guidance-signal-dot {
-  background: linear-gradient(135deg, #ff3b30 50%, #ff9f0a 50%);
-  box-shadow:
-    0 0 8px #ff9f0a,
-    0 0 16px rgb(255 159 10 / 0.9);
+.appearance-light .free-drive-signal .traffic-pill.traffic-red-amber {
+  --pill-text: #b26200;
 }
 
-/* Navigation information hierarchy: highway-teal glass, recessed lane ribbon, quiet secondary step. */
+.appearance-light .free-drive-signal .traffic-pill-distance {
+  color: rgb(20 22 26 / 0.68);
+}
+
+.appearance-light .free-drive-signal .traffic-pill-track {
+  background: rgb(0 0 0 / 0.12);
+}
+
+/* Navigation information hierarchy: highway-teal glass, compact banner proportions, recessed lane deck, quiet footer. */
 .appearance-dark .guidance {
   --glass: linear-gradient(160deg, rgb(18 90 96 / 0.9) 0%, rgb(10 60 66 / 0.95) 100%);
   --glass-rim: rgb(172 228 226 / 0.28);
 }
-.guidance-instruction {
-  text-wrap: pretty;
-  overflow-wrap: anywhere;
-}
-.guidance-step > div {
+
+.guidance-copy {
   flex: 1;
   min-width: 0;
 }
+
+.guidance-banner .guidance-primary {
+  padding: 14px 19px;
+}
+
+.guidance-banner .guidance-step {
+  gap: 14px;
+}
+
+.guidance-banner .guidance-distance {
+  font-size: clamp(26px, calc(31px * var(--text-scale, 1)), 44px);
+  line-height: 1.06;
+}
+
+.guidance-instruction {
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+
+.guidance-banner .guidance-instruction {
+  font-size: clamp(16px, calc(18.5px * var(--text-scale, 1)), 25px);
+  line-height: 1.22;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: clip;
+}
+
+.guidance-banner .guidance-footer {
+  background: rgb(4 36 40 / 0.46);
+  border-top: 1px solid rgb(255 255 255 / 0.14);
+  padding: 8px 16px;
+}
+
+.guidance-widget .guidance-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(255 255 255 / 0.2);
+}
+
+.guidance-widget .guidance-footer .guidance-then {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  font-size: calc(20px * var(--text-scale, 1));
+}
+
 .lane-guidance {
   display: flex;
   align-items: stretch;
   justify-content: center;
   gap: 2px;
-  background: rgb(0 22 26 / 0.34);
+  background: rgb(0 20 24 / 0.38);
   box-shadow:
     inset 0 1px 2px rgb(0 0 0 / 0.28),
     inset 0 0 0 1px rgb(255 255 255 / 0.1);
-  border-radius: 18px;
-  padding: 7px 10px;
-  margin-top: 14px;
+  border-radius: 14px;
+  padding: 6px 8px;
+  margin-top: 10px;
 }
+
 .lane-guidance-lane {
   position: relative;
-  color: rgb(207 238 238 / 0.34);
-  padding: 3px 8px 6px;
-  flex: 0 1 64px;
-  min-width: 0;
-  border-radius: 11px;
+  color: rgb(220 246 244 / 0.46);
+  padding: 3px 6px 6px;
+  flex: 0 1 52px;
+  min-width: 28px;
+  border-radius: 10px;
   transition:
     background-color 180ms var(--motion-ease),
     color 180ms var(--motion-ease);
 }
+
 .lane-guidance-lane + .lane-guidance-lane::before {
   content: '';
   position: absolute;
   left: -1.5px;
   top: 18%;
   bottom: 18%;
-  border-left: 1px dashed rgb(210 242 242 / 0.16);
+  border-left: 1px dashed rgb(210 242 242 / 0.18);
 }
+
 .lane-guidance-lane svg {
   display: block;
   width: 100%;
-  max-width: 48px;
-  height: 44px;
+  max-width: 38px;
+  height: 32px;
   margin: auto;
   fill: none;
   stroke: currentColor;
-  stroke-width: 3;
+  stroke-width: 2.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
 .lane-guidance-lane.recommended {
   color: #fff;
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.12) 0%, rgb(158 245 223 / 0.18) 100%);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.14) 0%, rgb(52 211 153 / 0.24) 100%);
+  box-shadow: inset 0 0 0 1px rgb(158 245 223 / 0.38);
 }
+
 .lane-guidance-lane.recommended svg {
-  stroke-width: 4;
+  stroke-width: 4.2;
   filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.28));
 }
+
+.lane-guidance-lane.recommended .lane-arrow-secondary {
+  opacity: 0.38;
+  stroke-width: 2.8;
+}
+
+.lane-guidance-lane.recommended .lane-arrow-primary {
+  opacity: 1;
+  stroke-width: 4.4;
+}
+
 .lane-recommended-mark {
   position: absolute;
-  width: 18px;
-  height: 3.5px;
+  width: 20px;
+  height: 3px;
   bottom: 2px;
-  left: calc(50% - 9px);
+  left: calc(50% - 10px);
   border-radius: 2px;
-  background: #9ef5df;
-  box-shadow: 0 0 8px rgb(158 245 223 / 0.65);
+  background: #6ee7b7;
+  box-shadow: 0 0 8px rgb(110 231 183 / 0.72);
 }
+
 .guidance-widget .lane-guidance {
   margin-top: 10px;
   padding: 5px 8px;
 }
+
 .guidance-widget .lane-guidance-lane svg {
-  height: 32px;
+  height: 30px;
 }
+
 .guidance-widget .guidance-distance {
   font-size: calc(36px * var(--text-scale, 1));
 }
+
 .guidance-widget .guidance-instruction {
   font-size: calc(22px * var(--text-scale, 1));
 }
-.map-navigation .map-controls {
+
+/* Unified bottom-right corner dock (MapControls.tsx in navigation mode). */
+.map-navigation .map-controls.map-dock {
   right: calc(var(--edge) + var(--nav-corner-inset, 8px));
   bottom: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  align-items: flex-end;
+  gap: 10px;
 }
-.map-navigation .map-search-button,
-.map-navigation .map-search-button.guided {
-  left: auto;
-  right: calc(var(--edge) + var(--nav-corner-inset, 8px) + 78px);
-  top: auto;
-  bottom: calc(var(--edge) + var(--nav-corner-inset, 8px));
+
+.map-navigation .map-recentre-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  transition:
+    background-color 180ms var(--motion-ease),
+    color 180ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease),
+    scale 150ms var(--motion-ease);
 }
-.map-controls .map-overview.selected {
+
+.map-navigation .map-recentre-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.1;
+}
+
+.map-navigation .map-recentre-btn .map-recentre-core {
+  stroke: none;
+  fill: currentColor;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 180ms var(--motion-ease),
+    scale 180ms var(--motion-ease);
+}
+
+.map-navigation .map-recentre-btn.centred {
+  color: #409cff;
+  box-shadow:
+    inset 0 0 0 1.5px rgb(10 132 255 / 0.55),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.22),
+    var(--shadow-raised-large);
+}
+
+.appearance-light .map-navigation .map-recentre-btn.centred {
+  color: #007aff;
+  box-shadow:
+    inset 0 0 0 1.5px rgb(0 122 255 / 0.45),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.88),
+    var(--shadow-raised-large);
+}
+
+.map-navigation .map-recentre-btn.centred:hover {
+  background: rgb(28 33 42 / 0.8);
+}
+
+.appearance-light .map-navigation .map-recentre-btn.centred:hover {
+  background: rgb(255 255 255 / 0.94);
+}
+
+.map-navigation .map-recentre-btn.off-center {
+  color: rgb(255 255 255 / 0.72);
+}
+
+.appearance-light .map-navigation .map-recentre-btn.off-center {
+  color: rgb(20 22 26 / 0.66);
+}
+
+.map-navigation .map-recentre-btn.off-center .map-recentre-core {
+  opacity: 0;
+  scale: 0.35;
+}
+
+.map-navigation .map-recentre-btn.off-center:hover {
+  color: #fff;
+  background: rgb(32 36 44 / 0.82);
+}
+
+.appearance-light .map-navigation .map-recentre-btn.off-center:hover {
+  color: #14161a;
+  background: rgb(255 255 255 / 0.94);
+}
+
+.map-dock-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.map-action-bar {
+  display: flex;
+  align-items: center;
+  border-radius: 25px;
+  overflow: hidden;
+}
+
+.map-dock-divider-v {
+  width: 1.5px;
+  height: 26px;
+  background: currentColor;
+  opacity: 0.16;
+  flex: none;
+}
+
+.map-view-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 25px;
+  overflow: hidden;
+}
+
+.map-navigation .map-dock :is(.map-action-bar, .map-view-rail) :is(.map-control, .map-compass) {
+  width: 50px;
+  height: 50px;
+  border-radius: 0;
+}
+
+.map-navigation .map-dock .map-control svg {
+  width: 24px;
+  height: 24px;
+}
+
+.map-navigation .map-dock .map-zoom-divider {
+  width: 28px;
+  height: 1.5px;
+}
+
+.map-controls .map-control.selected {
   background: #0a84ff;
   color: #fff;
 }
+
+.map-controls .map-control.selected:hover {
+  background: #1a8cff;
+}
+
+.map-controls .map-overview {
+  position: relative;
+}
+
+.map-controls .map-overview.locked {
+  background: #0066e6;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.55);
+}
+
+.map-controls .map-overview.locked:hover {
+  background: #0a74f5;
+}
+
+.map-navigation .map-dock .map-overview-lock {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffd60a;
+  color: #14161a;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.38);
+  pointer-events: none;
+}
+
+.map-navigation .map-dock .map-overview-lock svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+}
+
+.map-navigation .map-dock .map-overview-lock rect {
+  fill: currentColor;
+  stroke: none;
+}
+
 @container carplay (max-height: 520px) {
-  .map-navigation .map-controls {
+  .map-navigation .map-controls.map-dock {
     gap: 8px;
     right: calc(var(--edge) + var(--nav-corner-inset, 6px));
     bottom: calc(var(--edge) + var(--nav-corner-inset, 6px));
   }
-  .map-navigation .map-control,
-  .map-navigation .map-compass {
-    width: 48px;
-    height: 48px;
+  .map-navigation .map-dock-row {
+    gap: 8px;
   }
-  .map-navigation .map-zoom {
-    border-radius: 24px;
+  .map-navigation .map-recentre-btn,
+  .map-navigation .map-dock :is(.map-action-bar, .map-view-rail) :is(.map-control, .map-compass) {
+    width: 44px;
+    height: 44px;
   }
-  .map-navigation .map-control svg {
+  .map-navigation .map-action-bar,
+  .map-navigation .map-view-rail {
+    border-radius: 22px;
+  }
+  .map-navigation .map-recentre-btn svg,
+  .map-navigation .map-dock .map-control svg {
+    width: 21px;
+    height: 21px;
+  }
+  .map-navigation .map-dock .map-overview-lock {
+    right: 4px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+  }
+  .map-navigation .map-dock .map-overview-lock svg {
+    width: 10px;
+    height: 10px;
+  }
+  .map-navigation .map-dock .map-zoom-divider {
     width: 24px;
-    height: 24px;
   }
   .map-navigation .guidance-banner {
     left: var(--content-left);
     top: calc(var(--edge) + var(--nav-corner-inset, 6px));
-    padding: 13px 18px;
-    max-width: min(440px, calc(100% - var(--content-left) - var(--edge) - 160px));
+    min-width: 236px;
+    max-width: min(344px, calc(100% - var(--content-left) - var(--edge) - 165px));
+    border-radius: 20px;
   }
-  .map-navigation .guidance-distance {
-    font-size: calc(32px * var(--text-scale, 1));
+  .map-navigation .guidance-banner .guidance-primary {
+    padding: 11px 15px;
   }
-  .map-navigation .guidance-instruction {
-    font-size: calc(20px * var(--text-scale, 1));
+  .map-navigation .guidance-banner .guidance-distance {
+    font-size: clamp(22px, calc(25px * var(--text-scale, 1)), 32px);
   }
-  .map-navigation .maneuver-glyph {
-    width: 50px;
-    height: 50px;
+  .map-navigation .guidance-banner .guidance-instruction {
+    font-size: clamp(14px, calc(16px * var(--text-scale, 1)), 21px);
+  }
+  .map-navigation .guidance-banner .maneuver-glyph {
+    width: 42px;
+    height: 42px;
   }
   .map-navigation .lane-guidance {
-    padding: 5px 8px;
-    margin-top: 9px;
+    padding: 4px 6px;
+    margin-top: 7px;
   }
   .map-navigation .lane-guidance-lane svg {
-    height: 30px;
+    height: 28px;
   }
-  .map-navigation .map-search-button,
-  .map-navigation .map-search-button.guided {
-    right: calc(var(--edge) + var(--nav-corner-inset, 6px) + 60px);
-    bottom: calc(var(--edge) + var(--nav-corner-inset, 6px));
-    width: 48px;
-    height: 48px;
+  .map-navigation .guidance-banner .guidance-footer {
+    padding: 6px 13px;
+  }
+  .map-navigation .free-drive-signal {
+    left: var(--content-left);
+    top: calc(var(--edge) + var(--nav-corner-inset, 6px));
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .guidance,
   .guidance-step,
-  .guidance-then-slot {
+  .guidance-footer-slot,
+  .guidance-then-slot,
+  .traffic-light-badge.urgent .traffic-light-pin,
+  .traffic-pill.urgent,
+  .traffic-pill-fill,
+  .free-drive-signal,
+  .map-recentre-btn,
+  .map-recentre-core {
     animation: none;
     transition: none;
   }
 }
 
-.guidance-banner {
-  width: min(500px, 54%);
-  box-sizing: border-box;
-}
-.map-overview {
-  border-radius: 50%;
-}
 .map-route-stop {
   display: grid;
   place-items: center;
@@ -1407,6 +1754,7 @@
   font-weight: 750;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
 }
+
 @container widgets (max-width: 300px) or (max-height: 520px) {
   .guidance-widget .lane-guidance {
     padding: 4px;
@@ -1417,6 +1765,10 @@
   }
   .guidance-widget .lane-guidance-lane svg {
     height: 27px;
+  }
+  .guidance-widget .guidance-footer {
+    margin-top: 6px;
+    padding-top: 6px;
   }
 }
 

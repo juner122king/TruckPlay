@@ -19,6 +19,7 @@ import {
 } from '../safari/safari'
 import { timeframeName } from '../safari/SafariApp'
 import { DASHBOARD_WIDGETS, type DashboardWidget, useCabin, useLive } from '../../state/store'
+import { MAP_ZOOM_INTENSITIES } from '../../maps/camera'
 import { useText } from '../../state/text'
 import { TEXT_SIZES } from '../../state/textSize'
 import {
@@ -79,6 +80,8 @@ function PageContent({ page }: { page: SettingsPage }) {
       return <TextSizePage />
     case 'dateTime':
       return <DateTimePage />
+    case 'maps':
+      return <MapsPage />
     case 'safari':
       return <SafariPage />
     case 'searchEngine':
@@ -99,9 +102,12 @@ function useWantedAppearance(): Appearance {
 function ListPage() {
   const text = useText()
   const open = useSettings((state) => state.open)
+  const mapsIcon = useAppIcon('maps')
   const safariIcon = useAppIcon('safari')
   const mode = useCabin((state) => state.appearanceMode)
   const wanted = useWantedAppearance()
+  const mapAutoZoom = useCabin((state) => state.mapAutoZoom)
+  const mapZoomIntensity = useCabin((state) => state.mapZoomIntensity)
   return (
     <Page title={text.apps.settings} list>
       <Group>
@@ -152,11 +158,49 @@ function ListPage() {
       <Group>
         <NavRow
           tile="transparent"
+          icon={<img className="settings-app-icon" src={mapsIcon} alt="" />}
+          label={text.apps.maps}
+          value={mapAutoZoom ? text.settings.zoomIntensities[mapZoomIntensity] : text.settings.off}
+          onOpen={() => open('maps')}
+        />
+        <NavRow
+          tile="transparent"
           icon={<img className="settings-app-icon" src={safariIcon} alt="" />}
           label={text.apps.safari}
           onOpen={() => open('safari')}
         />
       </Group>
+    </Page>
+  )
+}
+
+/** Maps' driving camera preferences: dynamic speed zoom & tilt, junction approach zoom-in, and intensity. */
+function MapsPage() {
+  const text = useText()
+  const autoZoom = useCabin((state) => state.mapAutoZoom)
+  const setAutoZoom = useCabin((state) => state.setMapAutoZoom)
+  const intensity = useCabin((state) => state.mapZoomIntensity)
+  const setIntensity = useCabin((state) => state.setMapZoomIntensity)
+  const junctionZoom = useCabin((state) => state.mapJunctionZoom)
+  const setJunctionZoom = useCabin((state) => state.setMapJunctionZoom)
+  return (
+    <Page title={text.apps.maps}>
+      <Group footer={text.settings.mapDynamicViewFooter}>
+        <SwitchRow label={text.settings.mapDynamicView} on={autoZoom} onToggle={setAutoZoom} />
+        {autoZoom && <SwitchRow label={text.settings.mapJunctionZoom} on={junctionZoom} onToggle={setJunctionZoom} />}
+      </Group>
+      {autoZoom && (
+        <Group header={text.settings.mapZoomIntensity} footer={text.settings.mapZoomIntensityFooter}>
+          {MAP_ZOOM_INTENSITIES.map((choice) => (
+            <CheckRow
+              key={choice}
+              label={text.settings.zoomIntensities[choice]}
+              on={intensity === choice}
+              onPick={() => setIntensity(choice)}
+            />
+          ))}
+        </Group>
+      )}
     </Page>
   )
 }

@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { formatGameTime, formatTripDistance, formatTripTime } from '../../shared/format'
 import { cabClock } from '../../shared/host'
 import { hvtMapMessage } from '../maps/blockedMap'
-import { useMapBrowsing } from '../maps/liveMap'
+import { recentreLiveMap, useMapBrowsing } from '../maps/liveMap'
 import { GuidanceCard } from '../maps/GuidanceCard'
 import { DashboardMapControls, MapControls } from '../maps/MapControls'
 import { MapSearch } from '../maps/MapSearch'
@@ -11,6 +12,7 @@ import { useMapData } from '../maps/mapData'
 import { MapCacheNotice } from '../maps/MapCacheNotice'
 import { RoadMap } from '../maps/RoadMap'
 import { SpeedDisplay } from '../maps/SpeedDisplay'
+import { FreeDriveTrafficLight } from '../maps/TrafficLightPill'
 import { useClockStyle } from '../state/hooks'
 import { useLive } from '../state/store'
 import { useText } from '../state/text'
@@ -31,6 +33,9 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
   const data = useMapData()
   const hvtMap = useLive((state) => state.hvtMap)
   const chosen = useLive((state) => state.chosenLanguage)
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  if ((!interactive || !data) && searchOpen) setSearchOpen(false)
 
   if (hvtMap) {
     return (
@@ -81,11 +86,20 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
           {interactive && (
             <div className="map-guidance-layer" aria-hidden={overview}>
               <GuidanceCard variant="banner" />
+              <FreeDriveTrafficLight />
             </div>
           )}
-          {data && interactive && <MapControls />}
+          {data && interactive && (
+            <MapControls
+              searchOpen={searchOpen}
+              onToggleSearch={() => {
+                if (!searchOpen && useMapBrowsing.getState().routeOverview) recentreLiveMap()
+                setSearchOpen((open) => !open)
+              }}
+            />
+          )}
           {data && !interactive && <DashboardMapControls />}
-          {data && interactive && <MapSearch />}
+          {data && interactive && <MapSearch open={searchOpen} onClose={() => setSearchOpen(false)} />}
           <MapCacheNotice />
         </div>
       </div>

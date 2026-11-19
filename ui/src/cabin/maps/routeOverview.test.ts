@@ -8,9 +8,10 @@ describe('current-route overview session', () => {
   function setup() {
     vi.useFakeTimers()
     const change = vi.fn(),
-      back = vi.fn()
-    const session = createOverviewSession(change, back)
-    return { session, change, back }
+      back = vi.fn(),
+      lockChange = vi.fn()
+    const session = createOverviewSession(change, back, lockChange)
+    return { session, change, back, lockChange }
   }
   it('hides cards on entry and restores navigation after exactly 15 seconds', () => {
     const { session, change, back } = setup()
@@ -53,6 +54,34 @@ describe('current-route overview session', () => {
     session.enter()
     vi.advanceTimersByTime(15000)
     expect(back).toHaveBeenCalledTimes(1)
+  })
+  it('supports locking overview so it never auto-returns until explicitly exited', () => {
+    const { session, change, back, lockChange } = setup()
+    expect(session.mode()).toBe('off')
+
+    session.enter()
+    expect(session.mode()).toBe('timed')
+    expect(session.locked()).toBe(false)
+    vi.advanceTimersByTime(10000)
+
+    session.lock()
+    expect(session.mode()).toBe('locked')
+    expect(session.locked()).toBe(true)
+    expect(lockChange).toHaveBeenLastCalledWith(true)
+
+    vi.advanceTimersByTime(60000)
+    session.touch()
+    session.hold(true)
+    session.hold(false)
+    vi.advanceTimersByTime(60000)
+    expect(back).not.toHaveBeenCalled()
+    expect(session.active()).toBe(true)
+
+    session.exit()
+    expect(session.mode()).toBe('off')
+    expect(session.locked()).toBe(false)
+    expect(lockChange).toHaveBeenLastCalledWith(false)
+    expect(change).toHaveBeenLastCalledWith(false)
   })
   it('handles long, looping, short and missing routes', () => {
     expect(routeBounds([])).toBeNull()

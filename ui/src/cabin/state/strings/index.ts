@@ -1,5 +1,6 @@
 import type { Sky } from '../../../shared/host'
 import type { ReturnKind } from '../../keyboard/layouts'
+import type { MapZoomIntensity } from '../../maps/camera'
 import type { TurnKind } from '../../maps/guidance'
 import type { DestinationKind } from '../../maps/places'
 
@@ -477,6 +478,14 @@ export interface Strings {
     high: string
     resetEqualizer: string
     back: string
+    off: string
+    /** Settings › Maps: speed-based dynamic zoom & pitch, junction zoom-in, and intensity presets. */
+    mapDynamicView: string
+    mapDynamicViewFooter: string
+    mapJunctionZoom: string
+    mapZoomIntensity: string
+    mapZoomIntensityFooter: string
+    zoomIntensities: Record<MapZoomIntensity, string>
   }
   /** Apps. */
   apps: Record<string, string>

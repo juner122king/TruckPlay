@@ -56,9 +56,11 @@ function spansOf(route: TrafficLightRoute): Spans {
 
 export interface TrafficLightElements {
   badge: HTMLDivElement
+  pin?: HTMLDivElement
   timerBox: HTMLDivElement
   timer: HTMLSpanElement
   housing: HTMLDivElement
+  progress?: HTMLSpanElement
 }
 
 export interface TrafficLightPool {
@@ -77,15 +79,11 @@ export function createTrafficLightPool(): TrafficLightPool {
     const badge = document.createElement('div')
     badge.className = 'traffic-light-badge'
 
-    // Left: timer box (rounded pill with colored border matching current signal)
-    const timerBox = document.createElement('div')
-    timerBox.className = 'traffic-light-timer-box'
+    // Inner visual pin wrapper: MapLibre owns transform on the outer `badge` root element.
+    const pin = document.createElement('div')
+    pin.className = 'traffic-light-pin'
 
-    const timer = document.createElement('span')
-    timer.className = 'traffic-light-timer'
-    timerBox.appendChild(timer)
-
-    // Right: 3-hole vertical traffic light housing (red, yellow, green)
+    // Left: slim 3-lamp vertical traffic light core (red, yellow, green)
     const housing = document.createElement('div')
     housing.className = 'traffic-light-housing'
 
@@ -102,17 +100,33 @@ export function createTrafficLightPool(): TrafficLightPool {
     housing.appendChild(lampYellow)
     housing.appendChild(lampGreen)
 
-    badge.appendChild(timerBox)
-    badge.appendChild(housing)
+    // Right: integrated countdown readout
+    const timerBox = document.createElement('div')
+    timerBox.className = 'traffic-light-timer-box'
+
+    const timer = document.createElement('span')
+    timer.className = 'traffic-light-timer'
+    timerBox.appendChild(timer)
+
+    // Bottom: thin phase progress indicator
+    const progress = document.createElement('span')
+    progress.className = 'traffic-light-progress'
+
+    pin.appendChild(housing)
+    pin.appendChild(timerBox)
+    pin.appendChild(progress)
+    badge.appendChild(pin)
 
     const marker = new maplibregl.Marker({
       element: badge,
+      anchor: 'bottom',
+      offset: [0, -8],
       pitchAlignment: 'viewport',
       rotationAlignment: 'viewport',
     })
 
     markers.push(marker)
-    elements.push({ badge, timerBox, timer, housing })
+    elements.push({ badge, pin, timerBox, timer, housing, progress })
   }
 
   return { markers, elements }
@@ -147,11 +161,11 @@ export function trafficLightStateClass(state: number): string {
  * Strictly adheres to in-cabin navigation standards: displays only the single nearest traffic light
  * ahead in the vehicle's travel corridor at any given time.
  */
-export function syncTrafficLights(map: maplibregl.Map, pool: TrafficLightPool) {
+export function syncTrafficLights(map: maplibregl.Map, pool: TrafficLightPool, hidden = false) {
   const { semaphores, telemetry, route, routeNext } = useLive.getState()
   const zoom = map.getZoom()
 
-  if (zoom < MIN_ZOOM || semaphores.length === 0 || !telemetry) {
+  if (hidden || zoom < MIN_ZOOM || semaphores.length === 0 || !telemetry) {
     removeUnused(pool, 0)
     return
   }
@@ -181,18 +195,27 @@ export function syncTrafficLights(map: maplibregl.Map, pool: TrafficLightPool) {
     return
   }
 
-  const { badge, timerBox, timer } = pool.elements[0]
+  const { badge, timerBox, timer, progress } = pool.elements[0]
   const marker = pool.markers[0]
 
   const stateClass = trafficLightStateClass(s.state)
-  badge.className = `traffic-light-badge ${stateClass}`
   const seconds = Math.max(0, Math.ceil(s.countdown))
+  const urgent = seconds > 0 && seconds <= 3
+  badge.className = `traffic-light-badge ${stateClass}${urgent ? ' urgent' : ''}${seconds <= 0 ? ' no-timer' : ''}`
   if (seconds > 0) {
     timerBox.style.display = 'flex'
     timer.textContent = `${seconds}`
   } else {
     timerBox.style.display = 'none'
     timer.textContent = ''
+  }
+
+  const hasProgress = seconds > 0 && Number.isFinite(s.duration) && s.duration > 0
+  const ratio = hasProgress ? Math.max(0, Math.min(1, s.countdown / s.duration)) : 0
+  badge.style?.setProperty?.('--signal-progress', ratio.toFixed(3))
+  if (progress) {
+    progress.style.display = hasProgress ? 'block' : 'none'
+    progress.style.transform = `scaleX(${ratio.toFixed(3)})`
   }
 
   marker.setLngLat(lngLat)

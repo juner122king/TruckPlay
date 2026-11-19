@@ -21,6 +21,7 @@ import {
   type TruckInfo,
 } from '../../shared/host'
 import type { Maneuver, TurnKind } from '../maps/guidance'
+import { isMapZoomIntensity, type MapZoomIntensity } from '../maps/camera'
 import { validLaneHints } from '../maps/laneGuidance'
 import {
   receiveAnswer as receiveAppleMusicAnswer,
@@ -108,6 +109,12 @@ interface CabinState {
   /** The Dashboard's map filling it while driving, the screen left alone (Settings › Dashboard; owner
    * 2026-11-03): off, the widgets always shown. */
   mapGrows: boolean
+  /** Speed-based dynamic zoom & tilt in the standalone Maps app (Settings › Maps). */
+  mapAutoZoom: boolean
+  /** How strongly the Maps app zooms and tilts with speed and junctions. */
+  mapZoomIntensity: MapZoomIntensity
+  /** Whether approaching an upcoming turn/junction pulls the Maps camera closer & more overhead. */
+  mapJunctionZoom: boolean
   /** The clock in 24-hour time (Settings › Date & Time; owner 2026-10-28): off, 12-hour with AM and PM. */
   hours24: boolean
   /** The apps' text size, a step of `TEXT_SIZES` (Settings › Appearance › Text Size). */
@@ -138,6 +145,9 @@ interface CabinState {
   setDashboardWidget(widget: DashboardWidget, shown: boolean): void
   setAlbumArt(shown: boolean): void
   setMapGrows(on: boolean): void
+  setMapAutoZoom(on: boolean): void
+  setMapZoomIntensity(intensity: MapZoomIntensity): void
+  setMapJunctionZoom(on: boolean): void
   setHours24(on: boolean): void
   setTextSize(step: number): void
   /** One band of the curve, set in Settings › Equalizer (choosing Custom): played by every player, and kept with
@@ -164,6 +174,9 @@ type Persisted = Pick<
   | 'dashboardWidgets'
   | 'albumArt'
   | 'mapGrows'
+  | 'mapAutoZoom'
+  | 'mapZoomIntensity'
+  | 'mapJunctionZoom'
   | 'hours24'
   | 'textSize'
   | 'brightness'
@@ -180,6 +193,9 @@ export const useCabin = create<CabinState>()(
       dashboardWidgets: ALL_WIDGETS,
       albumArt: true,
       mapGrows: true,
+      mapAutoZoom: true,
+      mapZoomIntensity: 'standard',
+      mapJunctionZoom: true,
       hours24: true,
       textSize: DEFAULT_TEXT_SIZE,
       oemMode: 'auto',
@@ -200,6 +216,9 @@ export const useCabin = create<CabinState>()(
         set((state) => ({ dashboardWidgets: { ...state.dashboardWidgets, [widget]: shown } })),
       setAlbumArt: (albumArt) => set({ albumArt }),
       setMapGrows: (mapGrows) => set({ mapGrows }),
+      setMapAutoZoom: (mapAutoZoom) => set({ mapAutoZoom }),
+      setMapZoomIntensity: (mapZoomIntensity) => set({ mapZoomIntensity }),
+      setMapJunctionZoom: (mapJunctionZoom) => set({ mapJunctionZoom }),
       setHours24: (hours24) => set({ hours24 }),
       setTextSize: (step) => set({ textSize: toTextSize(step) }),
       setEqualizerBand: (band, db) => {
@@ -253,6 +272,9 @@ export const useCabin = create<CabinState>()(
         dashboardWidgets: state.dashboardWidgets,
         albumArt: state.albumArt,
         mapGrows: state.mapGrows,
+        mapAutoZoom: state.mapAutoZoom,
+        mapZoomIntensity: state.mapZoomIntensity,
+        mapJunctionZoom: state.mapJunctionZoom,
         hours24: state.hours24,
         textSize: state.textSize,
         brightness: state.brightness,
@@ -289,6 +311,9 @@ function sanitize(stored: Partial<Persisted> | undefined): Partial<Persisted> {
   }
   if (typeof stored.albumArt === 'boolean') result.albumArt = stored.albumArt
   if (typeof stored.mapGrows === 'boolean') result.mapGrows = stored.mapGrows
+  if (typeof stored.mapAutoZoom === 'boolean') result.mapAutoZoom = stored.mapAutoZoom
+  if (isMapZoomIntensity(stored.mapZoomIntensity)) result.mapZoomIntensity = stored.mapZoomIntensity
+  if (typeof stored.mapJunctionZoom === 'boolean') result.mapJunctionZoom = stored.mapJunctionZoom
   if (typeof stored.hours24 === 'boolean') result.hours24 = stored.hours24
   if (stored.textSize !== undefined) result.textSize = toTextSize(stored.textSize)
   if (typeof stored.brightness === 'number' && Number.isFinite(stored.brightness)) {

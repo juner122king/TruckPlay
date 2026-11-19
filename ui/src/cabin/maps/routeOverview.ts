@@ -1,9 +1,16 @@
 import { AUTO_RECENTRE_MS } from './camera'
 import type { Point } from './route'
 
+export type OverviewMode = 'off' | 'timed' | 'locked'
+
 /** User activity only: camera animations and telemetry never extend this deadline. */
-export function createOverviewSession(onChange: (active: boolean) => void, onReturn: () => void) {
+export function createOverviewSession(
+  onChange: (active: boolean) => void,
+  onReturn: () => void,
+  onLockChange?: (locked: boolean) => void,
+) {
   let active = false
+  let locked = false
   let held = false
   let timer: ReturnType<typeof setTimeout> | undefined
   const cancel = () => {
@@ -13,13 +20,17 @@ export function createOverviewSession(onChange: (active: boolean) => void, onRet
   const exit = () => {
     cancel()
     held = false
+    if (locked) {
+      locked = false
+      onLockChange?.(false)
+    }
     if (!active) return
     active = false
     onChange(false)
   }
   const touch = () => {
     cancel()
-    if (active && !held)
+    if (active && !locked && !held)
       timer = setTimeout(() => {
         exit()
         onReturn()
@@ -27,12 +38,29 @@ export function createOverviewSession(onChange: (active: boolean) => void, onRet
   }
   return {
     active: () => active,
+    locked: () => locked,
+    mode: (): OverviewMode => (!active ? 'off' : locked ? 'locked' : 'timed'),
     enter() {
+      if (locked) {
+        locked = false
+        onLockChange?.(false)
+      }
       if (!active) {
         active = true
         onChange(true)
       }
       touch()
+    },
+    lock() {
+      cancel()
+      if (!active) {
+        active = true
+        onChange(true)
+      }
+      if (!locked) {
+        locked = true
+        onLockChange?.(true)
+      }
     },
     touch,
     hold(value: boolean) {

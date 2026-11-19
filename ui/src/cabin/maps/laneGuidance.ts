@@ -1,4 +1,5 @@
-import type { LaneHint } from '../../shared/host'
+import type { LaneDirection, LaneHint } from '../../shared/host'
+import type { TurnKind } from './guidance'
 
 export const LANE_ENTER_METRES = 1000
 export const LANE_EXIT_METRES = 1200
@@ -52,4 +53,31 @@ export function laneHintOf(
     return null
   }
   return null
+}
+
+/** Conservatively checks if a lane arrow direction aligns with the active turn maneuver. */
+export function matchesTurnDirection(direction: LaneDirection, turn: TurnKind | null | undefined): boolean {
+  if (!turn) return false
+  switch (turn) {
+    case 'straight':
+      return direction === 'straight'
+    case 'left':
+    case 'sharp-left':
+    case 'keep-left':
+    case 'exit-left':
+      return direction === 'left' || direction === 'slight-left'
+    case 'slight-left':
+      return direction === 'slight-left' || direction === 'left'
+    case 'right':
+    case 'sharp-right':
+    case 'keep-right':
+    case 'exit-right':
+      return direction === 'right' || direction === 'slight-right'
+    case 'slight-right':
+      return direction === 'slight-right' || direction === 'right'
+    case 'u-turn':
+      return direction === 'u-turn'
+    case 'roundabout':
+      return false
+  }
 }

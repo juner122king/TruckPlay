@@ -10,21 +10,26 @@ import { type LiveState, useCabin, useLive } from '../state/store'
 import { textScale } from '../state/textSize'
 import {
   AUTO_RECENTRE_MS,
+  BASE_FOLLOW_PITCH,
   bearingOf,
   blendPose,
   type CameraPose,
   clampZoomOffset,
   damp,
   dampBearing,
+  type DynamicCameraSettings,
   easeInOut,
   FOLLOW_DELAY_MS,
   GLIDE_MS,
+  navigationCameraFor,
+  navZoomOffsetFor,
   samePose,
   type TruckSample,
   truckAt,
   zoomForSpeed,
   zoomOffsetFor,
 } from './camera'
+import { guidanceFor } from './guidanceDistance'
 import { buildingFilter, type Canopy, canopiesOver } from './buildings'
 import { labelLines, placeLabels } from './labels'
 import { NO_ENTRY_ICON, drawNoEntry, drawPlaceIcon, parsePlaceIcon } from './placeIcons'
@@ -87,12 +92,14 @@ import { addSeaProtocol } from './seaTiles'
 maplibregl.setWorkerUrl(workerUrl)
 
 /** The driving view's tilt, degrees. */
-const PITCH = 52
+const PITCH = BASE_FOLLOW_PITCH
 /** The truck sits this far down the map (share of its height above it), leaving the road ahead in view. */
 const PUCK_FROM_TOP = 0.66
 /** How quickly the map turns after the truck (ms): slow enough to feel calm, quick enough to keep up. */
 const BEARING_TAU_MS = 450
 const ZOOM_TAU_MS = 1500
+const NAV_ZOOM_TAU_MS = 1100
+const NAV_PITCH_TAU_MS = 1000
 const SAMPLES_KEPT = 8
 /** Place names' type size (a second line smaller: labelLines; both times the player's text size,
  * `nameScale`), and halo (maps.css), and the space kept between two names, pixels. */
@@ -169,8 +176,8 @@ interface LiveMap {
   ahead: Point[] | null
   aheadTold: number
   aheadShown: readonly OtherPlayer[] | null
-  /** The following camera's damped bearing and zoom. */
-  camera: { bearing: number; zoom: number } | null
+  /** The following camera's damped bearing, zoom and tilt. */
+  camera: { bearing: number; zoom: number; pitch: number } | null
   mode: Mode
   /** Whether the screen showing it lets the player move it (the Maps app). */
   interactive: boolean
@@ -201,10 +208,17 @@ interface LiveMap {
   keptAt: number
 }
 
-/** Whether the map is browsing (moved away from the truck): the Maps app shows its recentre button. */
-export const useMapBrowsing = createStore<{ browsing: boolean; routeOverview: boolean }>()(() => ({
+/** Whether the map is browsing away from the truck, showing route overview (timed or locked), or locked north up. */
+export const useMapBrowsing = createStore<{
+  browsing: boolean
+  routeOverview: boolean
+  routeOverviewLocked: boolean
+  northUp: boolean
+}>()(() => ({
   browsing: false,
   routeOverview: false,
+  routeOverviewLocked: false,
+  northUp: false,
 }))
 
 /** Those following the map's bearing (the compass), told each time it turns. */
@@ -239,6 +253,7 @@ const currentOverview = createOverviewSession(
     }
   },
   () => recentreLiveMap(),
+  (routeOverviewLocked) => useMapBrowsing.setState({ routeOverviewLocked }),
 )
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
@@ -526,12 +541,18 @@ function listen(target: LiveMap) {
   canvas.addEventListener('click', () => {
     if (target.interactive) currentOverview.touch()
   })
-  // Dragging or turning it leaves the truck behind.
-  const leave = (event: { originalEvent?: unknown }) => {
+  // Dragging leaves the truck behind; manually rotating also clears any north-up lock.
+  map.on('dragstart', (event: { originalEvent?: unknown }) => {
     if (event.originalEvent && target.interactive) browse(target)
-  }
-  map.on('dragstart', leave)
-  map.on('rotatestart', leave)
+  })
+  map.on('rotatestart', (event: { originalEvent?: unknown }) => {
+    if (!event.originalEvent || !target.interactive) return
+    if (target.northUp) {
+      target.northUp = false
+      useMapBrowsing.setState({ northUp: false })
+    }
+    browse(target)
+  })
   // The compass (MapControls.tsx) turns with the map.
   map.on('rotate', () => tellBearing(map.getBearing()))
   // A route offered tapped (Directions): picked, as its row on the card is.
@@ -574,8 +595,7 @@ function follow(target: LiveMap) {
   target.mode = 'follow'
   target.glide = null
   target.map.scrollZoom.disable()
-  // North up, the arrow stays: it brings the chase view back.
-  useMapBrowsing.setState({ browsing: target.northUp })
+  useMapBrowsing.setState({ browsing: false, northUp: target.northUp })
 }
 
 /** Switches the gestures for the screen showing the map: the Maps app moves it, the Dashboard doesn't. */
@@ -788,7 +808,7 @@ function disposeLiveMap() {
     Object.assign(window, { westplayMap: undefined, westplayRaised: undefined, westplayMeshes: undefined })
   live = null
   postToHost({ type: 'mapResource', resident: false })
-  useMapBrowsing.setState({ browsing: false })
+  useMapBrowsing.setState({ browsing: false, routeOverview: false, routeOverviewLocked: false, northUp: false })
 }
 
 /**
@@ -864,7 +884,7 @@ function place() {
       syncRouteTraffic(current, now)
       syncRoute(current, now)
       syncCanopies(current, now)
-      syncTrafficLights(current.map, current.trafficLights)
+      syncTrafficLights(current.map, current.trafficLights, currentOverview.active())
       current.raised?.update(now)
       current.meshes?.update(now)
       updateCamera(current, now, dt)
@@ -986,8 +1006,18 @@ export function setLiveMapAppearance(appearance: Appearance) {
   syncAppearance(live)
 }
 
-/** Shows the complete remaining active route; does not enter Directions' offered-route mode. */
+/** Cycles the active route overview through [timed overview -> locked overview -> off]. */
 export function overviewLiveRoute() {
+  const mode = currentOverview.mode()
+  if (mode === 'locked') {
+    recentreLiveMap()
+    return
+  }
+  if (mode === 'timed') {
+    currentOverview.lock()
+    if (live?.overviewNeedsFit) frameCurrentRoute(live)
+    return
+  }
   if (
     !live ||
     !live.interactive ||
@@ -996,10 +1026,8 @@ export function overviewLiveRoute() {
     (useLive.getState().telemetry?.navigationDistance ?? 0) <= 0
   )
     return
-  if (!currentOverview.active()) {
-    live.routeOverviewZoom = live.zoomOffset
-    browse(live)
-  }
+  live.routeOverviewZoom = live.zoomOffset
+  browse(live)
   currentOverview.enter()
   live.map.stop()
   frameCurrentRoute(live)
@@ -1048,28 +1076,40 @@ function exitCurrentOverview(target: LiveMap) {
   target.browsedFrom = target.map.getZoom()
 }
 
-/** Glides the map back onto the truck, behind it (the arrow): from a map moved away, or from north up. */
+/** Glides the map back onto the truck and exits overview without overriding the current north-up toggle. */
 export function recentreLiveMap() {
+  const wasOverview = currentOverview.active()
   if (live) exitCurrentOverview(live)
-  if (!live || (live.mode !== 'browse' && !live.northUp)) return
-  live.northUp = false
+  if (!live || (!wasOverview && live.mode !== 'browse')) return
   glideToTruck(live)
   useMapBrowsing.setState({ browsing: false })
 }
 
-/** Turns the map north up and looks down from above, following the truck still (the compass tapped, as
- * CarPlay's Maps does); the arrow appears, and brings the chase view back (owner 2026-10-21). */
+/** Toggles between heading-up 3D chase and top-down north-up while preserving follow vs browse centering. */
 export function northUpLiveMap() {
-  if (!live) return
-  if (currentOverview.active()) {
-    currentOverview.touch()
-    live.map.easeTo({ bearing: 0, pitch: 0, duration: reducedMotion() ? 0 : 300 })
+  if (!live || currentOverview.active() || live.overview) return
+  const next = !live.northUp
+  live.northUp = next
+  useMapBrowsing.setState({ northUp: next })
+  if (live.mode === 'browse') {
+    const truck = truckAt(samples, performance.now() - FOLLOW_DELAY_MS)
+    const headingBearing = truck ? bearingOf(truck.heading) : 0
+    const settings = navCameraSettings()
+    const guidance = settings.autoZoom && settings.junctionZoom ? guidanceFor(useLive.getState()) : null
+    const pitch = next ? 0 : live.interactive ? navigationCameraFor(truck?.speed ?? 0, settings, guidance).pitch : PITCH
+    live.map.easeTo({
+      bearing: next ? 0 : headingBearing,
+      pitch,
+      duration: reducedMotion() ? 0 : 300,
+    })
     return
   }
-  if (live.northUp) return
-  live.northUp = true
   glideToTruck(live)
-  useMapBrowsing.setState({ browsing: true })
+}
+
+function navCameraSettings(): DynamicCameraSettings {
+  const { mapAutoZoom, mapZoomIntensity, mapJunctionZoom } = useCabin.getState()
+  return { autoZoom: mapAutoZoom, intensity: mapZoomIntensity, junctionZoom: mapJunctionZoom }
 }
 
 /** Glides from where the map is to the following camera ([`updateCamera`]): behind the truck, or north up. */
@@ -1078,7 +1118,9 @@ function glideToTruck(target: LiveMap) {
   // A zoom the player chose while browsing (the wheel, the buttons) stays: the camera follows at it.
   if (target.mode === 'browse' && Math.abs(map.getZoom() - target.browsedFrom) > 0.01) {
     const speed = truckAt(samples, performance.now() - FOLLOW_DELAY_MS)?.speed ?? 0
-    target.zoomOffset = zoomOffsetFor(map.getZoom(), speed)
+    target.zoomOffset = target.interactive
+      ? navZoomOffsetFor(map.getZoom(), speed, navCameraSettings())
+      : zoomOffsetFor(map.getZoom(), speed)
   }
   target.glide = {
     from: {
@@ -1318,13 +1360,25 @@ function updateCamera(target: LiveMap, now: number, dt: number) {
     return
   }
 
-  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomForSpeed(truck.speed) + target.zoomOffset))
+  let baseZoom: number
+  let basePitch: number
+  if (target.interactive) {
+    const settings = navCameraSettings()
+    const guidance = settings.autoZoom && settings.junctionZoom ? guidanceFor(useLive.getState()) : null
+    const targetCam = navigationCameraFor(truck.speed, settings, guidance)
+    baseZoom = targetCam.zoom
+    basePitch = targetCam.pitch
+  } else {
+    baseZoom = zoomForSpeed(truck.speed)
+    basePitch = PITCH
+  }
+  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, baseZoom + target.zoomOffset))
   const height = map.getContainer().clientHeight
   // Behind the truck: facing its way, tilted, the truck low on the screen. North up: from above, the truck in
   // the middle.
   const wanted = target.northUp
     ? { bearing: 0, pitch: 0, top: 0 }
-    : { bearing, pitch: PITCH, top: height * (PUCK_FROM_TOP - 0.5) * 2 }
+    : { bearing, pitch: basePitch, top: height * (PUCK_FROM_TOP - 0.5) * 2 }
   const padding = { top: wanted.top, bottom: 0, left: 0, right: 0 }
 
   if (target.mode === 'return' && target.glide) {
@@ -1336,20 +1390,27 @@ function updateCamera(target: LiveMap, now: number, dt: number) {
     moveCamera(map, blendPose(target.glide.from, towards, eased), { ...padding, top })
     if (t >= 1) {
       follow(target)
-      target.camera = { bearing: wanted.bearing, zoom }
+      target.camera = { bearing: wanted.bearing, zoom, pitch: wanted.pitch }
     }
     return
   }
 
+  const zoomTau = target.interactive ? NAV_ZOOM_TAU_MS : ZOOM_TAU_MS
   target.camera = target.camera
     ? {
         bearing: dampBearing(target.camera.bearing, wanted.bearing, dt, BEARING_TAU_MS),
-        zoom: damp(target.camera.zoom, zoom, dt, ZOOM_TAU_MS),
+        zoom: damp(target.camera.zoom, zoom, dt, zoomTau),
+        pitch: target.interactive ? damp(target.camera.pitch, wanted.pitch, dt, NAV_PITCH_TAU_MS) : wanted.pitch,
       }
-    : { bearing: wanted.bearing, zoom }
+    : { bearing: wanted.bearing, zoom, pitch: wanted.pitch }
   // Held still while a button is down, so a drag can start (moving the camera cancels it).
   if (target.pressed) return
-  const pose = { center: position, bearing: target.camera.bearing, zoom: target.camera.zoom, pitch: wanted.pitch }
+  const pose = {
+    center: position,
+    bearing: target.camera.bearing,
+    zoom: target.camera.zoom,
+    pitch: target.camera.pitch,
+  }
   moveCamera(map, pose, padding)
 }
 

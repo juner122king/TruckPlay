@@ -1,18 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BASE_FOLLOW_PITCH,
   bearingDelta,
   bearingOf,
   blendPose,
   type CameraPose,
   clampZoomOffset,
-  zoomOffsetFor,
   damp,
   dampBearing,
+  type DynamicCameraSettings,
   easeInOut,
+  FIXED_FOLLOW_ZOOM,
+  isMapZoomIntensity,
+  navigationCameraFor,
+  navSpeedZoom,
+  navZoomOffsetFor,
   samePose,
   type TruckSample,
   truckAt,
   zoomForSpeed,
+  zoomOffsetFor,
 } from './camera'
 import { labelRange, metresBetween, pixelsPerMetre, toLngLat } from './projection'
 
@@ -138,5 +145,96 @@ describe('zoomOffsetFor', () => {
     // No further than the camera may be pulled in or out.
     expect(zoomOffsetFor(30, 0)).toBe(2)
     expect(zoomOffsetFor(5, 0)).toBe(-4)
+  })
+})
+
+describe('navigationCameraFor', () => {
+  const standard: DynamicCameraSettings = { autoZoom: true, intensity: 'standard', junctionZoom: true }
+  const kmh = (v: number) => v / 3.6
+
+  it('validates zoom intensity presets', () => {
+    expect(isMapZoomIntensity('gentle')).toBe(true)
+    expect(isMapZoomIntensity('standard')).toBe(true)
+    expect(isMapZoomIntensity('dynamic')).toBe(true)
+    expect(isMapZoomIntensity('extreme')).toBe(false)
+    expect(isMapZoomIntensity(null)).toBe(false)
+  })
+
+  it('locks to fixed zoom and default tilt when dynamic speed view is turned off', () => {
+    const off: DynamicCameraSettings = { autoZoom: false, intensity: 'dynamic', junctionZoom: true }
+    const turn = {
+      step: { kind: 'turn' as const, maneuver: { node: 1, turn: 'right' as const, angle: 90, exit: null } },
+      distance: 40,
+    }
+    expect(navigationCameraFor(0, off, null)).toEqual({ zoom: FIXED_FOLLOW_ZOOM, pitch: BASE_FOLLOW_PITCH })
+    expect(navigationCameraFor(kmh(120), off, turn)).toEqual({ zoom: FIXED_FOLLOW_ZOOM, pitch: BASE_FOLLOW_PITCH })
+    expect(navSpeedZoom(kmh(100), off)).toBe(FIXED_FOLLOW_ZOOM)
+  })
+
+  it('zooms out and tilts toward the horizon monotonically as speed rises across intensities', () => {
+    const gentleLow = navigationCameraFor(kmh(10), { ...standard, intensity: 'gentle' })
+    const gentleHigh = navigationCameraFor(kmh(120), { ...standard, intensity: 'gentle' })
+    const stdLow = navigationCameraFor(kmh(10), standard)
+    const stdMid = navigationCameraFor(kmh(70), standard)
+    const stdHigh = navigationCameraFor(kmh(120), standard)
+    const dynLow = navigationCameraFor(kmh(10), { ...standard, intensity: 'dynamic' })
+    const dynHigh = navigationCameraFor(kmh(120), { ...standard, intensity: 'dynamic' })
+
+    expect(stdLow.zoom).toBeGreaterThan(stdMid.zoom)
+    expect(stdMid.zoom).toBeGreaterThan(stdHigh.zoom)
+    expect(stdLow.pitch).toBeLessThan(stdMid.pitch)
+    expect(stdMid.pitch).toBeLessThan(stdHigh.pitch)
+
+    // Wider intensities span a broader zoom & pitch range.
+    expect(dynLow.zoom - dynHigh.zoom).toBeGreaterThan(stdLow.zoom - stdHigh.zoom)
+    expect(stdLow.zoom - stdHigh.zoom).toBeGreaterThan(gentleLow.zoom - gentleHigh.zoom)
+    expect(dynHigh.pitch - dynLow.pitch).toBeGreaterThan(stdHigh.pitch - stdLow.pitch)
+    expect(stdHigh.pitch - stdLow.pitch).toBeGreaterThan(gentleHigh.pitch - gentleLow.pitch)
+  })
+
+  it('handles reversing and non-finite speeds safely', () => {
+    expect(navigationCameraFor(-3, standard)).toEqual(navigationCameraFor(3, standard))
+    expect(navigationCameraFor(Number.NaN, standard)).toEqual(navigationCameraFor(0, standard))
+    expect(navigationCameraFor(Number.POSITIVE_INFINITY, standard)).toEqual(navigationCameraFor(0, standard))
+  })
+
+  it('pulls closer and lowers tilt when approaching turns, roundabouts, exits, or arrival', () => {
+    const rightTurn = { kind: 'turn' as const, maneuver: { node: 2, turn: 'right' as const, angle: 90, exit: null } }
+    const cruise = navigationCameraFor(kmh(100), standard, { step: rightTurn, distance: 400 })
+    const approaching = navigationCameraFor(kmh(100), standard, { step: rightTurn, distance: 180 })
+    const inside = navigationCameraFor(kmh(100), standard, { step: rightTurn, distance: 30 })
+
+    expect(approaching.zoom).toBeGreaterThan(cruise.zoom)
+    expect(inside.zoom).toBeGreaterThan(approaching.zoom)
+    expect(approaching.pitch).toBeLessThan(cruise.pitch)
+    expect(inside.pitch).toBeLessThan(approaching.pitch)
+
+    // Arrival triggers full junction zoom-in too, while straight hints are ignored.
+    const arriving = navigationCameraFor(kmh(100), standard, { step: { kind: 'arrive' }, distance: 40 })
+    expect(arriving).toEqual(inside)
+
+    const straight = { kind: 'turn' as const, maneuver: { node: 2, turn: 'straight' as const, angle: 0, exit: null } }
+    expect(navigationCameraFor(kmh(100), standard, { step: straight, distance: 20 })).toEqual(cruise)
+
+    // Gentle forks (keep-left / slight-right) pull in softer than sharp turns or exits.
+    const keepLeft = {
+      kind: 'turn' as const,
+      maneuver: { node: 2, turn: 'keep-left' as const, angle: -20, exit: null },
+    }
+    const fork = navigationCameraFor(kmh(100), standard, { step: keepLeft, distance: 30 })
+    expect(fork.zoom).toBeGreaterThan(cruise.zoom)
+    expect(fork.zoom).toBeLessThan(inside.zoom)
+
+    // Turning junctionZoom off disables turn pull-in while keeping speed zoom.
+    expect(
+      navigationCameraFor(kmh(100), { ...standard, junctionZoom: false }, { step: rightTurn, distance: 30 }),
+    ).toEqual(cruise)
+  })
+
+  it('computes manual zoom offset relative to pure speed baseline', () => {
+    const base = navSpeedZoom(kmh(90), standard)
+    expect(navZoomOffsetFor(base - 1.2, kmh(90), standard)).toBeCloseTo(-1.2)
+    expect(navZoomOffsetFor(30, 0, standard)).toBe(2)
+    expect(navZoomOffsetFor(5, 0, standard)).toBe(-4)
   })
 })

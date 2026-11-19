@@ -483,6 +483,15 @@ export const strings: Strings = {
     high: 'High',
     resetEqualizer: 'Reset',
     back: 'Back',
+    off: 'Off',
+    mapDynamicView: 'Dynamic Speed View',
+    mapDynamicViewFooter:
+      'Applies in the Maps app only: pulls the camera back and tilts toward the horizon at highway speeds, and zooms closer at low speeds. The Dashboard map stays unchanged.',
+    mapJunctionZoom: 'Zoom In for Turns',
+    mapZoomIntensity: 'Zoom Intensity',
+    mapZoomIntensityFooter:
+      'Gentle keeps subtle changes; Standard balances city and highway driving; Dynamic opens a wide horizon view at high speeds.',
+    zoomIntensities: { gentle: 'Gentle', standard: 'Standard', dynamic: 'Dynamic' },
   },
   apps: {
     maps: 'Maps',

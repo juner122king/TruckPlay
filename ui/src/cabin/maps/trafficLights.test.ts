@@ -79,9 +79,7 @@ describe('nearestTrafficLightAhead', () => {
         { position: [-60, 80] as [number, number], forward: [0, 1] as [number, number] },
       ],
     }
-    const semaphores: SemaphoreInfo[] = [
-      { x: 4, y: 0, z: -110, heading: 0.5, state: 1, countdown: 19, duration: 30 },
-    ]
+    const semaphores: SemaphoreInfo[] = [{ x: 4, y: 0, z: -110, heading: 0.5, state: 1, countdown: 19, duration: 30 }]
     const nearest = nearestTrafficLightAhead(semaphores, baseTelemetry, route, 0)
     expect(nearest).toBeNull()
   })
@@ -198,5 +196,67 @@ describe('nearestTrafficLightAhead', () => {
     for (let i = 1; i < pool.markers.length; i++) {
       expect(pool.markers[i].getElement().isConnected).toBe(false)
     }
+  })
+
+  it('syncTrafficLights hides active markers when hidden (e.g. route overview) and tracks urgent countdown + phase progress', () => {
+    const cssProps = new Map<string, string>()
+    const el = { isConnected: false }
+    const marker = {
+      getElement: () => el,
+      addTo: () => {
+        el.isConnected = true
+      },
+      remove: () => {
+        el.isConnected = false
+      },
+      setLngLat: () => {},
+    }
+    const element = {
+      badge: {
+        className: '',
+        style: {
+          setProperty: (k: string, v: string) => cssProps.set(k, v),
+        },
+      },
+      timerBox: { style: { display: '' } },
+      timer: { textContent: '' },
+      housing: {},
+      progress: { style: { display: '', transform: '' } },
+    }
+    const pool = { markers: [marker], elements: [element] } as unknown as TrafficLightPool
+    const mockMap: any = {
+      getZoom: () => 16,
+      getContainer: () => ({ clientWidth: 1000, clientHeight: 1000 }),
+      project: () => ({ x: 500, y: 500 }),
+    }
+
+    useLive.setState({
+      telemetry: baseTelemetry,
+      route: null,
+      routeNext: 0,
+      semaphores: [{ x: 2, y: 0, z: -40, heading: 0.5, state: 1, countdown: 2.4, duration: 24 }],
+    })
+
+    syncTrafficLights(mockMap, pool)
+    expect(el.isConnected).toBe(true)
+    expect(element.badge.className).toContain('traffic-red')
+    expect(element.badge.className).toContain('urgent')
+    expect(element.timer.textContent).toBe('3')
+    expect(cssProps.get('--signal-progress')).toBe('0.100')
+    expect(element.progress.style.display).toBe('block')
+    expect(element.progress.style.transform).toBe('scaleX(0.100)')
+
+    // Non-urgent signal
+    useLive.setState({
+      semaphores: [{ x: 2, y: 0, z: -40, heading: 0.5, state: 3, countdown: 12, duration: 30 }],
+    })
+    syncTrafficLights(mockMap, pool)
+    expect(element.badge.className).toContain('traffic-green')
+    expect(element.badge.className).not.toContain('urgent')
+    expect(cssProps.get('--signal-progress')).toBe('0.400')
+
+    // Hidden during route overview removes connected marker
+    syncTrafficLights(mockMap, pool, true)
+    expect(el.isConnected).toBe(false)
   })
 })
