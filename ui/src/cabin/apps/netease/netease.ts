@@ -2,10 +2,12 @@ import { useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import {
   isInHost,
+  type NeteaseArtist,
   type NeteaseCommand,
   type NeteasePlayback,
   type NeteasePlaylist,
   type NeteaseQuestion,
+  type NeteaseRadio,
   type NeteaseTrack,
   postToHost,
 } from '../../../shared/host'
@@ -13,11 +15,15 @@ import type { MediaSource } from '../../../shared/media'
 import {
   CAR_FAV_TRACKS,
   CHARTS,
+  DEFAULT_USER_ARTISTS,
   DEFAULT_USER_PLAYLISTS,
+  DEFAULT_USER_RADIOS,
   DISCOVER_CATEGORIES,
   EDM_TRACKS,
   FOLK_TRACKS,
+  getFallbackTracksForArtist,
   getFallbackTracksForPlaylist,
+  getFallbackTracksForRadio,
   HIGHWAY_TRACKS,
   HOT_SEARCH_TAGS,
   MOCK_RECOMMENDED_PLAYLISTS,
@@ -32,11 +38,15 @@ import {
 export {
   CAR_FAV_TRACKS,
   CHARTS,
+  DEFAULT_USER_ARTISTS,
   DEFAULT_USER_PLAYLISTS,
+  DEFAULT_USER_RADIOS,
   DISCOVER_CATEGORIES,
   EDM_TRACKS,
   FOLK_TRACKS,
+  getFallbackTracksForArtist,
   getFallbackTracksForPlaylist,
+  getFallbackTracksForRadio,
   HIGHWAY_TRACKS,
   HOT_SEARCH_TAGS,
   MOCK_RECOMMENDED_PLAYLISTS,
@@ -49,6 +59,8 @@ export {
 }
 
 export type NeteaseTab = 'recommend' | 'discover' | 'roaming' | 'my' | 'search'
+export type MyCategory = 'all' | 'created' | 'collected' | 'radio' | 'artist'
+export type CollectionKind = 'playlist' | 'radio' | 'artist'
 export type NeteasePlayMode = 'loop' | 'shuffle' | 'single'
 
 export interface UserProfile {
@@ -70,9 +82,14 @@ export interface NeteaseState {
   playing: boolean | null
   tracks: NeteaseTrack[]
   playlists: NeteasePlaylist[]
+  radios: NeteaseRadio[]
+  artists: NeteaseArtist[]
   recommendedPlaylists: NeteasePlaylist[]
   currentPlaylist: NeteasePlaylist | null
+  currentCollectionKind: CollectionKind
+  currentCollectionSubtitle?: string
   tab: NeteaseTab
+  myCategory: MyCategory
   discoverChartId: string
   searchQuery: string
   loading: boolean
@@ -98,9 +115,14 @@ export const useNetease = create<NeteaseState>(() => ({
   playing: false,
   tracks: MOCK_TRACKS,
   playlists: DEFAULT_USER_PLAYLISTS,
+  radios: DEFAULT_USER_RADIOS,
+  artists: DEFAULT_USER_ARTISTS,
   recommendedPlaylists: MOCK_RECOMMENDED_PLAYLISTS,
   currentPlaylist: null,
+  currentCollectionKind: 'playlist',
+  currentCollectionSubtitle: undefined,
   tab: 'recommend',
+  myCategory: 'all',
   discoverChartId: '3778678',
   searchQuery: '',
   loading: false,
@@ -126,7 +148,17 @@ export const useNetease = create<NeteaseState>(() => ({
   userProfile: IN_HOST ? null : PREVIEW_USER_PROFILE,
 }))
 
-type AskKind = 'recommend' | 'chart' | 'roaming' | 'userPlaylists' | 'search' | 'playlistTracks'
+type AskKind =
+  | 'recommend'
+  | 'chart'
+  | 'roaming'
+  | 'userPlaylists'
+  | 'userRadios'
+  | 'userArtists'
+  | 'search'
+  | 'playlistTracks'
+  | 'radioPrograms'
+  | 'artistSongs'
 
 interface InFlightAsk {
   kind: AskKind
@@ -137,6 +169,8 @@ let nextAskId = 100
 const inFlightAsks = new Map<number, InFlightAsk>()
 let latestRecommendAskId = 0
 let latestUserPlaylistsAskId = 0
+let latestUserRadiosAskId = 0
+let latestUserArtistsAskId = 0
 let latestTabTracksAskId = 0
 let latestPlaylistTracksAskId = 0
 let savedTabTracks: NeteaseTrack[] | null = null
@@ -161,9 +195,11 @@ function sendAsk(question: NeteaseQuestion, kind: AskKind, playlistId?: string):
   inFlightAsks.set(id, { kind, playlistId })
   if (kind === 'recommend') latestRecommendAskId = id
   if (kind === 'userPlaylists') latestUserPlaylistsAskId = id
-  if (kind === 'playlistTracks') {
+  if (kind === 'userRadios') latestUserRadiosAskId = id
+  if (kind === 'userArtists') latestUserArtistsAskId = id
+  if (kind === 'playlistTracks' || kind === 'radioPrograms' || kind === 'artistSongs') {
     latestPlaylistTracksAskId = id
-  } else if (kind !== 'userPlaylists') {
+  } else if (kind !== 'userPlaylists' && kind !== 'userRadios' && kind !== 'userArtists') {
     latestTabTracksAskId = id
   }
   send({ action: 'ask', id, question })
@@ -195,6 +231,8 @@ export function selectTab(tab: NeteaseTab): void {
   useNetease.setState({
     tab,
     currentPlaylist: null,
+    currentCollectionKind: 'playlist',
+    currentCollectionSubtitle: undefined,
     ...(restoreTracks && restoreTracks.length > 0 ? { tracks: restoreTracks } : {}),
   })
   if (tab === 'recommend') {
@@ -214,22 +252,67 @@ export function selectTab(tab: NeteaseTab): void {
     useNetease.setState({ loading: isInHost() })
     sendAsk({ ask: 'chart', id: '19723756' }, 'roaming')
   } else if (tab === 'my') {
-    const current = useNetease.getState().playlists
-    if (!current || current.length === 0) {
-      useNetease.setState({ playlists: DEFAULT_USER_PLAYLISTS })
+    const { myCategory } = useNetease.getState()
+    fetchMyCategoryData(myCategory)
+  }
+}
+
+function fetchMyCategoryData(category: MyCategory): void {
+  if (category === 'radio') {
+    const currentRadios = useNetease.getState().radios
+    if (!currentRadios || currentRadios.length === 0) {
+      useNetease.setState({ radios: isInHost() ? [] : DEFAULT_USER_RADIOS })
     }
     useNetease.setState({ loading: isInHost() })
-    const askId = sendAsk({ ask: 'userPlaylists' }, 'userPlaylists')
-    if (isInHost()) {
-      setTimeout(() => {
-        const s = useNetease.getState()
-        if (inFlightAsks.has(askId) && s.loading && s.tab === 'my' && askId === latestUserPlaylistsAskId) {
-          inFlightAsks.delete(askId)
-          useNetease.setState({ loading: false })
-        }
-      }, 2000)
-    }
+    if (!isInHost()) return
+    const askId = sendAsk({ ask: 'userRadios' }, 'userRadios')
+    setTimeout(() => {
+      const s = useNetease.getState()
+      if (inFlightAsks.has(askId) && s.loading && s.tab === 'my' && askId === latestUserRadiosAskId) {
+        inFlightAsks.delete(askId)
+        useNetease.setState({ loading: false })
+      }
+    }, 3000)
+    return
   }
+
+  if (category === 'artist') {
+    const currentArtists = useNetease.getState().artists
+    if (!currentArtists || currentArtists.length === 0) {
+      useNetease.setState({ artists: isInHost() ? [] : DEFAULT_USER_ARTISTS })
+    }
+    useNetease.setState({ loading: isInHost() })
+    if (!isInHost()) return
+    const askId = sendAsk({ ask: 'userArtists' }, 'userArtists')
+    setTimeout(() => {
+      const s = useNetease.getState()
+      if (inFlightAsks.has(askId) && s.loading && s.tab === 'my' && askId === latestUserArtistsAskId) {
+        inFlightAsks.delete(askId)
+        useNetease.setState({ loading: false })
+      }
+    }, 3000)
+    return
+  }
+
+  const current = useNetease.getState().playlists
+  if (!current || current.length === 0) {
+    useNetease.setState({ playlists: DEFAULT_USER_PLAYLISTS })
+  }
+  useNetease.setState({ loading: isInHost() })
+  if (!isInHost()) return
+  const askId = sendAsk({ ask: 'userPlaylists' }, 'userPlaylists')
+  setTimeout(() => {
+    const s = useNetease.getState()
+    if (inFlightAsks.has(askId) && s.loading && s.tab === 'my' && askId === latestUserPlaylistsAskId) {
+      inFlightAsks.delete(askId)
+      useNetease.setState({ loading: false })
+    }
+  }, 2000)
+}
+
+export function selectMyCategory(category: MyCategory): void {
+  useNetease.setState({ myCategory: category })
+  fetchMyCategoryData(category)
 }
 
 export function selectDiscoverChart(chartId: string): void {
@@ -263,12 +346,20 @@ export function selectPlaylist(playlist: NeteasePlaylist): void {
     useNetease.setState({
       loading: false,
       currentPlaylist: playlist,
+      currentCollectionKind: 'playlist',
+      currentCollectionSubtitle: undefined,
       tracks: getFallbackTracksForPlaylist(playlist),
     })
     return
   }
 
-  useNetease.setState({ loading: true, currentPlaylist: playlist, tracks: [] })
+  useNetease.setState({
+    loading: true,
+    currentPlaylist: playlist,
+    currentCollectionKind: 'playlist',
+    currentCollectionSubtitle: undefined,
+    tracks: [],
+  })
   const askId = sendAsk({ ask: 'playlistTracks', playlistId: playlist.id }, 'playlistTracks', playlist.id)
   setTimeout(() => {
     const s = useNetease.getState()
@@ -287,12 +378,117 @@ export function selectPlaylist(playlist: NeteasePlaylist): void {
   }, 6000)
 }
 
+export function selectRadio(radio: NeteaseRadio): void {
+  const { currentPlaylist, tracks } = useNetease.getState()
+  if (!currentPlaylist && savedTabTracks === null) {
+    savedTabTracks = tracks
+  }
+
+  const asPlaylist: NeteasePlaylist = {
+    id: radio.id,
+    name: radio.name,
+    coverImgUrl: radio.picUrl,
+    trackCount: radio.programCount,
+    playCount: radio.subCount,
+  }
+  const subtitle = radio.djName ? `主播 ${radio.djName}` : '订阅电台'
+  const isSynthetic = radio.id.startsWith('radio_')
+  if (!isInHost() || isSynthetic) {
+    latestPlaylistTracksAskId = nextAskId++
+    useNetease.setState({
+      loading: false,
+      currentPlaylist: asPlaylist,
+      currentCollectionKind: 'radio',
+      currentCollectionSubtitle: subtitle,
+      tracks: getFallbackTracksForRadio(radio),
+    })
+    return
+  }
+
+  useNetease.setState({
+    loading: true,
+    currentPlaylist: asPlaylist,
+    currentCollectionKind: 'radio',
+    currentCollectionSubtitle: subtitle,
+    tracks: [],
+  })
+  const askId = sendAsk({ ask: 'radioPrograms', radioId: radio.id }, 'radioPrograms', radio.id)
+  setTimeout(() => {
+    const s = useNetease.getState()
+    if (
+      inFlightAsks.has(askId) &&
+      s.loading &&
+      s.currentPlaylist?.id === radio.id &&
+      askId === latestPlaylistTracksAskId
+    ) {
+      inFlightAsks.delete(askId)
+      useNetease.setState({
+        tracks: getFallbackTracksForRadio(radio),
+        loading: false,
+      })
+    }
+  }, 6000)
+}
+
+export function selectArtist(artist: NeteaseArtist): void {
+  const { currentPlaylist, tracks } = useNetease.getState()
+  if (!currentPlaylist && savedTabTracks === null) {
+    savedTabTracks = tracks
+  }
+
+  const asPlaylist: NeteasePlaylist = {
+    id: artist.id,
+    name: artist.name,
+    coverImgUrl: artist.picUrl,
+    trackCount: artist.musicSize ?? 0,
+  }
+  const subtitle = artist.albumSize ? `${artist.albumSize} 张专辑` : '收藏歌手'
+  const isSynthetic = artist.id.startsWith('artist_')
+  if (!isInHost() || isSynthetic) {
+    latestPlaylistTracksAskId = nextAskId++
+    useNetease.setState({
+      loading: false,
+      currentPlaylist: asPlaylist,
+      currentCollectionKind: 'artist',
+      currentCollectionSubtitle: subtitle,
+      tracks: getFallbackTracksForArtist(artist),
+    })
+    return
+  }
+
+  useNetease.setState({
+    loading: true,
+    currentPlaylist: asPlaylist,
+    currentCollectionKind: 'artist',
+    currentCollectionSubtitle: subtitle,
+    tracks: [],
+  })
+  const askId = sendAsk({ ask: 'artistSongs', artistId: artist.id }, 'artistSongs', artist.id)
+  setTimeout(() => {
+    const s = useNetease.getState()
+    if (
+      inFlightAsks.has(askId) &&
+      s.loading &&
+      s.currentPlaylist?.id === artist.id &&
+      askId === latestPlaylistTracksAskId
+    ) {
+      inFlightAsks.delete(askId)
+      useNetease.setState({
+        tracks: getFallbackTracksForArtist(artist),
+        loading: false,
+      })
+    }
+  }, 6000)
+}
+
 export function backToPlaylists(): void {
   latestPlaylistTracksAskId = nextAskId++
   const restoreTracks = savedTabTracks
   savedTabTracks = null
   useNetease.setState({
     currentPlaylist: null,
+    currentCollectionKind: 'playlist',
+    currentCollectionSubtitle: undefined,
     loading: false,
     ...(restoreTracks && restoreTracks.length > 0 ? { tracks: restoreTracks } : {}),
   })
@@ -510,8 +706,17 @@ export function receiveState(
   })
 
   const state = useNetease.getState()
-  if (signedIn && state.tab === 'my' && (!prevSignedIn || state.playlists.every((p) => p.id.startsWith('user_')))) {
-    sendAsk({ ask: 'userPlaylists' }, 'userPlaylists')
+  if (signedIn && state.tab === 'my') {
+    if (state.myCategory === 'radio' && (!prevSignedIn || state.radios.every((r) => r.id.startsWith('radio_')))) {
+      sendAsk({ ask: 'userRadios' }, 'userRadios')
+    } else if (
+      state.myCategory === 'artist' &&
+      (!prevSignedIn || state.artists.every((a) => a.id.startsWith('artist_')))
+    ) {
+      sendAsk({ ask: 'userArtists' }, 'userArtists')
+    } else if (!prevSignedIn || state.playlists.every((p) => p.id.startsWith('user_'))) {
+      sendAsk({ ask: 'userPlaylists' }, 'userPlaylists')
+    }
   }
   if (!state.currentPlaylist && state.tab === 'recommend' && state.tracks.length <= 5) {
     sendAsk({ ask: 'recommend' }, 'recommend')
@@ -525,6 +730,8 @@ export function receiveAnswer(
   songs?: NeteaseTrack[] | null,
   playlists?: NeteasePlaylist[] | null,
   lyric?: string | null,
+  radios?: NeteaseRadio[] | null,
+  artists?: NeteaseArtist[] | null,
 ): void {
   const meta = inFlightAsks.get(id)
   if (meta) inFlightAsks.delete(id)
@@ -550,17 +757,39 @@ export function receiveAnswer(
       }
     }
 
+    if (Array.isArray(radios)) {
+      const uniqueRadios = dedupeById(radios)
+      if (!meta || (meta.kind === 'userRadios' && id === latestUserRadiosAskId)) {
+        useNetease.setState({
+          radios: uniqueRadios,
+          loading: false,
+        })
+      }
+    }
+
+    if (Array.isArray(artists)) {
+      const uniqueArtists = dedupeById(artists)
+      if (!meta || (meta.kind === 'userArtists' && id === latestUserArtistsAskId)) {
+        useNetease.setState({
+          artists: uniqueArtists,
+          loading: false,
+        })
+      }
+    }
+
     if (Array.isArray(songs)) {
       const uniqueSongs = dedupeById(songs)
-      if (meta?.kind === 'playlistTracks') {
+      if (meta?.kind === 'playlistTracks' || meta?.kind === 'radioPrograms' || meta?.kind === 'artistSongs') {
         const activePlaylist = state.currentPlaylist
         if (id === latestPlaylistTracksAskId && activePlaylist && activePlaylist.id === meta.playlistId) {
           const finalSongs =
             uniqueSongs.length > 0
               ? uniqueSongs
-              : (activePlaylist.trackCount ?? 0) === 0
+              : meta.kind === 'radioPrograms' || meta.kind === 'artistSongs'
                 ? []
-                : getFallbackTracksForPlaylist(activePlaylist)
+                : (activePlaylist.trackCount ?? 0) === 0
+                  ? []
+                  : getFallbackTracksForPlaylist(activePlaylist)
           useNetease.setState({ tracks: finalSongs, loading: false })
         }
       } else if (meta) {
@@ -582,11 +811,11 @@ export function receiveAnswer(
     return
   }
 
-  if (meta?.kind === 'playlistTracks') {
+  if (meta?.kind === 'playlistTracks' || meta?.kind === 'radioPrograms' || meta?.kind === 'artistSongs') {
     const activePlaylist = state.currentPlaylist
     if (id === latestPlaylistTracksAskId && activePlaylist && activePlaylist.id === meta.playlistId) {
       useNetease.setState({
-        tracks: getFallbackTracksForPlaylist(activePlaylist),
+        tracks: meta.kind === 'playlistTracks' ? getFallbackTracksForPlaylist(activePlaylist) : [],
         loading: false,
       })
     }
@@ -596,6 +825,14 @@ export function receiveAnswer(
         playlists: s.playlists.length > 0 ? s.playlists : DEFAULT_USER_PLAYLISTS,
         loading: false,
       }))
+    }
+  } else if (meta?.kind === 'userRadios') {
+    if (id === latestUserRadiosAskId) {
+      useNetease.setState({ loading: false })
+    }
+  } else if (meta?.kind === 'userArtists') {
+    if (id === latestUserArtistsAskId) {
+      useNetease.setState({ loading: false })
     }
   } else if (meta) {
     if (id === latestTabTracksAskId) {
@@ -1021,6 +1258,8 @@ export function releaseResource(): void {
     ...kept,
     tracks: [],
     playlists: [],
+    radios: [],
+    artists: [],
     recommendedPlaylists: [],
     queue: [],
     playback: null,

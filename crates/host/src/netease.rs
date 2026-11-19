@@ -44,6 +44,10 @@ pub enum Question {
     Chart { id: String },
     UserPlaylists,
     PlaylistTracks { playlist_id: String },
+    UserRadios,
+    RadioPrograms { radio_id: String },
+    UserArtists,
+    ArtistSongs { artist_id: String },
     Lyrics { id: String },
 }
 
@@ -60,6 +64,34 @@ pub struct Playlist {
     pub play_count: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subscribed: Option<bool>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Radio {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pic_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dj_name: Option<String>,
+    #[serde(default)]
+    pub program_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_count: Option<u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Artist {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pic_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album_size: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub music_size: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -123,6 +155,10 @@ pub struct Answer {
     pub songs: Option<Vec<Track>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub playlists: Option<Vec<Playlist>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radios: Option<Vec<Radio>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artists: Option<Vec<Artist>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lyric: Option<String>,
 }
@@ -319,6 +355,8 @@ pub fn answer_message(answer: &Answer) -> String {
         "error": answer.error,
         "songs": answer.songs,
         "playlists": answer.playlists,
+        "radios": answer.radios,
+        "artists": answer.artists,
         "lyric": answer.lyric,
     })
     .to_string()
@@ -407,5 +445,65 @@ mod tests {
         assert_eq!(empty_msg["signedIn"], serde_json::Value::Null);
         assert_eq!(empty_msg["signingIn"], true);
         assert_eq!(empty_msg["nickname"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn radio_and_artist_questions_and_answers_round_trip() {
+        let radio_cmd: Command = serde_json::from_str(r#"{"action":"ask","id":31,"question":{"ask":"userRadios"}}"#)
+            .expect("deserialize userRadios");
+        assert_eq!(radio_cmd, Command::Ask { id: 31, question: Question::UserRadios });
+
+        let prog_cmd: Command =
+            serde_json::from_str(r#"{"action":"ask","id":32,"question":{"ask":"radioPrograms","radioId":"793927849"}}"#)
+                .expect("deserialize radioPrograms");
+        assert_eq!(
+            prog_cmd,
+            Command::Ask { id: 32, question: Question::RadioPrograms { radio_id: "793927849".to_owned() } }
+        );
+        let prog_out = serde_json::to_value(&prog_cmd).expect("serialize radioPrograms");
+        assert_eq!(prog_out["question"]["radioId"], "793927849");
+
+        let artist_cmd: Command = serde_json::from_str(r#"{"action":"ask","id":33,"question":{"ask":"userArtists"}}"#)
+            .expect("deserialize userArtists");
+        assert_eq!(artist_cmd, Command::Ask { id: 33, question: Question::UserArtists });
+
+        let artist_songs_cmd: Command =
+            serde_json::from_str(r#"{"action":"ask","id":34,"question":{"ask":"artistSongs","artistId":"6452"}}"#)
+                .expect("deserialize artistSongs");
+        assert_eq!(
+            artist_songs_cmd,
+            Command::Ask { id: 34, question: Question::ArtistSongs { artist_id: "6452".to_owned() } }
+        );
+
+        let ans = Answer {
+            id: 35,
+            failed: false,
+            error: None,
+            songs: None,
+            playlists: None,
+            radios: Some(vec![Radio {
+                id: "793927849".to_owned(),
+                name: "公路深夜电台".to_owned(),
+                pic_url: Some("https://p1.music.126.net/r.jpg".to_owned()),
+                dj_name: Some("DJ小云".to_owned()),
+                program_count: 24,
+                sub_count: Some(1200),
+            }]),
+            artists: Some(vec![Artist {
+                id: "6452".to_owned(),
+                name: "周杰伦".to_owned(),
+                pic_url: Some("https://p1.music.126.net/a.jpg".to_owned()),
+                album_size: Some(15),
+                music_size: Some(180),
+            }]),
+            lyric: None,
+        };
+        let encoded = answer_message(&ans);
+        let parsed: serde_json::Value = serde_json::from_str(&encoded).expect("parse answer_message");
+        assert_eq!(parsed["type"], "neteaseAnswer");
+        assert_eq!(parsed["radios"][0]["djName"], "DJ小云");
+        assert_eq!(parsed["radios"][0]["programCount"], 24);
+        assert_eq!(parsed["artists"][0]["name"], "周杰伦");
+        assert_eq!(parsed["artists"][0]["musicSize"], 180);
     }
 }

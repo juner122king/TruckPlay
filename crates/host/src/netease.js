@@ -545,6 +545,100 @@
           console.error('[netease] fetch playlist tracks failed', e)
           post({ type: 'answer', answer: { id, failed: true, error: String(e), songs: [] } })
         }
+      } else if (question.ask === 'userRadios') {
+        const attempts = [
+          () => fetchJsonSafe('https://music.163.com/api/djradio/subed/v1?limit=50&offset=0', { credentials: 'include' }),
+          () => fetchJsonSafe('https://music.163.com/api/dj/sublist?limit=50&offset=0', { credentials: 'include' }),
+          () => fetchJsonSafe('https://music.163.com/api/dj/sublist', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'limit=50&offset=0'
+          })
+        ]
+        let rawRadios = []
+        for (const attempt of attempts) {
+          const data = await attempt()
+          const list = data?.djRadios || data?.data || data?.radios
+          if (data && data.code === 200 && Array.isArray(list)) {
+            rawRadios = list
+            break
+          }
+        }
+        const radios = dedupeById(rawRadios.map(r => ({
+          id: String(r.id),
+          name: r.name || '我的电台',
+          picUrl: toHttpsUrl(r.picUrl || r.intervenePicUrl),
+          djName: r.dj?.nickname || undefined,
+          programCount: Number(r.programCount || 0),
+          subCount: Number.isFinite(Number(r.subCount)) ? Number(r.subCount) : undefined
+        })))
+        post({ type: 'answer', answer: { id, radios } })
+      } else if (question.ask === 'radioPrograms') {
+        const rid = encodeURIComponent(String(question.radioId || '').trim())
+        const data = await fetchJsonSafe(`https://music.163.com/api/dj/program/byradio?radioId=${rid}&limit=50&offset=0&asc=false`, { credentials: 'include' })
+        const rawPrograms = Array.isArray(data?.programs) ? data.programs : []
+        const songs = dedupeById(rawPrograms.map(p => {
+          const main = p.mainSong || {}
+          const trackId = main.id || p.id
+          return {
+            id: String(trackId),
+            title: p.name || main.name || '电台节目',
+            artist: p.dj?.nickname || p.radio?.name || (main.artists || []).map(a => a.name).join(', ') || '电台主播',
+            album: p.radio?.name || '',
+            artwork: toHttpsUrl(p.coverUrl || p.radio?.picUrl || main.album?.picUrl),
+            duration: (p.duration || main.duration || 0) / 1000,
+            fee: 0,
+            playable: true
+          }
+        }))
+        post({ type: 'answer', answer: { id, songs } })
+      } else if (question.ask === 'userArtists') {
+        const attempts = [
+          () => fetchJsonSafe('https://music.163.com/api/artist/sublist?limit=50&offset=0', { credentials: 'include' }),
+          () => fetchJsonSafe('https://music.163.com/api/artist/sublist', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'limit=50&offset=0'
+          })
+        ]
+        let rawArtists = []
+        for (const attempt of attempts) {
+          const data = await attempt()
+          const list = data?.data || data?.artists
+          if (data && data.code === 200 && Array.isArray(list)) {
+            rawArtists = list
+            break
+          }
+        }
+        const artists = dedupeById(rawArtists.map(a => ({
+          id: String(a.id),
+          name: a.name || '未知歌手',
+          picUrl: toHttpsUrl(a.picUrl || a.img1v1Url),
+          albumSize: Number.isFinite(Number(a.albumSize)) ? Number(a.albumSize) : undefined,
+          musicSize: Number.isFinite(Number(a.musicSize)) ? Number(a.musicSize) : undefined
+        })))
+        post({ type: 'answer', answer: { id, artists } })
+      } else if (question.ask === 'artistSongs') {
+        const aid = encodeURIComponent(String(question.artistId || '').trim())
+        let rawSongs = []
+        let artistName = '未知歌手'
+        const topData = await fetchJsonSafe(`https://music.163.com/api/v1/artist/${aid}`, { credentials: 'include' })
+        if (topData && topData.code === 200) {
+          if (topData.artist?.name) artistName = topData.artist.name
+          if (Array.isArray(topData.hotSongs) && topData.hotSongs.length > 0) {
+            rawSongs = topData.hotSongs
+          }
+        }
+        if (rawSongs.length === 0) {
+          const moreData = await fetchJsonSafe(`https://music.163.com/api/v1/artist/songs?id=${aid}&order=hot&limit=50&offset=0`, { credentials: 'include' })
+          if (moreData && moreData.code === 200 && Array.isArray(moreData.songs)) {
+            rawSongs = moreData.songs
+          }
+        }
+        const songs = dedupeById(rawSongs.slice(0, 100).map(s => mapTrack(s, artistName, s.privilege || null)))
+        post({ type: 'answer', answer: { id, songs } })
       } else if (question.ask === 'lyrics') {
         const res = await fetch(`https://music.163.com/api/song/lyric?os=pc&id=${question.id}&lv=-1&kv=-1&tv=-1`)
         const data = await res.json()

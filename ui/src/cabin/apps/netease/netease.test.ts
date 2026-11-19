@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   backToPlaylists,
+  DEFAULT_USER_ARTISTS,
   DEFAULT_USER_PLAYLISTS,
+  DEFAULT_USER_RADIOS,
   DISCOVER_CATEGORIES,
   dismissPlaybackNotice,
   getFallbackTracksForPlaylist,
@@ -12,8 +14,11 @@ import {
   receivePlayback,
   receiveState,
   seek,
+  selectArtist,
   selectDiscoverChart,
+  selectMyCategory,
   selectPlaylist,
+  selectRadio,
   selectTab,
   sendVolume,
   setVolume,
@@ -581,5 +586,60 @@ describe('netease app store & playlists', () => {
     expect(useNetease.getState().playback?.trackId).toBe('rs-2')
     expect(useNetease.getState().queueIndex).toBe(1)
     expect(useNetease.getState().playing).toBe(true)
+  })
+
+  it('supports "电台" and "歌手" sub-tabs in "我的" with preview fallback and detail views', () => {
+    selectTab('my')
+    selectMyCategory('radio')
+    let state = useNetease.getState()
+    expect(state.myCategory).toBe('radio')
+    expect(state.radios.length).toBe(DEFAULT_USER_RADIOS.length)
+
+    selectRadio(DEFAULT_USER_RADIOS[0])
+    state = useNetease.getState()
+    expect(state.currentPlaylist?.id).toBe(DEFAULT_USER_RADIOS[0].id)
+    expect(state.currentCollectionKind).toBe('radio')
+    expect(state.tracks.length).toBeGreaterThan(0)
+
+    backToPlaylists()
+    expect(useNetease.getState().currentPlaylist).toBeNull()
+    expect(useNetease.getState().currentCollectionKind).toBe('playlist')
+
+    selectMyCategory('artist')
+    state = useNetease.getState()
+    expect(state.myCategory).toBe('artist')
+    expect(state.artists.length).toBe(DEFAULT_USER_ARTISTS.length)
+
+    selectArtist(DEFAULT_USER_ARTISTS[0])
+    state = useNetease.getState()
+    expect(state.currentPlaylist?.id).toBe(DEFAULT_USER_ARTISTS[0].id)
+    expect(state.currentCollectionKind).toBe('artist')
+    expect(state.tracks.length).toBeGreaterThan(0)
+    backToPlaylists()
+  })
+
+  it('updates radios and artists from receiveAnswer and deduplicates by id', () => {
+    receiveAnswer(
+      901,
+      false,
+      undefined,
+      null,
+      null,
+      null,
+      [
+        { id: 'r1', name: '电台A', djName: '主播A', programCount: 10 },
+        { id: 'r1', name: '电台A重复', djName: '主播A', programCount: 10 },
+        { id: 'r2', name: '电台B', programCount: 5 },
+      ],
+      [
+        { id: 'a1', name: '歌手A', albumSize: 4, musicSize: 30 },
+        { id: 'a1', name: '歌手A重复', albumSize: 4, musicSize: 30 },
+      ],
+    )
+    const state = useNetease.getState()
+    expect(state.radios).toHaveLength(2)
+    expect(state.radios[0].name).toBe('电台A')
+    expect(state.artists).toHaveLength(1)
+    expect(state.artists[0].name).toBe('歌手A')
   })
 })

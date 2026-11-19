@@ -1,5 +1,5 @@
 import { type CSSProperties, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { type NeteasePlaylist, type NeteaseTrack } from '../../../shared/host'
+import { type NeteaseArtist, type NeteasePlaylist, type NeteaseRadio, type NeteaseTrack } from '../../../shared/host'
 import { useKeyboard } from '../../keyboard/store'
 import { TextField } from '../../keyboard/TextField'
 import { useCabin } from '../../state/store'
@@ -35,13 +35,17 @@ import {
   DISCOVER_CATEGORIES,
   HOT_SEARCH_TAGS,
   MOCK_RECOMMENDED_PLAYLISTS,
+  type MyCategory,
   type NeteaseTab,
   play,
   playOrPause,
   playShuffled,
   searchSongs,
+  selectArtist,
   selectDiscoverChart,
+  selectMyCategory,
   selectPlaylist,
+  selectRadio,
   selectTab,
   sendSignIn,
   sendSignOut,
@@ -173,9 +177,14 @@ export function NeteaseApp() {
     signingIn,
     tracks,
     playlists,
+    radios,
+    artists,
     recommendedPlaylists,
     currentPlaylist,
+    currentCollectionKind,
+    currentCollectionSubtitle,
     tab,
+    myCategory,
     discoverChartId,
     loading,
     playback,
@@ -185,7 +194,6 @@ export function NeteaseApp() {
   const [query, setQuery] = useState('')
   const [beforeSearchTab, setBeforeSearchTab] = useState<Exclude<NeteaseTab, 'search'>>('recommend')
   const [currentDateNumber] = useState(() => new Date().getDate())
-  const [myCategory, setMyCategory] = useState<'all' | 'created' | 'collected'>('all')
   const typing = useKeyboard((s) => s.field?.id === SEARCH_FIELD)
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -221,7 +229,7 @@ export function NeteaseApp() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 })
-  }, [tab, currentPlaylist?.id, discoverChartId])
+  }, [tab, myCategory, currentPlaylist?.id, discoverChartId])
 
   useEffect(() => {
     if (tab !== 'discover') return
@@ -565,7 +573,9 @@ export function NeteaseApp() {
                         { id: 'all', label: '全部' },
                         { id: 'created', label: '自建' },
                         { id: 'collected', label: '收藏' },
-                      ] as const
+                        { id: 'radio', label: '电台' },
+                        { id: 'artist', label: '歌手' },
+                      ] as const satisfies readonly { id: MyCategory; label: string }[]
                     ).map((cat) => (
                       <button
                         key={cat.id}
@@ -573,14 +583,44 @@ export function NeteaseApp() {
                         role="tab"
                         aria-selected={myCategory === cat.id}
                         className={`ne-pill brand${myCategory === cat.id ? ' active' : ''}`}
-                        onClick={() => setMyCategory(cat.id)}
+                        onClick={() => selectMyCategory(cat.id)}
                       >
                         {cat.label}
                       </button>
                     ))}
                   </div>
 
-                  {loading && myPlaylists.length === 0 ? (
+                  {myCategory === 'radio' ? (
+                    loading && radios.length === 0 ? (
+                      <div className="ne-playlists-grid" aria-busy="true">
+                        {Array.from({ length: 6 }, (_, i) => (
+                          <div key={i} className="ne-pl-skeleton">
+                            <div className="ne-pl-skel-cover" />
+                            <div className="ne-pl-skel-line" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : radios.length === 0 ? (
+                      <div className="ne-list-empty">暂无订阅电台</div>
+                    ) : (
+                      <RadioGrid radios={radios} onSelect={selectRadio} />
+                    )
+                  ) : myCategory === 'artist' ? (
+                    loading && artists.length === 0 ? (
+                      <div className="ne-playlists-grid" aria-busy="true">
+                        {Array.from({ length: 6 }, (_, i) => (
+                          <div key={i} className="ne-pl-skeleton">
+                            <div className="ne-pl-skel-cover round" />
+                            <div className="ne-pl-skel-line" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : artists.length === 0 ? (
+                      <div className="ne-list-empty">暂无收藏歌手</div>
+                    ) : (
+                      <ArtistGrid artists={artists} onSelect={selectArtist} />
+                    )
+                  ) : loading && myPlaylists.length === 0 ? (
                     <div className="ne-playlists-grid" aria-busy="true">
                       {Array.from({ length: 6 }, (_, i) => (
                         <div key={i} className="ne-pl-skeleton">
@@ -636,16 +676,16 @@ export function NeteaseApp() {
             </div>
           )}
 
-          {/* 6. PLAYLIST DETAIL VIEW */}
+          {/* 6. PLAYLIST / RADIO / ARTIST DETAIL VIEW */}
           {currentPlaylist && (
             <div className="ne-page">
               <div className="ne-collection-head">
-                <div className="ne-collection-cover">
+                <div className={`ne-collection-cover${currentCollectionKind === 'artist' ? ' round' : ''}`}>
                   {currentPlaylist.coverImgUrl ? (
                     <img src={currentPlaylist.coverImgUrl} alt="" referrerPolicy="no-referrer" />
                   ) : (
                     <span className="ne-cover-fallback" aria-hidden="true">
-                      <NoteGlyph size={56} />
+                      {currentCollectionKind === 'artist' ? <PersonGlyph size={56} /> : <NoteGlyph size={56} />}
                     </span>
                   )}
                 </div>
@@ -653,7 +693,15 @@ export function NeteaseApp() {
                 <div className="ne-collection-meta">
                   <h1 className="ne-collection-title">{currentPlaylist.name}</h1>
                   <p className="ne-collection-sub">
-                    <span>{tracks.length > 0 ? tracks.length : currentPlaylist.trackCount} 首歌曲</span>
+                    {currentCollectionSubtitle && <span>{currentCollectionSubtitle} · </span>}
+                    <span>
+                      {tracks.length > 0 ? tracks.length : currentPlaylist.trackCount}{' '}
+                      {currentCollectionKind === 'radio'
+                        ? '期节目'
+                        : currentCollectionKind === 'artist'
+                          ? '首热门单曲'
+                          : '首歌曲'}
+                    </span>
                     {loading && <span className="ne-sync-badge">· 正在同步…</span>}
                   </p>
                   <div className="ne-collection-actions">
@@ -815,6 +863,58 @@ function PlaylistGrid({
           {showCount && <span className="ne-pl-sub">{pl.trackCount} 首歌曲</span>}
         </button>
       ))}
+    </div>
+  )
+}
+
+function RadioGrid({ radios, onSelect }: { radios: NeteaseRadio[]; onSelect(radio: NeteaseRadio): void }) {
+  const albumArt = useCabin((s) => s.albumArt)
+  return (
+    <div className="ne-playlists-grid">
+      {radios.map((radio) => (
+        <button key={radio.id} type="button" className="ne-pl-card" onClick={() => onSelect(radio)}>
+          <div className="ne-pl-thumb">
+            {albumArt && radio.picUrl ? (
+              <img src={radio.picUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="ne-cover-fallback" aria-hidden="true">
+                <RoamingGlyph size={38} />
+              </span>
+            )}
+            {radio.programCount > 0 && <span className="ne-pl-play-count">{radio.programCount} 期</span>}
+          </div>
+          <span className="ne-pl-title">{radio.name}</span>
+          <span className="ne-pl-sub">{radio.djName ? `by ${radio.djName}` : '播客电台'}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ArtistGrid({ artists, onSelect }: { artists: NeteaseArtist[]; onSelect(artist: NeteaseArtist): void }) {
+  const albumArt = useCabin((s) => s.albumArt)
+  return (
+    <div className="ne-playlists-grid">
+      {artists.map((artist) => {
+        const subParts: string[] = []
+        if (artist.musicSize) subParts.push(`${artist.musicSize} 首单曲`)
+        if (artist.albumSize) subParts.push(`${artist.albumSize} 张专辑`)
+        return (
+          <button key={artist.id} type="button" className="ne-pl-card ne-artist-card" onClick={() => onSelect(artist)}>
+            <div className="ne-pl-thumb ne-artist-thumb">
+              {albumArt && artist.picUrl ? (
+                <img src={artist.picUrl} alt="" referrerPolicy="no-referrer" />
+              ) : (
+                <span className="ne-cover-fallback" aria-hidden="true">
+                  <PersonGlyph size={44} />
+                </span>
+              )}
+            </div>
+            <span className="ne-pl-title">{artist.name}</span>
+            {subParts.length > 0 && <span className="ne-pl-sub">{subParts.join(' · ')}</span>}
+          </button>
+        )
+      })}
     </div>
   )
 }

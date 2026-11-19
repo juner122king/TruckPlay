@@ -887,6 +887,15 @@
   color: var(--ne-dim);
 }
 
+.shell .ne-artist-card {
+  align-items: center;
+  text-align: center;
+}
+
+.shell .ne-artist-thumb {
+  border-radius: 50%;
+}
+
 /* Loading skeletons */
 .shell .ne-pl-skeleton {
   display: flex;
@@ -899,6 +908,10 @@
   border-radius: var(--ne-corner);
   background: var(--ne-fill);
   animation: ne-pulse 1.4s ease-in-out infinite alternate;
+}
+
+.shell .ne-pl-skel-cover.round {
+  border-radius: 50%;
 }
 
 .shell .ne-pl-skel-line {
@@ -934,6 +947,10 @@
   overflow: hidden;
   background: var(--ne-fill);
   box-shadow: var(--shadow-raised);
+}
+
+.shell .ne-collection-cover.round {
+  border-radius: 50%;
 }
 
 .shell .ne-collection-cover img {

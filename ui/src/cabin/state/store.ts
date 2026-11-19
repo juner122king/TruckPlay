@@ -754,7 +754,16 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         )
         break
       case 'neteaseAnswer':
-        receiveNeteaseAnswer(message.id, message.failed, message.error, message.songs, message.playlists, message.lyric)
+        receiveNeteaseAnswer(
+          message.id,
+          message.failed,
+          message.error,
+          message.songs,
+          message.playlists,
+          message.lyric,
+          message.radios,
+          message.artists,
+        )
         break
       case 'neteasePlayback':
         receiveNeteasePlayback(message.playback)

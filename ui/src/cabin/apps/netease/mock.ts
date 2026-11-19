@@ -1,4 +1,4 @@
-import type { NeteasePlaylist, NeteaseTrack } from '../../../shared/host'
+import type { NeteaseArtist, NeteasePlaylist, NeteaseRadio, NeteaseTrack } from '../../../shared/host'
 import type { UserProfile } from './netease'
 
 export interface NeteaseCategory {
@@ -516,4 +516,77 @@ export function getFallbackTracksForPlaylist(playlist: NeteasePlaylist): Netease
     hash = (hash * 31 + id.charCodeAt(i)) | 0
   }
   return FALLBACK_POOLS[Math.abs(hash) % FALLBACK_POOLS.length]
+}
+
+export const DEFAULT_USER_RADIOS: NeteaseRadio[] = [
+  {
+    id: 'radio_highway',
+    name: '公路夜话 · 司机电台',
+    picUrl: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=400&q=80',
+    djName: '车载电台君',
+    programCount: 24,
+    subCount: 12800,
+  },
+  {
+    id: 'radio_lofi',
+    name: '深夜巡航 · 城市播客',
+    picUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80',
+    djName: 'FM 103.8',
+    programCount: 16,
+    subCount: 8400,
+  },
+  {
+    id: 'radio_story',
+    name: '音乐故事汇 · 经典回响',
+    picUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
+    djName: '声音实验室',
+    programCount: 42,
+    subCount: 26300,
+  },
+]
+
+export const DEFAULT_USER_ARTISTS: NeteaseArtist[] = [
+  {
+    id: 'artist_jay',
+    name: '周杰伦',
+    picUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+    albumSize: 15,
+    musicSize: 180,
+  },
+  {
+    id: 'artist_pushu',
+    name: '朴树',
+    picUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+    albumSize: 5,
+    musicSize: 48,
+  },
+  {
+    id: 'artist_beyond',
+    name: 'Beyond',
+    picUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?auto=format&fit=crop&w=400&q=80',
+    albumSize: 22,
+    musicSize: 210,
+  },
+  {
+    id: 'artist_liushuang',
+    name: '柳爽',
+    picUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?auto=format&fit=crop&w=400&q=80',
+    albumSize: 3,
+    musicSize: 36,
+  },
+]
+
+export function getFallbackTracksForRadio(radio: NeteaseRadio): NeteaseTrack[] {
+  if (radio.id === 'radio_lofi') return EDM_TRACKS
+  if (radio.id === 'radio_story') return FOLK_TRACKS
+  return HIGHWAY_TRACKS
+}
+
+export function getFallbackTracksForArtist(artist: NeteaseArtist): NeteaseTrack[] {
+  const name = (artist.name || '').toLowerCase()
+  if (name.includes('周杰伦')) return MOCK_TRACKS.filter((t) => t.artist.includes('周杰伦'))
+  if (name.includes('朴树')) return MOCK_TRACKS.filter((t) => t.artist.includes('朴树'))
+  if (name.includes('beyond')) return MOCK_TRACKS.filter((t) => t.artist.includes('Beyond'))
+  if (name.includes('柳爽')) return FOLK_TRACKS
+  return getFallbackTracksForPlaylist({ id: artist.id, name: artist.name, trackCount: artist.musicSize ?? 10 })
 }

@@ -776,6 +776,10 @@ export type NeteaseQuestion =
   | { ask: 'chart'; id: string }
   | { ask: 'userPlaylists' }
   | { ask: 'playlistTracks'; playlistId: string }
+  | { ask: 'userRadios' }
+  | { ask: 'radioPrograms'; radioId: string }
+  | { ask: 'userArtists' }
+  | { ask: 'artistSongs'; artistId: string }
   | { ask: 'lyrics'; id: string }
 
 export interface NeteasePlaylist {
@@ -785,6 +789,23 @@ export interface NeteasePlaylist {
   trackCount: number
   playCount?: number
   subscribed?: boolean
+}
+
+export interface NeteaseRadio {
+  id: string
+  name: string
+  picUrl?: string
+  djName?: string
+  programCount: number
+  subCount?: number
+}
+
+export interface NeteaseArtist {
+  id: string
+  name: string
+  picUrl?: string
+  albumSize?: number
+  musicSize?: number
 }
 
 export interface NeteaseTrack {
@@ -813,6 +834,8 @@ export interface NeteasePlayback {
 export interface NeteaseAnswers {
   songs?: NeteaseTrack[]
   playlists?: NeteasePlaylist[]
+  radios?: NeteaseRadio[]
+  artists?: NeteaseArtist[]
   lyric?: string
 }
 
