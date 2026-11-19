@@ -3,6 +3,11 @@
 What changed in each release of WestPlay. The newest release's notes are what the app shows when it offers the
 update.
 
+## 2.4.0-domestic.4 国内定制版 / Domestic Edition (2026-11-19)
+- 重构网易云音乐车机端 UI（CarPlay 风格）：在「我的音乐」中新增播客电台与歌手分类标签页，修复自动连播切歌并同步真实用户头像与昵称资料。
+- 重设计导航界面与相机控制：新增动态导航视角设置（自动缩放、缩放强度、路口放大）及配置/多语言支持，紧凑化左侧转向指引与 ETA 状态栏，统一右下角图标化居中、正北朝上切换与路线概览循环按钮并放大触控区域，修复信号灯标注漂移并新增 HUD 信号灯倒计时与主车道箭头高亮。
+- 优化国内媒体宿主性能与稳定性：跨媒体播放器共享 `CabCache` 去重缓存，修复车内音频图重建卡顿与喜马拉雅宿主页白屏问题。
+
 ## 2.4.0-domestic.3 国内定制版 / Domestic Edition (2026-11-18)
 - 修复电台（Radio）直播播放一段时间后自动暂停的问题：自动恢复非主动触发的音频暂停、连续异常时自动重建 HLS 连接、在稳定播放后重置重连预算并延长退避窗口与优化 `hls.js` 重试及缓冲配置。
 - 修复喜马拉雅/电台播放器接入车内 3D 扬声器音效（`westplayCabSound`）的参数签名错误，恢复均衡器、车外闷音与频谱分析并降低后台 CPU 占用，同时在 `app.log` 中区分 `loading`/`paused` 状态并记录播放错误原因。
