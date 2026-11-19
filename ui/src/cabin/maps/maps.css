@@ -1486,8 +1486,8 @@
 }
 
 .map-navigation .map-recentre-btn {
-  width: 50px;
-  height: 50px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   transition:
     background-color 180ms var(--motion-ease),
@@ -1497,8 +1497,8 @@
 }
 
 .map-navigation .map-recentre-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   stroke-width: 2.1;
 }
 
@@ -1568,13 +1568,13 @@
 .map-action-bar {
   display: flex;
   align-items: center;
-  border-radius: 25px;
+  border-radius: 32px;
   overflow: hidden;
 }
 
 .map-dock-divider-v {
   width: 1.5px;
-  height: 26px;
+  height: 34px;
   background: currentColor;
   opacity: 0.16;
   flex: none;
@@ -1584,23 +1584,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 25px;
+  border-radius: 32px;
   overflow: hidden;
 }
 
 .map-navigation .map-dock :is(.map-action-bar, .map-view-rail) :is(.map-control, .map-compass) {
-  width: 50px;
-  height: 50px;
+  width: 64px;
+  height: 64px;
   border-radius: 0;
 }
 
 .map-navigation .map-dock .map-control svg {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
 }
 
 .map-navigation .map-dock .map-zoom-divider {
-  width: 28px;
+  width: 36px;
   height: 1.5px;
 }
 
@@ -1628,10 +1628,10 @@
 
 .map-navigation .map-dock .map-overview-lock {
   position: absolute;
-  right: 5px;
-  top: 5px;
-  width: 16px;
-  height: 16px;
+  right: 6px;
+  top: 6px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #ffd60a;
   color: #14161a;
@@ -1642,8 +1642,8 @@
 }
 
 .map-navigation .map-dock .map-overview-lock svg {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   stroke: currentColor;
   stroke-width: 1.9;
   fill: none;
@@ -1665,30 +1665,33 @@
   }
   .map-navigation .map-recentre-btn,
   .map-navigation .map-dock :is(.map-action-bar, .map-view-rail) :is(.map-control, .map-compass) {
-    width: 44px;
-    height: 44px;
+    width: 54px;
+    height: 54px;
   }
   .map-navigation .map-action-bar,
   .map-navigation .map-view-rail {
-    border-radius: 22px;
+    border-radius: 27px;
+  }
+  .map-navigation .map-dock-divider-v {
+    height: 28px;
   }
   .map-navigation .map-recentre-btn svg,
   .map-navigation .map-dock .map-control svg {
-    width: 21px;
-    height: 21px;
+    width: 26px;
+    height: 26px;
   }
   .map-navigation .map-dock .map-overview-lock {
     right: 4px;
     top: 4px;
-    width: 14px;
-    height: 14px;
+    width: 18px;
+    height: 18px;
   }
   .map-navigation .map-dock .map-overview-lock svg {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
   }
   .map-navigation .map-dock .map-zoom-divider {
-    width: 24px;
+    width: 30px;
   }
   .map-navigation .guidance-banner {
     left: var(--content-left);
