@@ -39,6 +39,7 @@ export interface Strings {
   laneGuidance: string
   recommendedLane: string
   unavailableLane: string
+  speedCamera: string
   /** The compass: turns the map north up, seen from above. */
   northUp: string
   zoomIn: string

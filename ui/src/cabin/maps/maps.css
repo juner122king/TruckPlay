@@ -353,7 +353,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.guidance-alerts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .guidance-then {
@@ -952,6 +961,7 @@
 
 /* Compact unified on-map traffic light capsule: root marker stays unstyled in transform so MapLibre tracks 1:1. */
 .traffic-light-badge {
+  display: inline-flex;
   pointer-events: none;
   user-select: none;
   z-index: 10;
@@ -1273,11 +1283,20 @@
   }
 }
 
-/* Free-driving standalone traffic light HUD in top-left corner when no route guidance is active. */
-.free-drive-signal {
+/* Free-driving standalone traffic light & speed camera HUDs in top-left corner when no route guidance is active. */
+.free-drive-alerts {
   position: absolute;
   left: var(--content-left);
   top: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.free-drive-signal {
+  position: relative;
   padding: 5px;
   border-radius: 999px;
   background: rgb(20 23 28 / 0.84);
@@ -1291,10 +1310,216 @@
     var(--shadow-raised-large);
 }
 
-.free-drive-signal .traffic-pill {
+.free-drive-signal .traffic-pill,
+.free-drive-signal .speed-camera-pill {
   background: transparent;
   border-color: transparent;
-  padding: 3px 9px 4px 5px;
+  padding: 3px 9px 4px 7px;
+}
+
+/* Fixed speed camera map pin (speedCameras.ts): mirrors .traffic-light-badge in appearance and geometry. */
+.speed-camera-badge {
+  --camera-accent: #ff9f0a;
+  --camera-text: #ffd426;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.speed-camera-badge.overspeed {
+  --camera-accent: #ff3b30;
+  --camera-text: #ff6961;
+}
+
+.speed-camera-pin {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 3px 9px 4px 7px;
+  border-radius: 12px;
+  background: rgb(16 20 26 / 0.93);
+  border: 1.5px solid color-mix(in srgb, var(--camera-accent) 68%, rgb(255 255 255 / 0.22));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 4px 12px rgb(0 0 0 / 0.45);
+  box-sizing: border-box;
+}
+
+.appearance-light .speed-camera-pin {
+  background: rgb(20 24 30 / 0.94);
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.94),
+    0 4px 12px rgb(0 0 0 / 0.26);
+}
+
+.speed-camera-badge.no-limit .speed-camera-pin {
+  padding: 3px 8px 4px;
+}
+
+.speed-camera-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: rgb(16 20 26 / 0.94);
+  border-right: 1.5px solid color-mix(in srgb, var(--camera-accent) 68%, rgb(255 255 255 / 0.22));
+  border-bottom: 1.5px solid color-mix(in srgb, var(--camera-accent) 68%, rgb(255 255 255 / 0.22));
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.appearance-light .speed-camera-pin::after {
+  background: rgb(20 24 30 / 0.94);
+}
+
+.speed-camera-icon {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  color: var(--camera-accent);
+  flex: none;
+}
+
+.speed-camera-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.speed-camera-limit-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.speed-camera-limit {
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1;
+  color: var(--camera-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.speed-camera-badge.overspeed .speed-camera-pin {
+  animation: camera-pin-urgent 900ms ease-in-out infinite;
+}
+
+@keyframes camera-pin-urgent {
+  0%,
+  100% {
+    border-color: color-mix(in srgb, var(--camera-accent) 68%, rgb(255 255 255 / 0.22));
+  }
+  50% {
+    border-color: var(--camera-accent);
+    box-shadow:
+      0 0 12px color-mix(in srgb, var(--camera-accent) 60%, transparent),
+      0 4px 12px rgb(0 0 0 / 0.45);
+  }
+}
+
+/* Quantized HUD speed camera pill (SpeedCameraPill.tsx): shared by guidance footer and free-drive capsule. */
+.speed-camera-pill {
+  --pill-accent: #ff9f0a;
+  --pill-text: #ffd426;
+  --camera-lens-cut: #181b20;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 5px 8px;
+  border-radius: 999px;
+  overflow: clip;
+  background: rgb(8 18 22 / 0.62);
+  border: 1px solid color-mix(in srgb, var(--pill-accent) 42%, rgb(255 255 255 / 0.18));
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  flex: none;
+}
+
+.speed-camera-pill.compact {
+  padding: 3px 8px 3px 6px;
+  gap: 5px;
+}
+
+.speed-camera-pill.overspeed {
+  --pill-accent: #ff3b30;
+  --pill-text: #ff6961;
+}
+
+.speed-camera-pill.urgent {
+  animation: traffic-pill-urgent 900ms ease-in-out infinite;
+}
+
+.speed-camera-pill-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--pill-accent);
+  flex: none;
+}
+
+.speed-camera-pill.compact .speed-camera-pill-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.speed-camera-pill-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.speed-camera-pill-label {
+  font-size: clamp(12.5px, calc(14px * var(--text-scale, 1)), 18px);
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.94);
+  white-space: nowrap;
+}
+
+.speed-camera-pill-limit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  font-size: clamp(12px, calc(13px * var(--text-scale, 1)), 17px);
+  font-weight: 850;
+  color: var(--pill-text);
+}
+
+.speed-camera-pill-distance {
+  font-size: clamp(12px, calc(13.5px * var(--text-scale, 1)), 18px);
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.78);
+  white-space: nowrap;
+}
+
+.appearance-light .free-drive-signal .speed-camera-pill {
+  --pill-accent: #c46a00;
+  --pill-text: #b26200;
+  --camera-lens-cut: #ffffff;
+}
+
+.appearance-light .free-drive-signal .speed-camera-pill.overspeed {
+  --pill-accent: #d12c22;
+  --pill-text: #d12c22;
+}
+
+.appearance-light .free-drive-signal .speed-camera-pill-label {
+  color: rgb(20 22 26 / 0.92);
+}
+
+.appearance-light .free-drive-signal .speed-camera-pill-limit {
+  background: rgb(0 0 0 / 0.08);
+}
+
+.appearance-light .free-drive-signal .speed-camera-pill-distance {
+  color: rgb(20 22 26 / 0.68);
 }
 
 .appearance-light .free-drive-signal .traffic-pill.traffic-green {
@@ -1723,7 +1948,7 @@
   .map-navigation .guidance-banner .guidance-footer {
     padding: 6px 13px;
   }
-  .map-navigation .free-drive-signal {
+  .map-navigation .free-drive-alerts {
     left: var(--content-left);
     top: calc(var(--edge) + var(--nav-corner-inset, 6px));
   }
@@ -1737,6 +1962,8 @@
   .traffic-light-badge.urgent .traffic-light-pin,
   .traffic-pill.urgent,
   .traffic-pill-fill,
+  .speed-camera-badge.overspeed .speed-camera-pin,
+  .speed-camera-pill.urgent,
   .free-drive-signal,
   .map-recentre-btn,
   .map-recentre-core {

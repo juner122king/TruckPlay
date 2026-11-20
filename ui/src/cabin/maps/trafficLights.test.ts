@@ -259,4 +259,67 @@ describe('nearestTrafficLightAhead', () => {
     syncTrafficLights(mockMap, pool, true)
     expect(el.isConnected).toBe(false)
   })
+
+  it('syncTrafficLights preserves MapLibre marker classes across state updates', () => {
+    const classes = new Set(['maplibregl-marker', 'maplibregl-marker-anchor-bottom', 'traffic-light-badge'])
+    const el = { isConnected: false }
+    const marker = {
+      getElement: () => el,
+      addTo: () => {
+        el.isConnected = true
+      },
+      remove: () => {
+        el.isConnected = false
+      },
+      setLngLat: () => {},
+    }
+    const badge = {
+      classList: {
+        add: (...items: string[]) => items.forEach((item) => classes.add(item)),
+        remove: (...items: string[]) => items.forEach((item) => classes.delete(item)),
+      },
+      get className() {
+        return Array.from(classes).join(' ')
+      },
+      set className(value: string) {
+        classes.clear()
+        for (const item of value.split(/\s+/).filter(Boolean)) classes.add(item)
+      },
+    }
+    const element = {
+      badge,
+      timerBox: { style: { display: '' } },
+      timer: { textContent: '' },
+      housing: {},
+      progress: { style: { display: '', transform: '' } },
+    }
+    const pool = { markers: [marker], elements: [element] } as unknown as TrafficLightPool
+    const mockMap: any = {
+      getZoom: () => 16,
+      getContainer: () => ({ clientWidth: 1000, clientHeight: 1000 }),
+      project: () => ({ x: 500, y: 500 }),
+    }
+
+    useLive.setState({
+      telemetry: baseTelemetry,
+      route: null,
+      routeNext: 0,
+      semaphores: [{ x: 2, y: 0, z: -40, heading: 0.5, state: 1, countdown: 0, duration: 24 }],
+    })
+    syncTrafficLights(mockMap, pool)
+    expect(classes.has('maplibregl-marker')).toBe(true)
+    expect(classes.has('maplibregl-marker-anchor-bottom')).toBe(true)
+    expect(classes.has('traffic-red')).toBe(true)
+    expect(classes.has('no-timer')).toBe(true)
+
+    useLive.setState({
+      semaphores: [{ x: 2, y: 0, z: -40, heading: 0.5, state: 3, countdown: 10, duration: 30 }],
+    })
+    syncTrafficLights(mockMap, pool)
+    expect(classes.has('maplibregl-marker')).toBe(true)
+    expect(classes.has('maplibregl-marker-anchor-bottom')).toBe(true)
+    expect(classes.has('traffic-green')).toBe(true)
+    expect(classes.has('traffic-red')).toBe(false)
+    expect(classes.has('no-timer')).toBe(false)
+  })
 })

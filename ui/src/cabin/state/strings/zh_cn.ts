@@ -36,6 +36,7 @@ export const strings: Strings = {
   laneGuidance: '车道引导',
   recommendedLane: '推荐车道',
   unavailableLane: '非推荐车道',
+  speedCamera: '前方测速',
   northUp: '北方朝上',
   zoomIn: '放大',
   zoomOut: '缩小',

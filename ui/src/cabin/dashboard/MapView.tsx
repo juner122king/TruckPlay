@@ -11,6 +11,7 @@ import { nextStop } from '../maps/nextStop'
 import { useMapData } from '../maps/mapData'
 import { MapCacheNotice } from '../maps/MapCacheNotice'
 import { RoadMap } from '../maps/RoadMap'
+import { FreeDriveSpeedCamera } from '../maps/SpeedCameraPill'
 import { SpeedDisplay } from '../maps/SpeedDisplay'
 import { FreeDriveTrafficLight } from '../maps/TrafficLightPill'
 import { useClockStyle } from '../state/hooks'
@@ -86,7 +87,10 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
           {interactive && (
             <div className="map-guidance-layer" aria-hidden={overview}>
               <GuidanceCard variant="banner" />
-              <FreeDriveTrafficLight />
+              <div className="free-drive-alerts">
+                <FreeDriveTrafficLight />
+                <FreeDriveSpeedCamera />
+              </div>
             </div>
           )}
           {data && interactive && (

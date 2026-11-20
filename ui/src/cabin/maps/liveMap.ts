@@ -35,6 +35,13 @@ import { labelLines, placeLabels } from './labels'
 import { NO_ENTRY_ICON, drawNoEntry, drawPlaceIcon, parsePlaceIcon } from './placeIcons'
 import { type BuildingMeshes, buildingMeshes } from './buildingMeshes'
 import { type RaisedRoads, raisedRoads } from './raisedRoads'
+import {
+  createSpeedCameraPool,
+  ensureSpeedCameras,
+  getLoadedSpeedCameras,
+  syncSpeedCameras,
+  type SpeedCameraPool,
+} from './speedCameras'
 import { createTrafficLightPool, syncTrafficLights, type TrafficLightPool } from './trafficLights'
 import { cameraBounds, type MapData } from './mapData'
 import { loadView, type SavedView, saveView } from './mapView'
@@ -161,6 +168,8 @@ interface LiveMap {
   labels: { marker: maplibregl.Marker; at: [number, number]; width: number; height: number }[]
   /** Traffic light markers with real-time countdown timers. */
   trafficLights: TrafficLightPool
+  /** Fixed speed camera markers ahead in the driving corridor. */
+  speedCameras: SpeedCameraPool
   /** The appearance the page wants, and the one the map is painted in (they differ until it's restyled). */
   wanted: Appearance
   painted: Appearance
@@ -370,6 +379,7 @@ function create(data: MapData, appearance: Appearance): LiveMap {
   raised?.setShown(useCabin.getState().mapRoads)
   const meshes = data.meshes ? buildingMeshes(map, data.meshes, () => created.painted) : null
   meshes?.setShown(useCabin.getState().mapBuildings)
+  ensureSpeedCameras(data.speedCameras)
   const created: LiveMap = {
     data,
     map,
@@ -385,6 +395,7 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     canopies: { hidden: '', at: -Infinity },
     labels,
     trafficLights: createTrafficLightPool(),
+    speedCameras: createSpeedCameraPool(),
     wanted: appearance,
     painted: appearance,
     garagesShown: null,
@@ -885,6 +896,12 @@ function place() {
       syncRoute(current, now)
       syncCanopies(current, now)
       syncTrafficLights(current.map, current.trafficLights, currentOverview.active())
+      syncSpeedCameras(
+        current.map,
+        current.speedCameras,
+        getLoadedSpeedCameras(current.data.speedCameras),
+        currentOverview.active(),
+      )
       current.raised?.update(now)
       current.meshes?.update(now)
       updateCamera(current, now, dt)

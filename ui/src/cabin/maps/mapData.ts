@@ -57,6 +57,8 @@ export interface MapData {
   labels: MapLabel[]
   /** Where the player can be routed (places.ts): the file's address, `null` without one. */
   places: string | null
+  /** Fixed speed camera coordinates extracted from the map (speedCameras.ts), `null` on older builds. */
+  speedCameras: string | null
   /** Which country each part of the map is in, and their time zones (state/timeZone.ts): the file's address,
    * `null` without one (a map built before WestPlay read them). */
   countries: string | null
@@ -149,6 +151,7 @@ function load(base: string, built: number | null): Promise<MapData | null> {
           centre: manifest.centre,
           labels: manifest.labels ?? [],
           places: manifest.places ? `${base}/${manifest.places}` : null,
+          speedCameras: manifest.speedCameras ? `${base}/${manifest.speedCameras}` : null,
           countries: manifest.countries ? `${base}/${manifest.countries}` : null,
           scale: manifest.scale ?? ETS2_SCALE,
         }

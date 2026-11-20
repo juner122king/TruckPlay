@@ -34,6 +34,7 @@ export const strings: Strings = {
   laneGuidance: 'Lane guidance',
   recommendedLane: 'Recommended lane',
   unavailableLane: 'Not on route',
+  speedCamera: 'Speed camera',
   northUp: 'North up',
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',

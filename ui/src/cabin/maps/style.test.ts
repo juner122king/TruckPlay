@@ -16,6 +16,7 @@ const data: MapData = {
   centre: [0, 0],
   labels: [],
   places: null,
+  speedCameras: null,
   countries: null,
   scale: 19,
 }

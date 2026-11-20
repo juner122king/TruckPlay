@@ -8,7 +8,9 @@ import { guidanceFor } from './guidanceDistance'
 import { LaneRibbon } from './LaneRibbon'
 import { useLaneHint } from './useLaneHint'
 import { ManeuverGlyph } from './ManeuverGlyph'
+import { SpeedCameraPillView } from './SpeedCameraPill'
 import { TrafficLightPillView } from './TrafficLightPill'
+import { useUpcomingSpeedCamera } from './useSpeedCamera'
 import { useUpcomingTrafficLight } from './useTrafficLight'
 
 /** A step as the store can compare it: the maneuver itself (the route's own object, the same from one
@@ -166,11 +168,28 @@ function GuidanceFooter({
   closing: boolean
   variant: 'widget' | 'banner'
 }) {
-  const text = useText()
   const signal = useUpcomingTrafficLight()
+  const camera = useUpcomingSpeedCamera()
+  return <GuidanceFooterView thenStep={thenStep} signal={signal} camera={camera} closing={closing} variant={variant} />
+}
+
+export function GuidanceFooterView({
+  thenStep,
+  signal,
+  camera,
+  closing,
+  variant,
+}: {
+  thenStep: Step | null
+  signal: ReturnType<typeof useUpcomingTrafficLight>
+  camera: ReturnType<typeof useUpcomingSpeedCamera>
+  closing: boolean
+  variant: 'widget' | 'banner'
+}) {
+  const text = useText()
   const snapshot = useMemo(
-    () => (thenStep !== null || signal !== null ? { thenStep, signal } : null),
-    [thenStep, signal],
+    () => (thenStep !== null || signal !== null || camera !== null ? { thenStep, signal, camera } : null),
+    [thenStep, signal, camera],
   )
   const kept = useKept(snapshot)
   const active = snapshot ?? kept
@@ -186,7 +205,14 @@ function GuidanceFooter({
               <ManeuverGlyph step={active.thenStep} size={variant === 'widget' ? 22 : 24} />
             </div>
           )}
-          {active?.signal && <TrafficLightPillView signal={active.signal} compact={variant === 'widget'} />}
+          {(active?.signal || active?.camera) && (
+            <div className="guidance-alerts">
+              {active?.signal && <TrafficLightPillView signal={active.signal} compact={variant === 'widget'} />}
+              {active?.camera && (
+                <SpeedCameraPillView camera={active.camera} label={text.speedCamera} compact={variant === 'widget'} />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

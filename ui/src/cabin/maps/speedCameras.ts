@@ -1,0 +1,215 @@
+import maplibregl from 'maplibre-gl'
+import { useEffect, useState } from 'react'
+import { roadSpeed } from '../../shared/format'
+import { MapResourceCache } from '../../shared/idleResources'
+import type { Telemetry } from '../../shared/host'
+import { useLive } from '../state/store'
+import {
+  CORRIDOR_MIN_ZOOM,
+  type CorridorRoute,
+  isPointInsideViewport,
+  nearestAheadOnCorridor,
+  removeUnusedMarkers,
+} from './corridor'
+import { useMapData } from './mapData'
+import { toLngLat } from './projection'
+
+export interface SpeedCamera {
+  x: number
+  y: number
+  z: number
+  heading: number
+  reverse: boolean
+}
+
+const MAX_MARKERS = 8
+
+const CAMERA_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+  '<path d="M4.5 9.5A2 2 0 0 1 6.5 7.5h7a2 2 0 0 1 2 2v1.2l3.3-2a.8.8 0 0 1 1.2.7v5.2a.8.8 0 0 1-1.2.7l-3.3-2v1.2a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-5Z" fill="currentColor"/>' +
+  '<circle cx="10" cy="12" r="2.1" fill="#181b20"/>' +
+  '<path d="M10 17.5v3M7 20.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+  '</svg>'
+
+const loading = new MapResourceCache<SpeedCamera[]>()
+const loadedByUrl = new Map<string, SpeedCamera[] | null>()
+
+/** Fetches and caches fixed speed cameras for `url`. */
+export function loadSpeedCameras(url: string): Promise<SpeedCamera[] | null> {
+  return loading.load(url, () =>
+    fetch(url)
+      .then((response) => (response.ok ? (response.json() as Promise<SpeedCamera[]>) : null))
+      .then((data) => {
+        loadedByUrl.set(url, data)
+        return data
+      }),
+  )
+}
+
+/** Ensures `url` is fetched in the background (for non-React frame loops such as `liveMap.ts`). */
+export function ensureSpeedCameras(url: string | null): void {
+  if (!url || loadedByUrl.has(url)) return
+  void loadSpeedCameras(url).catch(() => loadedByUrl.set(url, null))
+}
+
+/** Synchronous cache lookup for `liveMap.ts` frame sync. */
+export function getLoadedSpeedCameras(url: string | null): readonly SpeedCamera[] {
+  return (url && loadedByUrl.get(url)) || []
+}
+
+/** Fixed speed cameras of the active map (`null` when unavailable, `undefined` while loading). */
+export function useSpeedCameras(): SpeedCamera[] | null | undefined {
+  const map = useMapData()
+  const url = map?.speedCameras ?? null
+  const [loaded, setLoaded] = useState<{ url: string; cameras: SpeedCamera[] | null } | null>(null)
+  useEffect(() => {
+    if (!url) return
+    let current = true
+    loadSpeedCameras(url).then((cameras) => current && setLoaded({ url, cameras }))
+    return () => {
+      current = false
+    }
+  }, [url])
+  if (map === undefined) return undefined
+  if (!url) return null
+  return loaded?.url === url ? loaded.cameras : undefined
+}
+
+export interface NearestSpeedCamera {
+  camera: SpeedCamera
+  distance: number
+}
+
+/**
+ * Finds the nearest fixed speed camera ahead in the vehicle's driving corridor,
+ * using the exact same corridor geometry and rules as `nearestTrafficLightAhead`.
+ */
+export function nearestSpeedCameraAhead(
+  cameras: readonly SpeedCamera[],
+  telemetry: Telemetry | null,
+  route: CorridorRoute | null = null,
+  routeNext = 0,
+): NearestSpeedCamera | null {
+  const found = nearestAheadOnCorridor(cameras, telemetry, route, routeNext)
+  return found ? { camera: found.item, distance: found.distance } : null
+}
+
+export interface SpeedCameraElements {
+  badge: HTMLDivElement
+  pin: HTMLDivElement
+  limitBox: HTMLDivElement
+  limitText: HTMLSpanElement
+}
+
+export interface SpeedCameraPool {
+  markers: maplibregl.Marker[]
+  elements: SpeedCameraElements[]
+}
+
+/** Creates a reusable pool of MapLibre DOM markers for fixed speed cameras. */
+export function createSpeedCameraPool(): SpeedCameraPool {
+  const markers: maplibregl.Marker[] = []
+  const elements: SpeedCameraElements[] = []
+
+  for (let i = 0; i < MAX_MARKERS; i++) {
+    const badge = document.createElement('div')
+    badge.className = 'speed-camera-badge'
+
+    const pin = document.createElement('div')
+    pin.className = 'speed-camera-pin'
+
+    const icon = document.createElement('div')
+    icon.className = 'speed-camera-icon'
+    icon.innerHTML = CAMERA_SVG
+
+    const limitBox = document.createElement('div')
+    limitBox.className = 'speed-camera-limit-box'
+
+    const limitText = document.createElement('span')
+    limitText.className = 'speed-camera-limit'
+    limitBox.appendChild(limitText)
+
+    pin.appendChild(icon)
+    pin.appendChild(limitBox)
+    badge.appendChild(pin)
+
+    const marker = new maplibregl.Marker({
+      element: badge,
+      anchor: 'bottom',
+      offset: [0, -8],
+      pitchAlignment: 'viewport',
+      rotationAlignment: 'viewport',
+    })
+
+    markers.push(marker)
+    elements.push({ badge, pin, limitBox, limitText })
+  }
+
+  return { markers, elements }
+}
+
+/**
+ * Synchronizes speed camera markers on the map using the same display rules as traffic lights:
+ * displays only the single nearest speed camera ahead in the driving corridor when `zoom >= 13.5` and not hidden.
+ */
+export function syncSpeedCameras(
+  map: maplibregl.Map,
+  pool: SpeedCameraPool,
+  cameras: readonly SpeedCamera[],
+  hidden = false,
+) {
+  const { telemetry, route, routeNext, mph } = useLive.getState()
+  const zoom = map.getZoom()
+
+  if (hidden || zoom < CORRIDOR_MIN_ZOOM || cameras.length === 0 || !telemetry) {
+    removeUnusedMarkers(pool.markers, 0)
+    return
+  }
+
+  const nearest = nearestSpeedCameraAhead(cameras, telemetry, route, routeNext)
+  if (!nearest) {
+    removeUnusedMarkers(pool.markers, 0)
+    return
+  }
+
+  const c = nearest.camera
+  if (!Number.isFinite(c.x) || !Number.isFinite(c.z)) {
+    removeUnusedMarkers(pool.markers, 0)
+    return
+  }
+
+  const lngLat = toLngLat(c.x, c.z)
+  if (!isPointInsideViewport(map, lngLat)) {
+    removeUnusedMarkers(pool.markers, 0)
+    return
+  }
+
+  const { badge, limitBox, limitText } = pool.elements[0]
+  const marker = pool.markers[0]
+
+  const limit = roadSpeed(telemetry.navigationSpeedLimit, mph)
+  const speed = roadSpeed(telemetry.speed, mph)
+  const overspeed = limit > 0 && speed > limit
+
+  if (badge.classList) {
+    badge.classList.toggle('overspeed', overspeed)
+    badge.classList.toggle('no-limit', limit <= 0)
+  } else {
+    badge.className = `speed-camera-badge${overspeed ? ' overspeed' : ''}${limit <= 0 ? ' no-limit' : ''}`
+  }
+
+  if (limit > 0) {
+    limitBox.style.display = 'flex'
+    limitText.textContent = `${limit}`
+  } else {
+    limitBox.style.display = 'none'
+    limitText.textContent = ''
+  }
+
+  marker.setLngLat(lngLat)
+  if (!marker.getElement().isConnected) {
+    marker.addTo(map)
+  }
+
+  removeUnusedMarkers(pool.markers, 1)
+}
