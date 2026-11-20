@@ -494,7 +494,7 @@ impl From<FileError> for MapError {
 /// Reads all of a map's sectors, as mounted (a DLC's sector replaces the base game's of the same name,
 /// carrying both's items).
 pub fn load_map(files: &GameFiles, name: &str) -> Result<Map, MapError> {
-    read_map(files, name, None, &mut |_| {})
+    read_map(files, name, None, None, &mut |_| {})
 }
 
 /// The map as the export draws it: [`load_map`]'s, but only its items of the kinds the map draws (roads,
@@ -515,7 +515,18 @@ pub fn load_drawn_map_telling(
     definitions: &Definitions,
     progress: &mut dyn FnMut(f32),
 ) -> Result<Map, MapError> {
-    let mut map = read_map(files, name, Some(definitions), progress)?;
+    load_drawn_map_with_cameras(files, name, definitions, None, progress)
+}
+
+/// [`load_drawn_map_telling`] that also keeps placed `ROAD_SIDE` and `MODEL` speed cameras listed in `cameras`.
+pub fn load_drawn_map_with_cameras(
+    files: &GameFiles,
+    name: &str,
+    definitions: &Definitions,
+    cameras: Option<&mut crate::speed_cameras::SpeedCameraCatalog>,
+    progress: &mut dyn FnMut(f32),
+) -> Result<Map, MapError> {
+    let mut map = read_map(files, name, Some(definitions), cameras, progress)?;
     map.items.shrink_to_fit();
     Ok(map)
 }
@@ -539,7 +550,8 @@ fn used_nodes(items: &[Item]) -> HashSet<u64> {
             | ItemData::Ferry { node, .. }
             | ItemData::MapOverlay { node, .. }
             | ItemData::BezierPatch { node, .. }
-            | ItemData::Model { node, .. } => {
+            | ItemData::Model { node, .. }
+            | ItemData::RoadSide { node, .. } => {
                 used.insert(*node);
             }
             ItemData::Other => {}
@@ -554,6 +566,7 @@ fn read_map(
     files: &GameFiles,
     name: &str,
     drawn: Option<&Definitions>,
+    mut cameras: Option<&mut crate::speed_cameras::SpeedCameraCatalog>,
     progress: &mut dyn FnMut(f32),
 ) -> Result<Map, MapError> {
     let dir = format!("/map/{name}");
@@ -613,11 +626,23 @@ fn read_map(
         add_sector(&mut kept, &mut nodes, &file, parts, |item| match (drawn, &item.data) {
             (None, _) => Keep::Item,
             (Some(_), ItemData::Other) => Keep::Drop,
+            (Some(_), ItemData::RoadSide { sign_model, .. }) => {
+                if cameras.as_deref_mut().is_some_and(|catalog| catalog.is_sign_camera(files, *sign_model)) {
+                    Keep::Item
+                } else {
+                    Keep::Drop
+                }
+            }
             (Some(drawn), ItemData::Model { model, .. }) if drawn.water_models.contains_key(model) => Keep::Item,
             (Some(drawn), ItemData::Model { model, .. })
                 if drawn.buildings.contains_key(model) || drawn.landmark_candidates.contains_key(model) =>
             {
                 Keep::Building
+            }
+            (Some(_), ItemData::Model { model, .. })
+                if cameras.as_deref().is_some_and(|catalog| catalog.has_model(*model)) =>
+            {
+                Keep::Item
             }
             (Some(_), ItemData::Model { .. }) => Keep::Drop,
             (Some(drawn), ItemData::Curve { model, .. }) if drawn.structure_sets.contains_key(model) => Keep::Wall,
@@ -694,7 +719,7 @@ fn add_sector(
     nodes: &mut ReadNodes,
     file: &str,
     parts: Vec<sector::Sector>,
-    keep: impl Fn(&Item) -> Keep,
+    mut keep: impl FnMut(&Item) -> Keep,
 ) {
     let mut renamed: HashMap<u64, u64> = HashMap::new();
     for node in parts.iter().flat_map(|part| &part.nodes) {
@@ -777,7 +802,8 @@ fn rename_nodes(data: &mut ItemData, renamed: &HashMap<u64, u64>) {
         | ItemData::Ferry { node, .. }
         | ItemData::MapOverlay { node, .. }
         | ItemData::BezierPatch { node, .. }
-        | ItemData::Model { node, .. } => rename(node),
+        | ItemData::Model { node, .. }
+        | ItemData::RoadSide { node, .. } => rename(node),
         ItemData::Other => {}
     }
 }
@@ -894,7 +920,7 @@ mod tests {
         nodes: &mut ReadNodes,
         file: &str,
         parts: Vec<sector::Sector>,
-        keep: impl Fn(&Item) -> Keep,
+        keep: impl FnMut(&Item) -> Keep,
     ) {
         add_sector(&mut Kept { items, models, walls: &mut Vec::new() }, nodes, file, parts, keep);
     }

@@ -321,6 +321,8 @@ pub enum ItemData {
         /// Every sub-curve used (research, 2026-10-30).
         subcurves: Vec<SubCurve>,
     },
+    /// A roadside sign (`sign.*` in `def/world/sign*.sii`), placed at `node`.
+    RoadSide { dlc_guard: u8, sign_model: u64, node: u64 },
     /// Everything else: stepped over.
     Other,
 }
@@ -777,6 +779,7 @@ fn parse_item(
             r.skip(0x10)?;
             ItemData::Model { model, node, scale }
         }
+        ROAD_SIDE => read_road_side(r, version, flags[1])?,
         _ => {
             skip_item(r, item_type, version)?;
             ItemData::Other
@@ -872,7 +875,6 @@ fn skip_item(r: &mut Reader, item_type: u32, version: u32) -> Result<(), ItemErr
             let heights = r.count()?;
             r.skip_records(heights, 4)?;
         }
-        ROAD_SIDE => skip_road_side(r, version)?,
         MOVER => {
             // Tags; model, look, variant; speed, delay, width; count; lengths; nodes.
             skip_counted(r, 0, 8, 3 * 8 + 3 * 4 + 4)?;
@@ -937,14 +939,16 @@ pub(crate) fn skip_string(r: &mut Reader) -> Result<(), OutOfBounds> {
     r.skip(usize::try_from(len).unwrap_or(usize::MAX))
 }
 
-/// Road signs: boards, then optional per-sign overrides.
-fn skip_road_side(r: &mut Reader, version: u32) -> Result<(), OutOfBounds> {
-    r.skip(0x20)?; // sign model, node, look, variant
+/// Road signs: sign model and node, then boards and optional per-sign overrides.
+fn read_road_side(r: &mut Reader, version: u32, dlc_guard: u8) -> Result<ItemData, OutOfBounds> {
+    let sign_model = r.u64()?;
+    let node = r.u64()?;
+    r.skip(0x10)?; // look, variant
     let boards = r.u8()?;
     r.skip_records(boards.into(), 0x18)?;
     let template_len = r.u64()?;
     if template_len == 0 {
-        return Ok(());
+        return Ok(ItemData::RoadSide { dlc_guard, sign_model, node });
     }
     r.skip(usize::try_from(template_len).unwrap_or(usize::MAX))?;
     let board_overrides = if version >= BOARD_OVERRIDES { r.count()? } else { 0 };
@@ -973,7 +977,7 @@ fn skip_road_side(r: &mut Reader, version: u32) -> Result<(), OutOfBounds> {
             }
         }
     }
-    Ok(())
+    Ok(ItemData::RoadSide { dlc_guard, sign_model, node })
 }
 
 fn parse_node(r: &mut Reader) -> Result<Node, OutOfBounds> {

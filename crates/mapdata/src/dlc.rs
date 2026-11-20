@@ -164,7 +164,7 @@ pub fn keep_owned(map: &mut Map, owned: &Owned, countries: &Countries) -> Droppe
             | ItemData::Prefab { flags, .. }
             | ItemData::MapArea { flags, .. }
             | ItemData::MapOverlay { flags, .. } => (Some(flags.dlc_guard), flags.hidden),
-            ItemData::Company { dlc_guard, .. } => (Some(*dlc_guard), false),
+            ItemData::Company { dlc_guard, .. } | ItemData::RoadSide { dlc_guard, .. } => (Some(*dlc_guard), false),
             _ => (None, false),
         };
         let [x0, z0, x1, z1] = item.bounds;

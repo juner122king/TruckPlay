@@ -65,7 +65,8 @@ use crate::profiles::{Mod, Profile};
 /// and the maps prepared again with the update.
 /// 45: resolve actual model/material overrides from the full active mod stack and read older PMD/PMG layouts.
 /// 46: upstream 2.4.0's damaged-mod tolerance, dependency manifests and indexed sea tiles.
-pub const BUILDER_VERSION: u32 = 46;
+/// 47: fixed speed cameras extracted from hookup locators (speed_cameras.json).
+pub const BUILDER_VERSION: u32 = 47;
 /// The builders whose change reached only maps that left a mod out (15: mods read that were left out before): a map that
 /// left none out, built by a builder since which there were only these, is as today's, and is kept (a mod's old prefabs
 /// it skipped are drawn once it's built again for another reason). Every other builder builds every map again. (Until

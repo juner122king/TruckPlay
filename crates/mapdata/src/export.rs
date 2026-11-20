@@ -27,6 +27,7 @@ use crate::routing;
 use crate::sea::SeaOptions;
 use crate::sector::ItemData;
 use crate::signs;
+use crate::speed_cameras;
 use crate::surface;
 use crate::tiles::{self, TileOptions};
 use crate::token::{string_to_token, token_to_string};
@@ -337,14 +338,20 @@ pub fn export(
     let mut definitions = world::load_definitions(files)?;
     crate::phases::mark("water materials");
     surface::find_water(files, &mut definitions);
+    crate::phases::mark("speed cameras");
+    let mut camera_catalog = speed_cameras::SpeedCameraCatalog::load(files)?;
     let stop = options.stop.clone().unwrap_or_default();
     let stopped = || stop.load(std::sync::atomic::Ordering::Relaxed);
     // Reading, to 0.15 of the whole, by the map's sector files.
     crate::phases::mark("sectors");
     tell(Stage::Reading, share::SECTORS);
-    let mut map = world::load_drawn_map_telling(files, &options.map, &definitions, &mut |done| {
-        tell(Stage::Reading, share::SECTORS + (share::READING - share::SECTORS) * done)
-    })?;
+    let mut map = world::load_drawn_map_with_cameras(
+        files,
+        &options.map,
+        &definitions,
+        Some(&mut camera_catalog),
+        &mut |done| tell(Stage::Reading, share::SECTORS + (share::READING - share::SECTORS) * done),
+    )?;
     if stopped() {
         return Err(ExportError::Stopped);
     }
@@ -471,9 +478,13 @@ pub fn export(
         drop(map);
         again = true;
         crate::phases::mark("area again (water late)");
-        map = world::load_drawn_map_telling(files, &options.map, &definitions, &mut |done| {
-            tell(Stage::Drawing, after_again(Again::Reading(done), 0.0))
-        })?;
+        map = world::load_drawn_map_with_cameras(
+            files,
+            &options.map,
+            &definitions,
+            Some(&mut camera_catalog),
+            &mut |done| tell(Stage::Drawing, after_again(Again::Reading(done), 0.0)),
+        )?;
         if stopped() {
             return Err(ExportError::Stopped);
         }
@@ -578,6 +589,7 @@ pub fn export(
     crate::phases::mark("no-entry signs");
     let signs = no_entry::signs(&map, &definitions, &mut prefabs, &reached);
     export.features.extend(signs.iter().map(|&at| area::no_entry_feature(at)));
+    let speed_cameras = speed_cameras::extract(&map, &camera_catalog, bounds.0);
     let counts = export.counts;
     drop(map);
     tell(Stage::Tiles, place(share::TILES));
@@ -651,6 +663,7 @@ pub fn export(
         "language": options.language,
         "labels": labels,
         "places": format!("{folder}/places.json"),
+        "speedCameras": format!("{folder}/speed_cameras.json"),
         "countries": format!("{folder}/countries.json"),
         // The game's picture of its world (world_picture.rs): its file (the sea in it), where it lies and where its
         // land is cut off; `null` without one: the cab draws the sea all round the map then.
@@ -660,6 +673,10 @@ pub fn export(
         "leftOut": options.left_out,
     });
     std::fs::write(tiles_dir.join("places.json"), serde_json::to_vec(&places).map_err(std::io::Error::other)?)?;
+    std::fs::write(
+        tiles_dir.join("speed_cameras.json"),
+        serde_json::to_vec(&speed_cameras).map_err(std::io::Error::other)?,
+    )?;
     if let Some(world) = &world {
         std::fs::write(tiles_dir.join(WORLD_FILE), world_json(world).to_string())?;
     }

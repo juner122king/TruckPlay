@@ -41,6 +41,7 @@ pub mod save;
 pub mod sea;
 pub mod sector;
 pub mod signs;
+pub mod speed_cameras;
 pub mod surface;
 pub mod sii;
 pub mod terrain;

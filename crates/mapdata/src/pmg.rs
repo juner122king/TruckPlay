@@ -34,6 +34,7 @@ const OLDEST: u32 = 0x506d_6712;
 
 const PIECE_COUNT_AT: usize = 4;
 const PART_COUNT_AT: usize = 8;
+const LOCATOR_COUNT_AT: usize = 20;
 const PART_SIZE: usize = 24;
 pub const LOCATOR_SIZE: usize = 44;
 /// "No such array" in a piece's record.
@@ -70,6 +71,8 @@ struct Layout {
     /// pieces of the Oyuncuyusbis map, 2026-11-12, examples/pmg_layouts).
     more: &'static [usize],
     indices: usize,
+    string_pool_at: Option<usize>,
+    string_pool_size: Option<usize>,
 }
 
 const V15: Layout = Layout {
@@ -87,8 +90,18 @@ const V15: Layout = Layout {
     colours: 76,
     more: &[],
     indices: 96,
+    string_pool_at: Some(88),
+    string_pool_size: Some(92),
 };
-const V14: Layout = Layout { box_at: 40, parts_at: 68, locators_at: 72, pieces_at: 76, ..V15 };
+const V14: Layout = Layout {
+    box_at: 40,
+    parts_at: 68,
+    locators_at: 72,
+    pieces_at: 76,
+    string_pool_at: Some(80),
+    string_pool_size: Some(84),
+    ..V15
+};
 const V13: Layout = Layout {
     box_at: 36,
     parts_at: 64,
@@ -104,6 +117,8 @@ const V13: Layout = Layout {
     colours: 76,
     more: &[80, 84],
     indices: 88,
+    string_pool_at: None,
+    string_pool_size: None,
 };
 const V12: Layout = Layout { vertices: Vertices::Separate, ..V13 };
 
@@ -210,6 +225,12 @@ impl<'a> Pmg<'a> {
     pub fn part_count(&self) -> Option<usize> {
         let count = self.at(PART_COUNT_AT)?;
         self.table_within(self.layout.parts_at, count, PART_SIZE).then_some(count)
+    }
+
+    /// How many locators it has; `None` if their records don't lie within the file.
+    pub fn locator_count(&self) -> Option<usize> {
+        let count = self.at(LOCATOR_COUNT_AT)?;
+        self.table_within(self.layout.locators_at, count, LOCATOR_SIZE).then_some(count)
     }
 
     /// The model's box: its least corner, its greatest.
@@ -368,6 +389,28 @@ impl<'a> Pmg<'a> {
             position: self.corner(at + 8)?,
             rotation: [self.float(at + 24)?, self.float(at + 28)?, self.float(at + 32)?, self.float(at + 36)?],
         })
+    }
+
+    /// The string pool storing hookup names attached to locators, if this format carries one within bounds.
+    fn string_pool(&self) -> Option<&'a [u8]> {
+        let at = self.at(self.layout.string_pool_at?)?;
+        let size = self.at(self.layout.string_pool_size?)?;
+        self.data.get(at..at.checked_add(size)?)
+    }
+
+    /// The hookup name attached to locator `index` (e.g., `"speedcam.20"`), if any.
+    pub fn locator_hookup(&self, index: usize) -> Option<&'a str> {
+        if index >= self.locator_count()? {
+            return None;
+        }
+        let pool = self.string_pool()?;
+        let at = self.locators_at()?.checked_add(index.checked_mul(LOCATOR_SIZE)?)?;
+        let offset = i32::from_le_bytes(self.data.get(at + 40..at + 44)?.try_into().ok()?);
+        let offset = usize::try_from(offset).ok()?;
+        let rest = pool.get(offset..)?;
+        let end = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
+        let text = std::str::from_utf8(&rest[..end]).ok()?;
+        (!text.is_empty()).then_some(text)
     }
 
     /// Vertex `index` of `piece`'s alpha (0 to 1); 1 where it has no colours.
@@ -732,5 +775,27 @@ mod tests {
         let model = Pmg::read(&data).unwrap();
         let piece = model.piece(0).unwrap();
         assert_eq!(model.bounds(&piece), ([-1.0, -1.0, -3.0], [3.0, 3.0, 1.0]));
+    }
+
+    #[test]
+    fn reads_locator_hookup_from_v15_string_pool() {
+        let mut data = vec![0u8; 0x190];
+        put(&mut data, 0, CURRENT);
+        put(&mut data, LOCATOR_COUNT_AT, 2);
+        put(&mut data, 80, 0x88); // locators_at
+        put(&mut data, 84, 0x88 + 2 * LOCATOR_SIZE as u32); // pieces_at
+        put(&mut data, 88, 0x170); // string_pool_at
+        put(&mut data, 92, 16); // string_pool_size
+        // Locator 0: hookup at offset 0
+        put(&mut data, 0x88 + 40, 0);
+        // Locator 1: no hookup (-1)
+        put(&mut data, 0x88 + LOCATOR_SIZE + 40, u32::MAX);
+        data[0x170..0x170 + 12].copy_from_slice(b"speedcam.20\0");
+
+        let model = Pmg::read(&data).unwrap();
+        assert_eq!(model.locator_count(), Some(2));
+        assert_eq!(model.locator_hookup(0), Some("speedcam.20"));
+        assert_eq!(model.locator_hookup(1), None);
+        assert_eq!(model.locator_hookup(2), None);
     }
 }
