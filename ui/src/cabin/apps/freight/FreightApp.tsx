@@ -8,6 +8,7 @@ import { useClockStyle } from '../../state/hooks'
 import { useLive } from '../../state/store'
 import { useLanguage, useText } from '../../state/text'
 import {
+  type HosAdviceStatus,
   calculateJourneyTimeline,
   calculateNetPayout,
   calculateOverallHealth,
@@ -52,6 +53,12 @@ import './freight.css'
 type FreightTab = 'waybill' | 'inspection' | 'hos'
 
 const TABS: readonly FreightTab[] = ['waybill', 'inspection', 'hos']
+
+const HOS_BREAK_CLASSES: Record<HosAdviceStatus, { card: string; value: string }> = {
+  ok: { card: '', value: '' },
+  rest_soon: { card: ' alert-border', value: ' tone-warn' },
+  overdue: { card: ' danger-border', value: ' tone-bad' },
+}
 
 /**
  * CarPlay-style Freight Assistant (iOS 26 / Apple HIG):
@@ -267,7 +274,7 @@ export function FreightApp() {
                   displayDestCity={displayDestCity}
                   displayDestCompany={displayDestCompany}
                   hosRestDueText={hos.restDueText}
-                  needRestEnRoute={hos.needRestEnRoute}
+                  hosAdviceStatus={hos.adviceStatus}
                   nextBreakSubtitle={nextBreakSubtitle}
                   onOpenTab={(tab) => selectTab(tab)}
                 />
@@ -287,7 +294,6 @@ export function FreightApp() {
                   cabOffset={cabOffset}
                   navSeconds={navSeconds}
                   nextBreakSubtitle={nextBreakSubtitle}
-                  isZh={isZh}
                 />
               )}
             </>
@@ -315,7 +321,7 @@ function WaybillPanel({
   displayDestCity,
   displayDestCompany,
   hosRestDueText,
-  needRestEnRoute,
+  hosAdviceStatus,
   nextBreakSubtitle,
   onOpenTab,
 }: {
@@ -335,7 +341,7 @@ function WaybillPanel({
   displayDestCity: string
   displayDestCompany: string
   hosRestDueText: string
-  needRestEnRoute: boolean
+  hosAdviceStatus: HosAdviceStatus
   nextBreakSubtitle: string
   onOpenTab: (tab: FreightTab) => void
 }) {
@@ -535,7 +541,7 @@ function WaybillPanel({
           </dl>
         </div>
 
-        <div className={`fr-inset-card ${needRestEnRoute ? 'alert-border' : ''}`}>
+        <div className={`fr-inset-card${HOS_BREAK_CLASSES[hosAdviceStatus].card}`}>
           <div className="fr-inset-top">
             <div className="fr-card-title-row">
               <span className="fr-tile orange small" aria-hidden="true">
@@ -543,7 +549,7 @@ function WaybillPanel({
               </span>
               <span className="fr-inset-title">{text.freight.waybill.nextBreak}</span>
             </div>
-            <span className={`fr-inset-value ${needRestEnRoute ? 'tone-warn' : ''}`}>{hosRestDueText}</span>
+            <span className={`fr-inset-value${HOS_BREAK_CLASSES[hosAdviceStatus].value}`}>{hosRestDueText}</span>
           </div>
           <div className="fr-inset-sub">{nextBreakSubtitle}</div>
         </div>
@@ -779,7 +785,6 @@ function HosPanel({
   cabOffset,
   navSeconds,
   nextBreakSubtitle,
-  isZh,
 }: {
   job: ReturnType<typeof useLive.getState>['job']
   telemetry: NonNullable<ReturnType<typeof useLive.getState>['telemetry']>
@@ -789,7 +794,6 @@ function HosPanel({
   cabOffset: number
   navSeconds: number
   nextBreakSubtitle: string
-  isZh: boolean
 }) {
   const text = useText()
   const clockStyle = useClockStyle()
@@ -801,10 +805,53 @@ function HosPanel({
   }
   const hosBadge = statusMap[hos.level]
 
+  const adviceMeta = {
+    ok: {
+      tone: 'good' as const,
+      heading: text.freight.hos.nonStopCapable,
+      body: text.freight.hos.adviceNonStop,
+    },
+    rest_soon: {
+      tone: 'warn' as const,
+      heading: text.freight.hos.restStop8h,
+      body: text.freight.hos.adviceRestNeeded,
+    },
+    overdue: {
+      tone: 'bad' as const,
+      heading: text.freight.hos.restOverdueTitle,
+      body: text.freight.hos.adviceOverdue,
+    },
+  }[hos.adviceStatus]
+
+  const breakClasses = HOS_BREAK_CLASSES[hos.adviceStatus]
+
   const timeline =
     job?.active && job.deliveryTime > 0
       ? calculateJourneyTimeline(gameTime, navSeconds, telemetry.nextRestStop, job.deliveryTime)
       : null
+
+  const timelineStatus = timeline
+    ? !timeline.canDirectOnTime
+      ? {
+          pillClass: 'bad' as const,
+          label: text.freight.waybill.timeLate,
+          directClass: 'tone-bad',
+          restClass: 'tone-bad',
+        }
+      : !timeline.canDeliverAfterRest
+        ? {
+            pillClass: 'warn' as const,
+            label: text.freight.hos.restTightRisk,
+            directClass: '',
+            restClass: 'tone-warn',
+          }
+        : {
+            pillClass: 'good' as const,
+            label: text.freight.hos.restPunctual,
+            directClass: '',
+            restClass: 'tone-good',
+          }
+    : null
 
   return (
     <div className="fr-grid-2">
@@ -847,7 +894,7 @@ function HosPanel({
       </article>
 
       {/* Right Card: Smart Rest Advice & Journey Timeline */}
-      <article className="fr-card" data-tone={hos.needRestEnRoute ? 'warn' : 'good'}>
+      <article className="fr-card" data-tone={adviceMeta.tone}>
         <header className="fr-card-head">
           <div className="fr-card-title-row">
             <span className="fr-tile orange" aria-hidden="true">
@@ -857,29 +904,27 @@ function HosPanel({
           </div>
         </header>
 
-        <div className={`fr-advice-box ${hos.needRestEnRoute ? 'warn' : 'good'}`}>
+        <div className={`fr-advice-box ${adviceMeta.tone}`}>
           <div className="fr-advice-head">
-            {hos.needRestEnRoute ? <AlertTriangleGlyph size={18} /> : <CheckCircleGlyph size={18} />}
-            <span>{hos.needRestEnRoute ? text.freight.hos.restStop8h : text.freight.hos.nonStopCapable}</span>
+            {adviceMeta.tone === 'good' ? <CheckCircleGlyph size={18} /> : <AlertTriangleGlyph size={18} />}
+            <span>{adviceMeta.heading}</span>
           </div>
-          <p className="fr-advice-text">
-            {hos.needRestEnRoute ? text.freight.hos.adviceRestNeeded : text.freight.hos.adviceNonStop}
-          </p>
+          <p className="fr-advice-text">{adviceMeta.body}</p>
         </div>
 
-        {timeline ? (
+        {timeline && timelineStatus ? (
           <div className="fr-timeline-block">
             <div className="fr-timeline-title-row">
               <span className="fr-timeline-title">{text.freight.hos.timelineTitle}</span>
-              <span className={`fr-status-pill ${timeline.canDeliverAfterRest ? 'good' : 'warn'}`}>
-                {timeline.canDeliverAfterRest ? text.freight.hos.restPunctual : text.freight.hos.restTightRisk}
-              </span>
+              <span className={`fr-status-pill ${timelineStatus.pillClass}`}>{timelineStatus.label}</span>
             </div>
 
             <div className="fr-timeline-bar" aria-hidden="true">
               <div className="fr-tl-seg drive" style={{ width: `${Math.round(timeline.navRatio * 100)}%` }} />
               <div className="fr-tl-seg rest" style={{ width: `${Math.round(timeline.restRatio * 100)}%` }} />
-              <div className="fr-tl-seg buffer" style={{ width: `${Math.round(timeline.bufferRatio * 100)}%` }} />
+              {timeline.bufferRatio > 0 && (
+                <div className="fr-tl-seg buffer" style={{ width: `${Math.round(timeline.bufferRatio * 100)}%` }} />
+              )}
             </div>
 
             <div className="fr-timeline-legend">
@@ -891,21 +936,25 @@ function HosPanel({
                 <i className="rest" aria-hidden="true" />
                 {text.freight.hos.legendRest}
               </span>
-              <span className="fr-tl-legend-item">
-                <i className="buffer" aria-hidden="true" />
-                {text.freight.hos.legendBuffer}
-              </span>
+              {timeline.bufferRatio > 0 && (
+                <span className="fr-tl-legend-item">
+                  <i className="buffer" aria-hidden="true" />
+                  {text.freight.hos.legendBuffer}
+                </span>
+              )}
             </div>
 
             <div className="fr-kv-plate">
               <dl className="fr-kv-list">
                 <div className="fr-kv-row">
                   <dt>{text.freight.hos.timelineDirectArrival}</dt>
-                  <dd>{formatDeadline(timeline.etaDirectMinutes + cabOffset, cabNow, text.days, clockStyle)}</dd>
+                  <dd className={timelineStatus.directClass || undefined}>
+                    {formatDeadline(timeline.etaDirectMinutes + cabOffset, cabNow, text.days, clockStyle)}
+                  </dd>
                 </div>
                 <div className="fr-kv-row">
                   <dt>{text.freight.hos.timelineRestArrival}</dt>
-                  <dd className={timeline.canDeliverAfterRest ? 'tone-good' : 'tone-warn'}>
+                  <dd className={timelineStatus.restClass}>
                     {formatDeadline(timeline.etaWithRestMinutes + cabOffset, cabNow, text.days, clockStyle)}
                   </dd>
                 </div>
@@ -920,7 +969,7 @@ function HosPanel({
           <p className="fr-hos-note">{text.freight.hos.simulationNote}</p>
         )}
 
-        <div className="fr-inset-card">
+        <div className={`fr-inset-card${breakClasses.card}`}>
           <div className="fr-inset-top">
             <div className="fr-card-title-row">
               <span className="fr-tile orange small" aria-hidden="true">
@@ -928,7 +977,7 @@ function HosPanel({
               </span>
               <span className="fr-inset-title">{text.freight.waybill.nextBreak}</span>
             </div>
-            <span className="fr-inset-value">{formatDuration(hos.restDueMinutes, isZh)}</span>
+            <span className={`fr-inset-value${breakClasses.value}`}>{hos.restDueText}</span>
           </div>
           <div className="fr-inset-sub">{nextBreakSubtitle}</div>
         </div>

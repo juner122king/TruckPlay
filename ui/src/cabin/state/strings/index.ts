@@ -639,6 +639,7 @@ export interface Strings {
       adviceTitle: string
       adviceNonStop: string
       adviceRestNeeded: string
+      adviceOverdue: string
       simulationNote: string
       timelineTitle: string
       timelineCurrent: string
@@ -646,6 +647,7 @@ export interface Strings {
       timelineRestArrival: string
       timelineDeadline: string
       restStop8h: string
+      restOverdueTitle: string
       restPunctual: string
       restTightRisk: string
       nonStopCapable: string

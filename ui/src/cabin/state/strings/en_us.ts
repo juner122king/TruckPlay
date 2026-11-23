@@ -659,6 +659,8 @@ export const strings: Strings = {
       adviceNonStop: 'Available driving hours are sufficient to reach your destination directly without en-route rest.',
       adviceRestNeeded:
         'Remaining driving hours are insufficient to reach destination. Plan a stop at a service area to sleep and avoid fatigue fines.',
+      adviceOverdue:
+        'Continuous driving limit has been reached. Pull into the nearest rest area immediately to sleep and avoid fatigue fines.',
       simulationNote:
         'Driving hours conform to simulation tachograph rules. Sleeping 8 hours maintains ample delivery buffers.',
       timelineTitle: 'Journey & Rest Timeline',
@@ -667,6 +669,7 @@ export const strings: Strings = {
       timelineRestArrival: 'Arrival w/ Rest',
       timelineDeadline: 'Deadline',
       restStop8h: '8h Mandatory Rest',
+      restOverdueTitle: 'Mandatory Rest Overdue',
       restPunctual: 'Punctual with Rest',
       restTightRisk: 'Delay Risk with Rest',
       nonStopCapable: 'Direct Run Feasible',

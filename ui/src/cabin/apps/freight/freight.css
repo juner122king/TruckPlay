@@ -833,6 +833,10 @@
   border-color: color-mix(in oklab, var(--apple-orange) 45%, transparent);
 }
 
+.shell .fr-inset-card.danger-border {
+  border-color: color-mix(in oklab, var(--apple-red) 48%, transparent);
+}
+
 .shell .fr-inset-top {
   display: flex;
   align-items: center;
@@ -1240,6 +1244,11 @@ progress.fr-health-ring.tone-bad {
   border-color: color-mix(in oklab, var(--apple-orange) 32%, transparent);
 }
 
+.shell .fr-advice-box.bad {
+  background: color-mix(in oklab, var(--apple-red) 12%, transparent);
+  border-color: color-mix(in oklab, var(--apple-red) 34%, transparent);
+}
+
 .shell .fr-advice-head {
   display: flex;
   align-items: center;
@@ -1254,6 +1263,10 @@ progress.fr-health-ring.tone-bad {
 
 .shell .fr-advice-box.warn .fr-advice-head {
   color: var(--apple-orange);
+}
+
+.shell .fr-advice-box.bad .fr-advice-head {
+  color: var(--apple-red);
 }
 
 .shell .fr-advice-text {

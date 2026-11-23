@@ -425,17 +425,22 @@ export function evaluateWear(name: string, rawFraction: number | undefined): Com
   return { name, fraction, percentText, grade }
 }
 
+export type HosAdviceStatus = 'ok' | 'rest_soon' | 'overdue'
+
 export interface HosEvaluation {
   restDueMinutes: number
   restDueText: string
   fatiguePercent: number
   level: 'fresh' | 'normal' | 'tired'
+  isOverdue: boolean
+  adviceStatus: HosAdviceStatus
   needRestEnRoute: boolean
 }
 
 /** Evaluates driver HOS / fatigue status and generates smart rest advice. */
 export function evaluateHos(nextRestStop: number | undefined, navTimeSeconds: number, isZh: boolean): HosEvaluation {
   const restDueMinutes = nextRestStop ?? 0
+  const isOverdue = restDueMinutes <= 0
   // Standard max driving cycle: ~11h (660 min)
   const maxCycle = 660
   const fatigueRatio = Math.max(0, Math.min(1, (maxCycle - Math.max(0, restDueMinutes)) / maxCycle))
@@ -449,15 +454,22 @@ export function evaluateHos(nextRestStop: number | undefined, navTimeSeconds: nu
   }
 
   const navMinutes = Math.ceil(Math.max(0, navTimeSeconds) / 60)
-  // Need rest if remaining driving hours are less than destination route + 30 min buffer
-  const needRestEnRoute = restDueMinutes > 0 && navMinutes > 0 && restDueMinutes <= navMinutes + 30
-  const restDueText = restDueMinutes > 0 ? formatDuration(restDueMinutes, isZh) : isZh ? '已达上限' : 'Overdue'
+  // Need rest if overdue, or remaining driving hours are insufficient for the route + 30 min safety buffer
+  const adviceStatus: HosAdviceStatus = isOverdue
+    ? 'overdue'
+    : (navMinutes > 0 && restDueMinutes <= navMinutes + 30) || (navMinutes === 0 && restDueMinutes <= 90)
+      ? 'rest_soon'
+      : 'ok'
+  const needRestEnRoute = adviceStatus !== 'ok'
+  const restDueText = !isOverdue ? formatDuration(restDueMinutes, isZh) : isZh ? '已达上限' : 'Overdue'
 
   return {
     restDueMinutes,
     restDueText,
     fatiguePercent,
     level,
+    isOverdue,
+    adviceStatus,
     needRestEnRoute,
   }
 }
@@ -512,6 +524,7 @@ export function calculateRouteProgress(
 
 export interface JourneyTimeline {
   canDirectDeliver: boolean
+  canDirectOnTime: boolean
   canDeliverAfterRest: boolean
   etaDirectMinutes: number
   etaWithRestMinutes: number
@@ -536,7 +549,8 @@ export function calculateJourneyTimeline(
   deliveryTime: number,
 ): JourneyTimeline {
   const navMinutes = Math.ceil(Math.max(0, navTimeSeconds) / 60)
-  const restDueMinutes = Math.max(0, nextRestStop ?? 0)
+  const rawRestDue = nextRestStop ?? 0
+  const restDueMinutes = Math.max(0, rawRestDue)
   const windowMinutes = Math.max(0, deliveryTime - gameTime)
   const simulatedRestMinutes = 480 // 8 hours standard rest
 
@@ -544,16 +558,33 @@ export function calculateJourneyTimeline(
   const etaWithRestMinutes = gameTime + navMinutes + simulatedRestMinutes
   const restMarginMinutes = deliveryTime - etaWithRestMinutes
 
-  const canDirectDeliver = restDueMinutes >= navMinutes
+  const canDirectDeliver = rawRestDue > 0 && restDueMinutes >= navMinutes
+  const canDirectOnTime = deliveryTime - etaDirectMinutes >= 0
   const canDeliverAfterRest = restMarginMinutes >= 0
 
-  const totalHorizon = Math.max(windowMinutes, navMinutes + simulatedRestMinutes, 1)
-  const navRatio = Math.min(0.65, Math.max(0.15, navMinutes / totalHorizon))
-  const restRatio = Math.min(0.45, Math.max(0.15, simulatedRestMinutes / totalHorizon))
-  const bufferRatio = Math.max(0, 1 - navRatio - restRatio)
+  let navRatio: number
+  let restRatio: number
+  let bufferRatio: number
+  if (restMarginMinutes <= 0) {
+    const tripWithRest = Math.max(navMinutes + simulatedRestMinutes, 1)
+    navRatio = Math.min(0.82, Math.max(0.18, navMinutes / tripWithRest))
+    restRatio = 1 - navRatio
+    bufferRatio = 0
+  } else {
+    const totalHorizon = Math.max(windowMinutes, navMinutes + simulatedRestMinutes, 1)
+    const minSeg = 0.08
+    const n = Math.max(minSeg, navMinutes / totalHorizon)
+    const r = Math.max(minSeg, simulatedRestMinutes / totalHorizon)
+    const b = Math.max(minSeg, restMarginMinutes / totalHorizon)
+    const sum = n + r + b
+    navRatio = n / sum
+    restRatio = r / sum
+    bufferRatio = b / sum
+  }
 
   return {
     canDirectDeliver,
+    canDirectOnTime,
     canDeliverAfterRest,
     etaDirectMinutes,
     etaWithRestMinutes,

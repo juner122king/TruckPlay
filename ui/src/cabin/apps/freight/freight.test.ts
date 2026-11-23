@@ -141,12 +141,43 @@ describe('freight logic helpers', () => {
     // 8 hours available, 2 hours trip -> fresh, no need to rest en route
     const ok = evaluateHos(480, 7200, true)
     expect(ok.level).toBe('fresh')
+    expect(ok.isOverdue).toBe(false)
+    expect(ok.adviceStatus).toBe('ok')
     expect(ok.needRestEnRoute).toBe(false)
 
     // 1 hour available, 2 hours trip -> tired, must rest en route
     const needRest = evaluateHos(60, 7200, true)
     expect(needRest.level).toBe('tired')
+    expect(needRest.isOverdue).toBe(false)
+    expect(needRest.adviceStatus).toBe('rest_soon')
     expect(needRest.needRestEnRoute).toBe(true)
+
+    // 1 hour available with no active GPS route (navTimeSeconds = 0) -> rest soon
+    const lowWithNoNav = evaluateHos(60, 0, true)
+    expect(lowWithNoNav.adviceStatus).toBe('rest_soon')
+    expect(lowWithNoNav.needRestEnRoute).toBe(true)
+
+    // 1 hour available, short 20 min trip (60 > 20 + 30) -> ok
+    const shortOk = evaluateHos(60, 1200, true)
+    expect(shortOk.adviceStatus).toBe('ok')
+    expect(shortOk.needRestEnRoute).toBe(false)
+
+    // Already at or past HOS limit (0 or negative), both with route and with 0 navTime
+    for (const restDue of [0, -30]) {
+      for (const navSeconds of [7200, 0]) {
+        const overdueZh = evaluateHos(restDue, navSeconds, true)
+        expect(overdueZh.isOverdue).toBe(true)
+        expect(overdueZh.adviceStatus).toBe('overdue')
+        expect(overdueZh.needRestEnRoute).toBe(true)
+        expect(overdueZh.restDueText).toBe('已达上限')
+
+        const overdueEn = evaluateHos(restDue, navSeconds, false)
+        expect(overdueEn.isOverdue).toBe(true)
+        expect(overdueEn.adviceStatus).toBe('overdue')
+        expect(overdueEn.needRestEnRoute).toBe(true)
+        expect(overdueEn.restDueText).toBe('Overdue')
+      }
+    }
   })
 
   it('calculates route progress metrics', () => {
@@ -174,15 +205,36 @@ describe('freight logic helpers', () => {
     // Direct ETA: 1120. With 8h rest (480 min): ETA 1600. Deadline: 1800 -> On time!
     const plan = calculateJourneyTimeline(1000, 7200, 300, 1800)
     expect(plan.canDirectDeliver).toBe(true)
+    expect(plan.canDirectOnTime).toBe(true)
     expect(plan.canDeliverAfterRest).toBe(true)
     expect(plan.etaDirectMinutes).toBe(1120)
     expect(plan.etaWithRestMinutes).toBe(1600)
     expect(plan.restMarginMinutes).toBe(200)
+    expect(plan.bufferRatio).toBeGreaterThan(0)
+    expect(plan.navRatio + plan.restRatio + plan.bufferRatio).toBeCloseTo(1, 5)
 
-    // Very tight deadline: Deadline 1500 -> Rest makes it late!
+    // Very tight deadline: Direct arrival 1120 is on time, but 8h rest ETA 1600 exceeds 1500
     const tightPlan = calculateJourneyTimeline(1000, 7200, 300, 1500)
+    expect(tightPlan.canDirectOnTime).toBe(true)
     expect(tightPlan.canDeliverAfterRest).toBe(false)
     expect(tightPlan.restMarginMinutes).toBeLessThan(0)
+    expect(tightPlan.bufferRatio).toBe(0)
+    expect(tightPlan.navRatio + tightPlan.restRatio).toBeCloseTo(1, 5)
+
+    // Already past delivery deadline: direct & rested arrival are both late, no false buffer
+    const latePlan = calculateJourneyTimeline(2000, 7200, 300, 1800)
+    expect(latePlan.canDirectOnTime).toBe(false)
+    expect(latePlan.canDeliverAfterRest).toBe(false)
+    expect(latePlan.bufferRatio).toBe(0)
+    expect(latePlan.navRatio + latePlan.restRatio).toBeCloseTo(1, 5)
+
+    // Overdue driver cannot deliver directly even when navTimeSeconds is 0
+    for (const restDue of [0, -20]) {
+      for (const navSeconds of [0, 3600]) {
+        const overduePlan = calculateJourneyTimeline(1000, navSeconds, restDue, 2000)
+        expect(overduePlan.canDirectDeliver).toBe(false)
+      }
+    }
   })
 
   it('calculates composite vehicle health score', () => {
