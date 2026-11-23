@@ -1,7 +1,25 @@
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { type SignedIn, useAskOnce, useSignedIn } from './accounts'
 import { isReleasedApp } from '../cabin/state/apps'
-import { appVersion, call, PREVIEW_TUTORIAL } from './bridge'
+import {
+  appVersion,
+  call,
+  closeWindow,
+  minimizeWindow,
+  PREVIEW_TUTORIAL,
+  type ResizeDirection,
+  startDraggingWindow,
+  startResizingWindow,
+} from './bridge'
 import { Onboarding } from './onboarding/Onboarding'
 import { chosenLanguage, percent, type Words, wordsFor } from './onboarding/words'
 import { About } from './pages/About'
@@ -13,6 +31,7 @@ import { Controls } from './pages/Controls'
 import { Customize } from './pages/Customize'
 import { type MapProgress, useMapProgress } from './mapProgress'
 import { MapPage } from './pages/MapPage'
+import { Options } from './pages/Options'
 import { screenState } from './pages/page'
 import { ScreenPage } from './pages/ScreenPage'
 import { Setup } from './pages/Setup'
@@ -58,24 +77,25 @@ export function Companion() {
   // Over the onboarding or the room, whichever is up: a map's preparation stopped by the game starting.
   const [gameStopped, closeGameStopped] = useGameStopped(status)
 
-  if (!setup) return <div className="cp-blank">{setupError ?? ''}</div>
-  const over = gameStopped && (
-    <GameStoppedSheet
-      cw={companionWords(chosenLanguage(settings.settings?.language, setup.language))}
-      close={closeGameStopped}
-    />
-  )
-  if (!setup.finished && !tutorial) {
+  const cw = companionWords(chosenLanguage(settings.settings?.language, setup?.language ?? null))
+  const over = gameStopped && <GameStoppedSheet cw={cw} close={closeGameStopped} />
+  const content = !setup ? (
+    <div className="cp-blank">{setupError ?? ''}</div>
+  ) : !setup.finished && !tutorial ? (
     // The onboarding set the game up: what's set up is read again (the companion read it before), then its
     // tutorial.
-    const onboarded = (start: 'lesson' | 'launch') => {
-      setupState()
-        .then(setSetup, () => {})
-        .finally(() => setTutorial(start))
-    }
-    return <Onboarding initial={setup} status={status} settings={settings} onFinished={onboarded} over={over} />
-  }
-  return (
+    <Onboarding
+      initial={setup}
+      status={status}
+      settings={settings}
+      onFinished={(start) => {
+        setupState()
+          .then(setSetup, () => {})
+          .finally(() => setTutorial(start))
+      }}
+      over={over}
+    />
+  ) : (
     <Room
       setup={setup}
       refreshSetup={() => setupState().then(setSetup, () => {})}
@@ -89,12 +109,82 @@ export function Companion() {
       over={over}
     />
   )
+
+  return <WindowChrome labels={cw.window}>{content}</WindowChrome>
+}
+
+const NON_DRAG_SELECTOR =
+  'button, a, input, select, textarea, label, [role="button"], [role="slider"], [role="switch"], .ob-slider, .ob-group, .ob-key, .cp-row, .cp-sheet, .cp-tour, .ts-touch[data-active], .cp-win-resize, .cp-win-controls'
+
+const RESIZE_HANDLES: { dir: ResizeDirection; className: string }[] = [
+  { dir: 'North', className: 'n' },
+  { dir: 'South', className: 's' },
+  { dir: 'West', className: 'w' },
+  { dir: 'East', className: 'e' },
+  { dir: 'NorthWest', className: 'nw' },
+  { dir: 'NorthEast', className: 'ne' },
+  { dir: 'SouthWest', className: 'sw' },
+  { dir: 'SouthEast', className: 'se' },
+]
+
+/** Frameless rounded glass window shell: top-right glass minimize/close buttons, drag-anywhere on empty spots
+ * or the top edge, and thin edge handles for resizing. */
+function WindowChrome({ labels, children }: { labels: CompanionWords['window']; children: ReactNode }) {
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary) return
+    const target = event.target instanceof Element ? event.target : null
+    if (target?.closest(NON_DRAG_SELECTOR)) return
+    void startDraggingWindow()
+  }
+
+  return (
+    <div className="cp-window" onPointerDown={onPointerDown}>
+      {children}
+      <div className="cp-win-controls">
+        <button
+          type="button"
+          className="cp-win-btn"
+          aria-label={labels.minimize}
+          title={labels.minimize}
+          onClick={() => void minimizeWindow()}
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M2.5 6h7" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="cp-win-btn"
+          data-close
+          aria-label={labels.close}
+          title={labels.close}
+          onClick={() => void closeWindow()}
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true">
+            <path d="M3 3l6 6M9 3l-6 6" />
+          </svg>
+        </button>
+      </div>
+      {RESIZE_HANDLES.map(({ dir, className }) => (
+        <div
+          key={dir}
+          className={`cp-win-resize cp-win-resize-${className}`}
+          aria-hidden="true"
+          onPointerDown={(event) => {
+            if (event.button !== 0 || !event.isPrimary) return
+            event.stopPropagation()
+            void startResizingWindow(dir)
+          }}
+        />
+      ))}
+    </div>
+  )
 }
 
 const SECTIONS: SectionId[][] = [
   ['screen', 'controls', 'customize'],
   ['accounts', 'map'],
-  ['setup', 'about'],
+  ['options', 'setup', 'about'],
   ['support'],
 ]
 /** The sections in order: the tutorial's tour goes through them. */
@@ -114,6 +204,7 @@ const SECTION_GLOW: Record<SectionId, string> = {
   customize: GLOW.home,
   accounts: GLOW.youtube,
   map: GLOW.maps,
+  options: GLOW.home,
   setup: GLOW.scan,
   about: GLOW.dashboard,
   support: GLOW.home,
@@ -357,6 +448,7 @@ function Room({
             {roomShown && section === 'customize' && <Customize {...page} />}
             {roomShown && section === 'accounts' && <Accounts {...page} />}
             {roomShown && section === 'map' && <MapPage {...page} />}
+            {roomShown && section === 'options' && <Options {...page} />}
             {roomShown && section === 'setup' && <Setup {...page} />}
             {roomShown && section === 'about' && <About {...page} />}
             {roomShown && section === 'support' && <Support {...page} />}
@@ -414,7 +506,7 @@ function SectionList({
   update: Offer | null
   mapProgress: MapProgress
 }) {
-  const list = useRef<HTMLElement>(null)
+  const list = useRef<HTMLDivElement>(null)
   const [lit, setLit] = useState<{ top: number; height: number } | null>(null)
   const version = useVersion()
   const state = screenState(status)
@@ -455,6 +547,7 @@ function SectionList({
             .filter(Boolean)
             .join(', ') || cw.values.none,
     map: mapValue(status, mapProgress, cw, words),
+    options: '',
     // The games set up, by their short names (their versions too long for the list).
     setup: GAME_KINDS.filter((kind) => setup.games.some((game) => game.kind === kind))
       .map((kind) => GAME_SHORT_NAMES[kind])
@@ -465,7 +558,7 @@ function SectionList({
 
   let place = 2
   return (
-    <nav ref={list} className="cp-list" aria-label="WestPlay">
+    <nav className="cp-list" aria-label="WestPlay">
       <header className="cp-brand ob-in" style={n(0)}>
         <img src="/westplay.png" alt="" />
         <span>
@@ -476,25 +569,27 @@ function SectionList({
           </span>
         </span>
       </header>
-      {lit && <i className="cp-lit" style={{ top: lit.top, height: lit.height }} />}
-      {SECTIONS.map((group, g) => (
-        <div key={g} className="cp-group">
-          {group.map((id) => (
-            <button
-              key={id}
-              type="button"
-              className="cp-row ob-in"
-              style={n(place++)}
-              data-section={id}
-              data-here={id === section || undefined}
-              onClick={() => open(id)}
-            >
-              <b>{cw.sections[id]}</b>
-              <span>{value[id]}</span>
-            </button>
-          ))}
-        </div>
-      ))}
+      <div ref={list} className="cp-list-items">
+        {lit && <i className="cp-lit" style={{ top: lit.top, height: lit.height }} />}
+        {SECTIONS.map((group, g) => (
+          <div key={g} className="cp-group">
+            {group.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="cp-row ob-in"
+                style={n(place++)}
+                data-section={id}
+                data-here={id === section || undefined}
+                onClick={() => open(id)}
+              >
+                <b>{cw.sections[id]}</b>
+                <span>{value[id]}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
       <footer className="cp-socials ob-in" style={n(place++)}>
         {SOCIALS.map(({ site, name, glyph }) => (
           <button

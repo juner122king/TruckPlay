@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Companion window: receives host status events.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-start-resize-dragging"]
 }

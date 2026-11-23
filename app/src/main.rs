@@ -15,16 +15,29 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use setup::SetupStore;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindow};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindow, WindowEvent};
 use westplay_host::maps::SetUpGame;
 use westplay_host::settings::{Settings, SettingsFile, SharedSettings};
 use westplay_host::{
     AccountAction, AccountRequests, BrowserGone, Config, Content, OpenRequest, SCREEN_HEIGHT, SCREEN_WIDTH, Status,
 };
 
+const TRAY_ID: &str = "main-tray";
+
 struct Host {
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
+}
+
+/// Companion window startup, tray persistence, and single-instance wakeup state.
+struct WindowLifecycle {
+    keep_in_tray: Arc<AtomicBool>,
+    quitting: Arc<AtomicBool>,
+    startup_handled: AtomicBool,
+    woken_early: AtomicBool,
+    start_minimized: bool,
 }
 
 /// Requests from the companion window to open or close WestPlay on the truck's screen (the cabin page owns
@@ -45,14 +58,91 @@ struct SettingsStore {
 /// (`companion_ready`), so it never shows blank while the page loads; after this long it shows anyway.
 const SHOW_ANYWAY: Duration = Duration::from_secs(8);
 
-/// The companion's page has drawn its first screen: the window shows.
+/// The companion's page has drawn its first screen: apply the configured startup visibility once.
 #[tauri::command]
-fn companion_ready(window: WebviewWindow) {
+fn companion_ready(app: AppHandle) {
+    apply_initial_visibility(&app, false);
+}
+
+fn apply_initial_visibility(app: &AppHandle, fallback: bool) {
+    let Some(lifecycle) = app.try_state::<WindowLifecycle>() else {
+        return;
+    };
+    if lifecycle.startup_handled.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let woken = lifecycle.woken_early.load(Ordering::Acquire);
+    let keep_in_tray = lifecycle.keep_in_tray.load(Ordering::Acquire);
+    if !woken && lifecycle.start_minimized {
+        if keep_in_tray {
+            westplay_host::startup::mark("app: started in system tray");
+            return;
+        }
+        westplay_host::startup::mark("app: started minimized");
+        if let Ok(hwnd) = window.hwnd() {
+            westplay_host::companion_window::show_minimized_no_activate(hwnd.0 as isize);
+        } else {
+            let _ = window.minimize();
+        }
+        return;
+    }
     if !window.is_visible().unwrap_or(false) {
-        westplay_host::startup::mark("app: window shown");
+        westplay_host::startup::mark(if fallback {
+            "app: window shown without its page ready"
+        } else {
+            "app: window shown"
+        });
         let _ = window.show();
         let _ = window.set_focus();
     }
+}
+
+/// Brings the companion window up from the tray, taskbar, or background and focuses it.
+fn show_main_window(app: &AppHandle) {
+    if let Some(lifecycle) = app.try_state::<WindowLifecycle>() {
+        lifecycle.woken_early.store(true, Ordering::Release);
+        lifecycle.startup_handled.store(true, Ordering::Release);
+    }
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(window) = handle.get_webview_window("main") else {
+            return;
+        };
+        if window.is_minimized().unwrap_or(false) {
+            let _ = window.unminimize();
+        }
+        let _ = window.show();
+        let _ = window.set_focus();
+        if let Ok(hwnd) = window.hwnd() {
+            westplay_host::companion_window::force_foreground(hwnd.0 as isize);
+        }
+    });
+}
+
+#[tauri::command]
+fn window_minimize(window: WebviewWindow, lifecycle: State<WindowLifecycle>) {
+    if lifecycle.keep_in_tray.load(Ordering::Acquire) {
+        let _ = window.hide();
+    } else {
+        let _ = window.minimize();
+    }
+}
+
+#[tauri::command]
+fn window_close(window: WebviewWindow, lifecycle: State<WindowLifecycle>) {
+    if lifecycle.keep_in_tray.load(Ordering::Acquire) {
+        let _ = window.hide();
+    } else {
+        let _ = window.close();
+    }
+}
+
+#[tauri::command]
+fn window_start_dragging(window: WebviewWindow) {
+    let _ = window.start_dragging();
 }
 
 /// Whether the companion's window is the one in front. Windows' word: the page's own `document.hasFocus()` says
@@ -233,12 +323,40 @@ fn get_settings(store: State<SettingsStore>) -> Settings {
     store.shared.get()
 }
 
+fn tray_is_zh(settings: &Settings) -> bool {
+    settings
+        .language
+        .as_ref()
+        .map(|code| code.as_str().to_owned())
+        .or_else(setup::onboarding_language)
+        .is_some_and(|code| code.starts_with("zh_"))
+}
+
+fn build_tray_menu(app: &AppHandle, zh: bool) -> tauri::Result<Menu<tauri::Wry>> {
+    let open =
+        MenuItem::with_id(app, "open", if zh { "打开 TruckPlay" } else { "Open TruckPlay" }, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", if zh { "退出" } else { "Quit" }, true, None::<&str>)?;
+    Menu::with_items(app, &[&open, &quit])
+}
+
 /// Saves new settings and applies them. Values are corrected on the way in (see `westplay_host::settings`);
 /// the settings as saved are returned and announced to every window (`settings-changed`).
 #[tauri::command]
-fn update_settings(settings: Settings, store: State<SettingsStore>, app: AppHandle) -> Result<Settings, String> {
+fn update_settings(
+    settings: Settings,
+    store: State<SettingsStore>,
+    lifecycle: State<WindowLifecycle>,
+    app: AppHandle,
+) -> Result<Settings, String> {
     store.file.save(&settings).map_err(|e| format!("Couldn't save the settings: {e}"))?;
     store.shared.set(settings.clone());
+    lifecycle.keep_in_tray.store(settings.window.keep_in_tray, Ordering::Release);
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_visible(settings.window.keep_in_tray);
+        if let Ok(menu) = build_tray_menu(&app, tray_is_zh(&settings)) {
+            let _ = tray.set_menu(Some(menu));
+        }
+    }
     let _ = app.emit("settings-changed", &settings);
     Ok(settings)
 }
@@ -249,12 +367,15 @@ fn main() {
     if let Some(code) = westplay_setup::plugin::run_as_administrator_copy(&args) {
         std::process::exit(code);
     }
-    // One WestPlay at a time: a second only says so (held until the app ends). Before the log starts: a second
-    // making the log anew would empty the running one's.
+    // One WestPlay at a time: a second brings the running window up (or falls back to the message box if no
+    // companion wake event exists). Before the log starts: a second making the log anew would empty ours.
     let Some(_instance) = westplay_host::Instance::claim() else {
-        westplay_host::tell_already_running();
+        if !westplay_host::wake_running_instance() {
+            westplay_host::tell_already_running();
+        }
         return;
     };
+    let wake_signal = westplay_host::WakeSignal::create();
     westplay_host::log::init();
     westplay_host::startup::mark("app: started");
     let open_request = Arc::new(OpenRequest::default());
@@ -269,6 +390,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             companion_ready,
             window_in_front,
+            window_minimize,
+            window_close,
+            window_start_dragging,
             room_held,
             set_westplay_open,
             youtube_sign_in,
@@ -320,21 +444,87 @@ fn main() {
             setup::remove_data,
             setup::leave_pc
         ])
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let hide = window
+                    .app_handle()
+                    .try_state::<WindowLifecycle>()
+                    .is_some_and(|l| l.keep_in_tray.load(Ordering::Acquire) && !l.quitting.load(Ordering::Acquire));
+                if hide {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .setup(move |app| {
             westplay_host::startup::mark("app: window set up");
-            // A page that never says it's ready (it failed to load) still shows, rather than nothing at all.
-            if let Some(window) = app.get_webview_window("main") {
-                std::thread::spawn(move || {
-                    std::thread::sleep(SHOW_ANYWAY);
-                    if !window.is_visible().unwrap_or(true) {
-                        westplay_host::startup::mark("app: window shown without its page ready");
-                        let _ = window.show();
+            let config_dir = app.path().app_config_dir()?;
+            let file = SettingsFile::in_dir(&config_dir);
+            let initial_settings = file.load();
+            let shared = Arc::new(SharedSettings::new(initial_settings.clone()));
+            let keep_in_tray = Arc::new(AtomicBool::new(initial_settings.window.keep_in_tray));
+            let quitting = Arc::new(AtomicBool::new(false));
+
+            if let Some(window) = app.get_webview_window("main")
+                && let Ok(hwnd) = window.hwnd()
+            {
+                westplay_host::companion_window::attach(hwnd.0 as isize, keep_in_tray.clone());
+            }
+
+            let menu = build_tray_menu(app.handle(), tray_is_zh(&initial_settings))?;
+            let quit_flag = quitting.clone();
+            let mut tray_builder = TrayIconBuilder::with_id(TRAY_ID)
+                .tooltip("TruckPlay")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "open" => show_main_window(app),
+                    "quit" => {
+                        quit_flag.store(true, Ordering::Release);
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if matches!(
+                        event,
+                        TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. }
+                            | TrayIconEvent::DoubleClick { button: MouseButton::Left, .. }
+                    ) {
+                        show_main_window(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon().cloned() {
+                tray_builder = tray_builder.icon(icon);
+            }
+            let tray = tray_builder.build(app)?;
+            let _ = tray.set_visible(initial_settings.window.keep_in_tray);
+
+            app.manage(WindowLifecycle {
+                keep_in_tray,
+                quitting,
+                startup_handled: AtomicBool::new(false),
+                woken_early: AtomicBool::new(false),
+                start_minimized: initial_settings.window.start_minimized,
+            });
+
+            // A page that never says it's ready (it failed to load) still applies initial visibility.
+            let fallback_app = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(SHOW_ANYWAY);
+                let app_handle = fallback_app.clone();
+                let _ = fallback_app.run_on_main_thread(move || apply_initial_visibility(&app_handle, true));
+            });
+
+            if let Some(wake_signal) = wake_signal {
+                let wake_app = app.handle().clone();
+                let _ = std::thread::Builder::new().name("westplay-wakeup".into()).spawn(move || {
+                    while wake_signal.wait() {
+                        show_main_window(&wake_app);
                     }
                 });
             }
-            let config_dir = app.path().app_config_dir()?;
-            let file = SettingsFile::in_dir(&config_dir);
-            let shared = Arc::new(SharedSettings::new(file.load()));
+
             let setup = SetupStore::load(&config_dir, app.handle());
             setup::watch_installed_mods(&setup);
             let customize = customize::Customize {

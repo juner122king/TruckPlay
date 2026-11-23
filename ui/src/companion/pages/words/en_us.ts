@@ -6,6 +6,7 @@ export const words: CompanionWords = {
     controls: 'Controls',
     accounts: 'Accounts',
     map: 'Map',
+    options: 'Options',
     setup: 'Setup',
     about: 'About',
     customize: 'Customize',
@@ -259,6 +260,7 @@ export const words: CompanionWords = {
       customize: 'Add your own wallpapers and app icons, and choose which ones your screen shows.',
       accounts: 'Sign in to YouTube, Spotify and Apple Music whenever you like.',
       map: 'Your map, made from your game. It’s prepared again when the game or your map mods change.',
+      options: 'Start WestPlay minimized, or keep it running in the system tray when minimized or closed.',
       setup: 'Where WestPlay is installed, with Reinstall and Uninstall if you ever need them.',
       about: 'Your version, and a report to copy if something isn’t right.',
       support: 'If you enjoy WestPlay, you can support its development here.',
@@ -372,5 +374,19 @@ export const words: CompanionWords = {
     sub: 'WestPlay is free. If it makes your drives better, you can support its development on Kreosus, once or every month.',
     button: 'Support on Kreosus',
     note: 'Opens Kreosus in your browser.',
+  },
+  options: {
+    title: 'Options',
+    sub: 'How WestPlay’s window opens and stays running.',
+    startMinimized: 'Start minimized',
+    startMinimizedDetail: 'Opens WestPlay minimized on the taskbar.',
+    keepInTray: 'Keep in the system tray',
+    keepInTrayDetail:
+      'Minimizing or closing the window leaves WestPlay running in the tray by the clock. Click its icon to open it again, or right-click it to quit.',
+    bothNote: 'With both on, WestPlay starts in the tray.',
+  },
+  window: {
+    minimize: 'Minimize',
+    close: 'Close',
   },
 }

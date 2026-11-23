@@ -36,11 +36,23 @@ pub struct Settings {
     #[serde(deserialize_with = "lenient")]
     pub map: MapSettings,
     #[serde(deserialize_with = "lenient")]
+    pub window: WindowSettings,
+    #[serde(deserialize_with = "lenient")]
     pub mobile_web_ui: bool,
     /// The language WestPlay speaks, in the cab and the companion (the companion's Setup page): one of the
     /// game's, by its code (`tr_tr`), or `None`: the game's own (owner 2026-11-03).
     #[serde(deserialize_with = "lenient")]
     pub language: Option<LanguageCode>,
+}
+
+/// Companion window behavior options: starting minimized to taskbar and keeping alive in the system tray.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct WindowSettings {
+    #[serde(deserialize_with = "lenient")]
+    pub start_minimized: bool,
+    #[serde(deserialize_with = "lenient")]
+    pub keep_in_tray: bool,
 }
 
 /// One of the game's language codes, as its `config.cfg` writes them (`tr_tr`, `pt_br`): two letters, `_`, two.
@@ -553,6 +565,7 @@ mod tests {
                 coach: CoachSpeakers::Passengers,
             },
             map: MapSettings { buildings: false, roads: false, fast: true, maintenance: MapMaintenance::default() },
+            window: WindowSettings { start_minimized: true, keep_in_tray: true },
             mobile_web_ui: true,
             language: LanguageCode::new("pt_br"),
         };
@@ -562,6 +575,8 @@ mod tests {
         assert!(json.contains("\"key\": 5"), "{json}");
         assert!(json.contains("\"mode\": \"toggle\""), "{json}");
         assert!(json.contains("\"truckStrip\": \"off\""), "{json}");
+        assert!(json.contains("\"startMinimized\": true"), "{json}");
+        assert!(json.contains("\"keepInTray\": true"), "{json}");
         assert!(json.contains("\"language\": \"pt_br\""), "{json}");
         assert_eq!(parse(&json).unwrap(), settings);
     }
@@ -602,6 +617,14 @@ mod tests {
         assert!(!parse(r#"{"mobileWebUi":"true"}"#).unwrap().mobile_web_ui);
         let enabled = Settings { mobile_web_ui: true, ..Default::default() };
         assert!(parse(&to_json(&enabled)).unwrap().mobile_web_ui);
+    }
+
+    #[test]
+    fn window_options_default_off_and_fall_back_leniently() {
+        assert_eq!(parse("{}").unwrap().window, WindowSettings { start_minimized: false, keep_in_tray: false });
+        let bad = parse(r#"{"window": {"startMinimized": "yes", "keepInTray": true}}"#).unwrap();
+        assert!(!bad.window.start_minimized);
+        assert!(bad.window.keep_in_tray);
     }
 
     #[test]

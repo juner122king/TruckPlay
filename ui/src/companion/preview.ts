@@ -86,6 +86,7 @@ let settings: Settings = {
   graphics: { gpu: null },
   sound: { equalizer: { bass: 0, mid: 0, treble: 0 }, custom: false, coach: 'driver' },
   map: { buildings: true, roads: true, fast: false, maintenance: { games: {}, profiles: {} } },
+  window: { startMinimized: false, keepInTray: false },
   language: null,
 }
 
@@ -518,6 +519,10 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
       return later(undefined)
     case 'companion_ready':
     case 'room_held':
+    case 'window_minimize':
+    case 'window_close':
+    case 'window_start_dragging':
+    case 'window_start_resize_dragging':
       return later(undefined, 0)
     case 'customize_list':
       return later(structuredClone(custom), 150)

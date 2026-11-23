@@ -290,6 +290,21 @@ export interface CompanionWords {
     button: string
     note: string
   }
+  /** Options: companion window startup and system tray behavior. */
+  options: {
+    title: string
+    sub: string
+    startMinimized: string
+    startMinimizedDetail: string
+    keepInTray: string
+    keepInTrayDetail: string
+    bothNote: string
+  }
+  /** Custom glass window buttons at the top right. */
+  window: {
+    minimize: string
+    close: string
+  }
 }
 
 export interface UninstallWords {
@@ -333,7 +348,8 @@ export interface TutorialWords {
   finish: string
 }
 
-export type SectionId = 'screen' | 'controls' | 'customize' | 'accounts' | 'map' | 'setup' | 'about' | 'support'
+export type SectionId =
+  'screen' | 'controls' | 'customize' | 'accounts' | 'map' | 'options' | 'setup' | 'about' | 'support'
 
 const WORDS: Record<string, CompanionWords> = Object.fromEntries(
   Object.entries(import.meta.glob<CompanionWords>('./[a-z][a-z]_[a-z][a-z].ts', { eager: true, import: 'words' })).map(

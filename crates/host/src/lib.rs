@@ -11,6 +11,7 @@ mod brightness;
 pub mod browser;
 mod camera;
 mod capture;
+pub mod companion_window;
 mod cursor;
 pub mod customize;
 mod dev_window;
@@ -392,13 +393,8 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut screen_light = 1.0;
     // Where the page is on the frame (`westplay_shared::page_place`): the whole frame until a screen asks for another
     // shape, or a bus's Gps part for its glass.
-    let mut page_place = westplay_shared::PagePlace {
-        left: 0,
-        top: 0,
-        width: config.width,
-        rows: config.height,
-        height: config.height,
-    };
+    let mut page_place =
+        westplay_shared::PagePlace { left: 0, top: 0, width: config.width, rows: config.height, height: config.height };
     let mut pointer = Pointer::new(config.width, config.height);
     let mut mobile_enabled = false;
     let mut lan: Option<lan::Lan> = None;
@@ -2310,6 +2306,70 @@ impl Drop for Instance {
     }
 }
 
+/// Named event signaled by a second launch to bring the running companion window to the foreground.
+pub struct WakeSignal(windows::Win32::Foundation::HANDLE);
+
+// SAFETY: an OS event handle, waited on or closed once on drop.
+unsafe impl Send for WakeSignal {}
+// SAFETY: Win32 event handles are thread-safe for wait/signal operations.
+unsafe impl Sync for WakeSignal {}
+
+impl WakeSignal {
+    /// Creates (or opens) the session's auto-reset wake event.
+    pub fn create() -> Option<Self> {
+        Self::create_named(windows::core::w!(r"Local\WestPlay.ShowWindow"))
+    }
+
+    fn create_named(name: windows::core::PCWSTR) -> Option<Self> {
+        // SAFETY: static name, auto-reset unsignaled event owned by this wrapper.
+        let handle = unsafe { windows::Win32::System::Threading::CreateEventW(None, false, false, name) }.ok()?;
+        Some(Self(handle))
+    }
+
+    /// Blocks until another launch signals this event (or `timeout_ms` elapses); returns `true` if signaled.
+    pub fn wait_timeout(&self, timeout_ms: u32) -> bool {
+        use windows::Win32::Foundation::WAIT_OBJECT_0;
+        // SAFETY: `self.0` is a valid event handle alive for `&self`.
+        unsafe { windows::Win32::System::Threading::WaitForSingleObject(self.0, timeout_ms) == WAIT_OBJECT_0 }
+    }
+
+    /// Blocks indefinitely until another launch signals this event.
+    pub fn wait(&self) -> bool {
+        self.wait_timeout(windows::Win32::System::Threading::INFINITE)
+    }
+}
+
+impl Drop for WakeSignal {
+    fn drop(&mut self) {
+        // SAFETY: the handle is this `WakeSignal`'s own, closed once on drop.
+        unsafe {
+            let _ = windows::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
+/// Signals the already-running WestPlay companion instance to bring its window up (from the tray or taskbar),
+/// granting it foreground activation permission first. Returns `false` if no companion wake event exists.
+pub fn wake_running_instance() -> bool {
+    wake_named(windows::core::w!(r"Local\WestPlay.ShowWindow"))
+}
+
+fn wake_named(name: windows::core::PCWSTR) -> bool {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{EVENT_MODIFY_STATE, OpenEventW, SetEvent};
+    use windows::Win32::UI::WindowsAndMessaging::{ASFW_ANY, AllowSetForegroundWindow};
+    // SAFETY: plain Win32 calls; `AllowSetForegroundWindow` lets the running background process take focus.
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+        let Ok(handle) = OpenEventW(EVENT_MODIFY_STATE, false, name) else {
+            return false;
+        };
+        let ok = SetEvent(handle).is_ok();
+        let _ = CloseHandle(handle);
+        ok
+    }
+}
+
 /// Tells the player WestPlay is already running (a second one was started), in a message box.
 pub fn tell_already_running() {
     use windows::Win32::UI::WindowsAndMessaging::{MB_ICONINFORMATION, MB_OK, MessageBoxW};
@@ -2933,7 +2993,9 @@ enum PageMessage {
     },
     /// The cab's guidance (the next turn it shows, at which node, and how far), every 30 s while there's a route, for
     /// the log (ui/src/cabin/maps/guidanceLog.ts).
-    Guidance { line: String },
+    Guidance {
+        line: String,
+    },
     /// Whether WestPlay is open on the truck's screen: posted as the page loads and whenever it changes.
     Westplay {
         open: bool,
@@ -3393,6 +3455,17 @@ mod tests {
         assert!(super::Instance::claim_named(name).is_none(), "a second must not");
         drop(first);
         assert!(super::Instance::claim_named(name).is_some(), "once let go, it can be claimed again");
+    }
+
+    #[test]
+    fn wake_signal_wakes_the_waiting_instance() {
+        let name = windows::core::w!(r"Local\WestPlay.ShowWindow.Test");
+        assert!(!super::wake_named(name));
+        let signal = super::WakeSignal::create_named(name).expect("creates wake event");
+        assert!(!signal.wait_timeout(0));
+        assert!(super::wake_named(name));
+        assert!(signal.wait_timeout(200));
+        assert!(!signal.wait_timeout(0), "auto-reset clears after waking once");
     }
 
     #[test]

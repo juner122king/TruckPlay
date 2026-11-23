@@ -23,6 +23,30 @@ export function windowInFront(): Promise<boolean> {
   return IN_APP ? invoke<boolean>('window_in_front') : Promise.resolve(document.hasFocus())
 }
 
+export type ResizeDirection =
+  'East' | 'North' | 'NorthEast' | 'NorthWest' | 'South' | 'SouthEast' | 'SouthWest' | 'West'
+
+/** Minimizes the companion window (or hides it to the tray if Keep in the system tray is enabled). */
+export function minimizeWindow(): Promise<void> {
+  return call<void>('window_minimize')
+}
+
+/** Closes the companion window (or hides it to the tray if Keep in the system tray is enabled). */
+export function closeWindow(): Promise<void> {
+  return call<void>('window_close')
+}
+
+/** Begins dragging the frameless companion window from a non-interactive area. */
+export function startDraggingWindow(): Promise<void> {
+  return call<void>('window_start_dragging')
+}
+
+/** Begins resizing the frameless companion window from an edge or corner handle. */
+export function startResizingWindow(direction: ResizeDirection): Promise<void> {
+  if (IN_APP) return import('@tauri-apps/api/window').then((w) => w.getCurrentWindow().startResizeDragging(direction))
+  return call<void>('window_start_resize_dragging', { direction })
+}
+
 /** Listens to one of the app's events; returns how to stop. */
 export function on<T>(event: string, handler: (payload: T) => void): () => void {
   if (IN_APP) {

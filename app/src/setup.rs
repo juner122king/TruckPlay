@@ -177,7 +177,7 @@ pub async fn setup_state(store: State<'_, SetupStore>) -> Result<SetupState, Str
 /// names): the one a game was last set to (the `config.cfg` written last, of either game), or one set for
 /// trying it out (`WESTPLAY_LANGUAGE`). A player who never started a game has neither: the onboarding then
 /// follows Windows'.
-fn onboarding_language() -> Option<String> {
+pub(crate) fn onboarding_language() -> Option<String> {
     let set = std::env::var("WESTPLAY_LANGUAGE").ok().filter(|code| !code.is_empty());
     set.or_else(|| {
         let config = Kind::ALL

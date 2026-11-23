@@ -14,7 +14,153 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  background: transparent;
+}
+
+.cp-window {
+  position: relative;
+  height: 100svh;
+  overflow: hidden;
+  border-radius: 18px;
   background: #060608;
+}
+
+.cp-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.12);
+  pointer-events: none;
+}
+
+/* Top-right glass minimize and close buttons replacing Windows' title bar. */
+.cp-win-controls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+}
+
+.cp-win-btn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.08);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.1),
+    0 6px 18px rgb(0 0 0 / 0.35);
+  color: rgb(245 245 247 / 0.78);
+  cursor: pointer;
+  transition:
+    background 220ms ease,
+    color 220ms ease,
+    transform 350ms var(--ease);
+}
+
+.cp-win-btn svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.cp-win-btn:hover {
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
+}
+
+.cp-win-btn[data-close]:hover {
+  background: rgb(255 69 58 / 0.72);
+  color: #fff;
+}
+
+.cp-win-btn:active {
+  transform: scale(0.9);
+}
+
+/* Invisible edge/corner resize strips for the frameless window. */
+.cp-win-resize {
+  position: absolute;
+  z-index: 19;
+}
+
+.cp-win-resize-n {
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 5px;
+  cursor: n-resize;
+}
+
+.cp-win-resize-s {
+  bottom: 0;
+  left: 18px;
+  right: 18px;
+  height: 5px;
+  cursor: s-resize;
+}
+
+.cp-win-resize-w {
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 5px;
+  cursor: w-resize;
+}
+
+.cp-win-resize-e {
+  top: 18px;
+  bottom: 18px;
+  right: 0;
+  width: 5px;
+  cursor: e-resize;
+}
+
+.cp-win-resize-nw {
+  top: 4px;
+  left: 4px;
+  width: 12px;
+  height: 12px;
+  cursor: nw-resize;
+}
+
+.cp-win-resize-ne {
+  top: 4px;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  cursor: ne-resize;
+}
+
+.cp-win-resize-sw {
+  bottom: 4px;
+  left: 4px;
+  width: 12px;
+  height: 12px;
+  cursor: sw-resize;
+}
+
+.cp-win-resize-se {
+  bottom: 4px;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
 }
 
 h1,
@@ -62,25 +208,45 @@ button {
   transform: translate3d(262px, -3svh, 0) scale(0.47) rotateY(-22deg) rotateX(2deg);
 }
 
-/* ---------- The sections, at the left ---------- */
+/* ---------- The sections, in a floating pane of glass at the left ---------- */
 
 .cp-list {
   position: absolute;
-  top: 22px;
-  bottom: 22px;
-  left: 16px;
+  top: 14px;
+  bottom: 14px;
+  left: 14px;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  width: 200px;
+  gap: 10px;
+  width: 206px;
+  padding: 14px 10px 12px;
+  border-radius: 18px;
+  background: rgb(28 28 31 / 0.72);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06),
+    0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+.cp-list-items {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
 .cp-brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 2px 12px 8px;
+  gap: 10px;
+  padding: 0 8px 4px;
 }
 
 .cp-brand img {
@@ -142,7 +308,7 @@ button {
 .cp-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .cp-row {
@@ -152,13 +318,13 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  height: 40px;
-  padding: 0 12px;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: transparent;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 13.5px;
   text-align: left;
   cursor: pointer;
   transition:
@@ -202,14 +368,14 @@ button {
   display: flex;
   gap: 8px;
   margin-top: auto;
-  padding: 0 12px;
+  padding: 2px 8px 0;
 }
 
 .cp-socials button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 0;
   border-radius: 99px;
@@ -256,7 +422,7 @@ button {
   left: 0;
   right: 0;
   z-index: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--fill-strong);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
   transition:
@@ -270,7 +436,7 @@ button {
 .ob-words[data-place='page'] {
   top: 36px;
   bottom: 24px;
-  left: 236px;
+  left: 238px;
   z-index: 2;
   width: 304px;
 }
@@ -551,13 +717,13 @@ button {
 /* The tour's card, under the list: what the open section is for. */
 .cp-tour {
   position: absolute;
-  bottom: 22px;
-  left: 16px;
+  bottom: 14px;
+  left: 14px;
   z-index: 3;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 200px;
+  width: 206px;
   padding: 14px 14px 12px;
   border-radius: 16px;
   background: rgb(30 30 33 / 0.9);

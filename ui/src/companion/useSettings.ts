@@ -47,6 +47,11 @@ export interface Settings {
     fast: boolean
     maintenance?: { games: Record<string, boolean>; profiles: Record<string, boolean> }
   }
+  /** Companion window behavior options: starting minimized and keeping alive in the system tray. */
+  window: {
+    startMinimized: boolean
+    keepInTray: boolean
+  }
   /** The language WestPlay speaks in the cab and here: one of the game's (`de_de`), or `null`: the game's. */
   language: string | null
 }
