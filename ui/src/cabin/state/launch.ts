@@ -114,13 +114,45 @@ export function whenTransitionEnds(next: () => void): void {
   running.finished.catch(() => {}).finally(next)
 }
 
+/** Minimal `window` shape needed to check whether the page is inside an `<iframe>`. */
+export interface SubframeCheckWindow {
+  readonly self: unknown
+  readonly top: unknown
+}
+
+/**
+ * Whether this page is embedded in an iframe. Microsoft Edge WebView2 158 hits a renderer crash
+ * (`STATUS_BREAKPOINT`) when a same-document View Transition morphs named elements inside a subframe
+ * (such as the companion's `<TruckScreen>` preview); top-level documents (the in-cab WebView2) are unaffected.
+ */
+export function inSubframe(
+  win: SubframeCheckWindow | undefined = typeof window !== 'undefined' ? window : undefined,
+): boolean {
+  if (!win) return false
+  try {
+    return win.self !== win.top
+  } catch {
+    return true
+  }
+}
+
+/** Whether same-document View Transitions may run safely in this document. */
+export function canUseViewTransitions(
+  doc: Partial<Pick<Document, 'startViewTransition'>> | undefined = typeof document !== 'undefined'
+    ? document
+    : undefined,
+  win: SubframeCheckWindow | undefined = typeof window !== 'undefined' ? window : undefined,
+): boolean {
+  return typeof doc?.startViewTransition === 'function' && !inSubframe(win)
+}
+
 /**
  * Runs `update` (a navigation) as an animated transition. `update` must change the screen
- * synchronously. Without View Transitions support it just runs. Start it from `afterRunningTransition`, so
- * it begins from the current screen.
+ * synchronously. Without View Transitions support (or inside an iframe) it just runs. Start it from
+ * `afterRunningTransition`, so it begins from the current screen.
  */
 export function animateNavigation(launch: Launch | null, update: () => void): void {
-  if (typeof document.startViewTransition !== 'function') {
+  if (!canUseViewTransitions()) {
     update()
     return
   }
@@ -172,8 +204,12 @@ function intoSidebar(root: HTMLElement): void {
  * change already animating keeps going, and the appearance just changes under it.
  */
 export function animateAppearance(update: () => void): void {
+  if (!canUseViewTransitions()) {
+    update()
+    return
+  }
   const root = document.documentElement
-  if (typeof document.startViewTransition !== 'function' || (running && root.dataset.transition !== 'appearance')) {
+  if (running && root.dataset.transition !== 'appearance') {
     update()
     return
   }
