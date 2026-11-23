@@ -9,8 +9,8 @@
 //!
 //! It looks as the page's did (`shell.css`, `.cursor`): a soft white dot with a ring, its shadow outside it,
 //! shrinking while pressed; dark over something light; faded away after a while untouched. Each change moves on
-//! the page's own curve and times. The page is squeezed into the frame where it's laid out taller
-//! (`webview::Stage::set_page_height`), and so is the dot: the game stretches the frame back, and it's round.
+//! the page's own curve and times. The page is placed and squeezed into the frame
+//! (`webview::Stage::set_page_place`), and so is the dot: the game stretches the frame back, and it's round.
 //!
 //! [`set_light`]: Cursor::set_light
 
@@ -97,6 +97,23 @@ impl Tween {
 
     fn snap(&mut self, to: f32, now: Instant) {
         *self = Self::at(to, now);
+    }
+}
+
+/// Where the page is on the frame: its left and top (frame pixels) and how much it's squeezed down it (the frame's
+/// rows for each of its pixels): the whole frame, laid out taller and squeezed, or a bus's Gps part's glass
+/// (`westplay_shared::page_place`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Placement {
+    pub left: f32,
+    pub top: f32,
+    pub squeeze: f32,
+}
+
+impl Placement {
+    /// The frame's pixel at the page's (`x`, `y`).
+    pub fn frame_point(&self, x: f32, y: f32) -> (f32, f32) {
+        (self.left + x, self.top + y * self.squeeze)
     }
 }
 
@@ -325,9 +342,10 @@ impl Painter {
         }
     }
 
-    /// Draws `look` over what the frame holds, the page squeezed into it `squeeze` times its height, its colours'
-    /// light scaled by `light` as the frame's is (`brightness.rs`).
-    pub fn draw(&self, look: &Look, squeeze: f32, light: f32) -> Result<()> {
+    /// Draws `look` over what the frame holds, the page placed and squeezed as `placement` says, its colours' light
+    /// scaled by `light` as the frame's is (`brightness.rs`).
+    pub fn draw(&self, look: &Look, placement: Placement, light: f32) -> Result<()> {
+        let Placement { left, top, squeeze } = placement;
         let (fill, ring, shadow) = colours(look);
         let (fill, ring) = (lit(fill, light), lit(ring, light));
         let radius = RADIUS * look.scale;
@@ -340,8 +358,8 @@ impl Painter {
         unsafe {
             let context = &self.context;
             context.BeginDraw();
-            // Page pixels: the page squeezed into the frame.
-            context.SetTransform(&Matrix3x2 { M11: 1.0, M12: 0.0, M21: 0.0, M22: squeeze, M31: 0.0, M32: 0.0 });
+            // Page pixels: placed on the frame and squeezed down it.
+            context.SetTransform(&Matrix3x2 { M11: 1.0, M12: 0.0, M21: 0.0, M22: squeeze, M31: left, M32: top });
             // The whole cursor seen as one, fading, and only within its area (under the black corners).
             let within = match look.area {
                 Some(area) => Some(self.within(&area)?),
@@ -556,6 +574,14 @@ mod tests {
         assert_eq!((fill, ring, shadow), (white(0.35), white(0.85), black(0.35)));
     }
 
+    #[test]
+    fn a_page_on_a_buss_glass_has_its_points_where_its_glass_is_on_the_frame() {
+        let place = Placement { left: 499.0, top: 229.0, squeeze: 511.0 / 744.0 };
+        assert_eq!(place.frame_point(0.0, 0.0), (499.0, 229.0));
+        let (x, y) = place.frame_point(100.0, 744.0);
+        assert!((x - 599.0).abs() < 1e-3 && (y - 740.0).abs() < 1e-3, "({x}, {y})");
+    }
+
     /// The real drawing, on this PC's GPU: the cursor over a dark and a light half, at rest, pressed and dark,
     /// the page squeezed as a tall page is; the pixels read back and saved as a picture (WESTPLAY_CURSOR_PNG,
     /// else the temporary folder's westplay-cursor.png) to look at.
@@ -594,23 +620,27 @@ mod tests {
         let texture = texture.unwrap();
         let painter = Painter::new(&gpu, &texture).unwrap();
         // A page 1.25 times the frame's height: squeezed to 0.8, the dot drawn 0.8 as tall.
-        let squeeze = 0.8;
+        let placement = Placement { left: 0.0, top: 0.0, squeeze: 0.8 };
         let at = |x: f32, scale: f32, tone: f32, press: f32| Look {
             x,
-            y: 80.0 / squeeze,
+            y: 80.0 / placement.squeeze,
             opacity: 1.0,
             scale,
             tone,
             press,
             area: None,
         };
-        painter.draw(&at(100.0, 1.0, 0.0, 0.0), squeeze, 1.0).unwrap();
-        painter.draw(&at(240.0, PRESSED_SCALE, 1.0, 1.0), squeeze, 1.0).unwrap();
-        painter.draw(&at(330.0, 1.0, 1.0, 0.0), squeeze, 1.0).unwrap();
+        painter.draw(&at(100.0, 1.0, 0.0, 0.0), placement, 1.0).unwrap();
+        painter.draw(&at(240.0, PRESSED_SCALE, 1.0, 1.0), placement, 1.0).unwrap();
+        painter.draw(&at(330.0, 1.0, 1.0, 0.0), placement, 1.0).unwrap();
         // In its area only: a cursor at the frame's top left corner, its area round there (radius 40), 2 in.
-        let corner = Area { left: 2.0, top: 2.0, right: 398.0, bottom: 158.0 / squeeze, radius: 40.0 };
+        let corner = Area { left: 2.0, top: 2.0, right: 398.0, bottom: 158.0 / placement.squeeze, radius: 40.0 };
         painter
-            .draw(&Look { x: 8.0, y: 8.0 / squeeze, area: Some(corner), ..at(0.0, 1.0, 0.0, 0.0) }, squeeze, 1.0)
+            .draw(
+                &Look { x: 8.0, y: 8.0 / placement.squeeze, area: Some(corner), ..at(0.0, 1.0, 0.0, 0.0) },
+                placement,
+                1.0,
+            )
             .unwrap();
 
         desc.Usage = D3D11_USAGE_STAGING;

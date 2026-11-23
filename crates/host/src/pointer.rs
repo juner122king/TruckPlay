@@ -139,7 +139,7 @@ impl Pointer {
         (active, if self.held_through_cover { 0 } else { buttons })
     }
 
-    /// The page laid out at another size (`webview::Stage::set_page_height`): the cursor stays where it was on
+    /// The page laid out at another size (`webview::Stage::set_page_place`): the cursor stays where it was on
     /// the screen, the same share of the way across and down.
     pub fn set_size(&mut self, width: u32, height: u32) {
         let (width, height) = (width as f32, height as f32);
@@ -243,17 +243,25 @@ impl Pointer {
         phase: crate::lan::Phase,
         x: f32,
         y: f32,
+        place: westplay_shared::PagePlace,
         webview: &OffscreenWebView,
         web: Option<WebArea<'_>>,
     ) {
-        let events = self.touch_events(phase, x, y);
+        let events = self.touch_events(phase, x, y, place);
         if !events.is_empty() {
             self.dispatch_events(events, webview, web);
         }
     }
 
-    /// The phone sends normalized frame coordinates. The page can be taller than the frame.
-    fn touch_events(&mut self, phase: crate::lan::Phase, x: f32, y: f32) -> Vec<(COREWEBVIEW2_MOUSE_EVENT_KIND, u32)> {
+    /// The phone sends normalized frame coordinates. The page can be placed in a sub-rectangle of the frame
+    /// (on a bus's Gps glass) and can be taller than the area it occupies.
+    fn touch_events(
+        &mut self,
+        phase: crate::lan::Phase,
+        x: f32,
+        y: f32,
+        place: westplay_shared::PagePlace,
+    ) -> Vec<(COREWEBVIEW2_MOUSE_EVENT_KIND, u32)> {
         use crate::lan::Phase;
         let mut events = Vec::new();
         if phase == Phase::Cancel {
@@ -268,8 +276,14 @@ impl Pointer {
             return events;
         }
 
-        self.x = (x * self.width).clamp(0.0, self.width - 1.0);
-        self.y = (y * self.height).clamp(0.0, self.height - 1.0);
+        let px = (x * westplay_shared::SCREEN_WIDTH as f32 - place.left as f32) / place.width.max(1) as f32;
+        let py = (y * westplay_shared::SCREEN_HEIGHT as f32 - place.top as f32) / place.rows.max(1) as f32;
+        if phase == Phase::Down && (!(0.0..=1.0).contains(&px) || !(0.0..=1.0).contains(&py)) {
+            return events;
+        }
+
+        self.x = (px * self.width).clamp(0.0, (self.width - 1.0).max(0.0));
+        self.y = (py * self.height).clamp(0.0, (self.height - 1.0).max(0.0));
         events.push((COREWEBVIEW2_MOUSE_EVENT_KIND_MOVE, 0));
         match phase {
             Phase::Down => {
@@ -465,15 +479,16 @@ mod tests {
         use super::{Pointer, PointerBlock};
         use crate::lan::Phase;
 
-        let mut pointer = Pointer::new(1280, 793);
-        assert!(pointer.touch_events(Phase::Move, 0.25, 0.5).is_empty());
-        let down = pointer.touch_events(Phase::Down, 0.25, 0.5);
+        let place = westplay_shared::PagePlace { left: 0, top: 0, width: 1280, rows: 720, height: 793 };
+        let mut pointer = Pointer::new(place.width, place.height);
+        assert!(pointer.touch_events(Phase::Move, 0.25, 0.5, place).is_empty());
+        let down = pointer.touch_events(Phase::Down, 0.25, 0.5, place);
         assert_eq!(down.len(), 2);
         assert_eq!((pointer.x, pointer.y), (320.0, 396.5));
         assert_eq!(pointer.buttons, PointerBlock::LEFT);
-        pointer.touch_events(Phase::Move, 1.0, 1.0);
+        pointer.touch_events(Phase::Move, 1.0, 1.0, place);
         assert_eq!((pointer.x, pointer.y), (1279.0, 792.0));
-        assert_eq!(pointer.touch_events(Phase::Cancel, 0.0, 0.0).len(), 2);
+        assert_eq!(pointer.touch_events(Phase::Cancel, 0.0, 0.0, place).len(), 2);
         assert_eq!(pointer.buttons, 0);
         assert!(!pointer.active);
     }
@@ -667,5 +682,36 @@ mod tests {
             events,
             vec![(COREWEBVIEW2_MOUSE_EVENT_KIND_LEFT_BUTTON_UP, 0), (COREWEBVIEW2_MOUSE_EVENT_KIND_LEAVE, 0)]
         );
+    }
+
+    #[test]
+    fn remote_touch_maps_frame_coords_into_a_buss_glass_place() {
+        use crate::lan::Phase;
+        let place = westplay_shared::PagePlace { left: 499, top: 229, width: 781, rows: 511, height: 744 };
+        let mut pointer = Pointer::new(place.width, place.height);
+
+        // Outside the glass: initial press is ignored.
+        let outside = pointer.touch_events(Phase::Down, 100.0 / 1280.0, 100.0 / 720.0, place);
+        assert!(outside.is_empty());
+        assert!(!pointer.active);
+
+        // Top-left and centre of the glass map into [0..place.width) x [0..place.height).
+        let center_x = (place.left as f32 + place.width as f32 / 2.0) / westplay_shared::SCREEN_WIDTH as f32;
+        let center_y = (place.top as f32 + place.rows as f32 / 2.0) / westplay_shared::SCREEN_HEIGHT as f32;
+        let down = pointer.touch_events(Phase::Down, center_x, center_y, place);
+        assert_eq!(down, vec![(COREWEBVIEW2_MOUSE_EVENT_KIND_MOVE, 0), (LEFT_DOWN, 0)]);
+        assert!((pointer.x - place.width as f32 / 2.0).abs() < 1.0, "x={}", pointer.x);
+        assert!((pointer.y - place.height as f32 / 2.0).abs() < 1.0, "y={}", pointer.y);
+
+        // Dragging outside while active still moves (clamped) and up releases cleanly.
+        let mv = pointer.touch_events(Phase::Move, 0.0, 0.0, place);
+        assert_eq!(mv, vec![(COREWEBVIEW2_MOUSE_EVENT_KIND_MOVE, 0)]);
+        assert_eq!((pointer.x, pointer.y), (0.0, 0.0));
+        let up = pointer.touch_events(Phase::Up, center_x, center_y, place);
+        assert_eq!(
+            up,
+            vec![(COREWEBVIEW2_MOUSE_EVENT_KIND_MOVE, 0), (COREWEBVIEW2_MOUSE_EVENT_KIND_LEFT_BUTTON_UP, 0)]
+        );
+        assert!(!pointer.active);
     }
 }

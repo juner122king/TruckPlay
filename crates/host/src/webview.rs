@@ -133,11 +133,10 @@ pub enum Failure {
 pub struct Stage {
     _dispatcher: DispatcherQueueController,
     compositor: Compositor,
-    /// The frame captured, `frame` in size.
+    /// The frame captured.
     root: ContainerVisual,
-    frame: (u32, u32),
-    /// What's on the frame (the cabin page, the players), laid out at the page's size and squeezed into the
-    /// frame where the page is taller ([`Stage::set_page_height`]).
+    /// What's on the frame (the cabin page, the players), laid out in its placement and squeezed where taller
+    /// ([`Stage::set_page_place`]).
     page: ContainerVisual,
     page_size: PageSize,
 }
@@ -166,7 +165,6 @@ impl Stage {
             _dispatcher: dispatcher,
             compositor,
             root,
-            frame: (width, height),
             page,
             page_size: Rc::new(Cell::new((width, height))),
         })
@@ -201,13 +199,14 @@ impl Stage {
         self.page_size.clone()
     }
 
-    /// Lays what's on the frame out `height` tall (the frame's width), squeezed into the frame's height when
-    /// it's taller: a screen the game shows the frame on in another shape stretches it back
-    /// (`westplay_shared::page_height`). The WebViews on it are sized by their owners.
-    pub fn set_page_height(&self, height: u32) -> windows::core::Result<()> {
-        let (width, frame_height) = self.frame;
+    /// Lays what's on the frame out in `place`: either the whole frame laid out `place.height` tall and squeezed
+    /// into `place.rows`, or on a bus's Gps part just its glass (`westplay_shared::page_place`). The WebViews on
+    /// it are sized by their owners.
+    pub fn set_page_place(&self, place: westplay_shared::PagePlace) -> windows::core::Result<()> {
+        let (width, height) = (place.width.max(1), place.height.max(1));
         self.page.SetSize(Vector2 { X: width as f32, Y: height as f32 })?;
-        let squeeze = frame_height as f32 / height as f32;
+        self.page.SetOffset(windows_numerics::Vector3 { X: place.left as f32, Y: place.top as f32, Z: 0.0 })?;
+        let squeeze = place.rows as f32 / height as f32;
         self.page.SetScale(windows_numerics::Vector3 { X: 1.0, Y: squeeze, Z: 1.0 })?;
         self.page_size.set((width, height));
         Ok(())

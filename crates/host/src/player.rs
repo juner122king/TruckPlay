@@ -73,8 +73,6 @@ impl PlayerWatch {
             let mut kind = Kind::Ets2;
             let mut documents = places::game_documents(kind);
             let mut game = game::find(kind).into_iter().next();
-            // Steam Cloud keeps the game's profiles under Steam's `userdata`.
-            let userdata = places::steam().map(|dir| dir.join("userdata")).filter(|dir| dir.is_dir());
             let mut last: Option<(PathBuf, SystemTime, Option<SystemTime>)> = None;
             // The truck the player is in, the save's trucks and the profile's mods' files (in load order), and
             // what the parts' speakers were last found from.
@@ -93,6 +91,8 @@ impl PlayerWatch {
                     (last, saved, mod_files, found_from) = (None, Vec::new(), Vec::new(), None);
                     log!("player: {} ({:?})", kind.name(), documents.as_deref().map(Path::display));
                 }
+                // Steam Cloud keeps the game's profiles under the signed-in Steam account's `userdata`.
+                let userdata = places::steam_user();
                 // The newest save of the profile the game has selected (its log), else the newest of all.
                 let latest = documents.as_deref().and_then(|dir| {
                     let selected = profiles::selected(dir);
