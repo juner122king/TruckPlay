@@ -1,330 +1,1463 @@
 /* ==========================================================================
-   Automotive In-Cabin Modern Glassmorphism Freight Cockpit HUD
-   Strictly unified margins with sidebar, screen edges, and inter-card gap.
+   Freight Assistant — Apple CarPlay Ultra / iOS 26 Liquid Glass Styling
+   Built on WestPlay semantic tokens (shell/apple.css & shell/shell.css) for
+   automatic Light/Dark appearance, --text-scale scaling, and container-based
+   adaptation across every truck display profile.
    ========================================================================== */
 
-.freight-app.modern-hud {
-  position: absolute;
-  left: var(--content-left, 170px);
-  right: var(--edge, 16px);
-  top: var(--edge, 16px);
-  bottom: var(--edge, 16px);
-  box-sizing: border-box;
-  background: transparent;
-  color: #f8fafc;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Instrument Sans', sans-serif;
-  overflow: hidden;
-  user-select: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--tile-gap, var(--edge, 16px));
+@property --value {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
 }
 
-/* ==========================================================================
-   Glassmorphism Cards (Twin-Card Cockpit)
-   ========================================================================== */
+:root {
+  --fr-in-oklch: ;
+}
 
-.hud-glass-card {
-  position: relative;
-  background: linear-gradient(175deg, #101726 0%, #0a0f1d 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--panel-radius, 24px);
-  padding: 26px 30px;
+@supports (background: linear-gradient(in oklch, white, black)) {
+  :root {
+    --fr-in-oklch: in oklch;
+  }
+}
+
+.shell .freight-app {
+  --fr-key: var(--apple-blue);
+  --fr-key-tint: color-mix(in oklab, var(--fr-key) 14%, transparent);
+  --fr-bar: 76px;
+  --fr-bar-inset: max(0px, calc((var(--panel-radius) - var(--fr-bar) / 2) * var(--corner-inset)));
+  --fr-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 12px);
+  --fr-gutter: 24px;
+
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-  box-sizing: border-box;
-  min-width: 0;
-  min-height: 0;
   overflow: hidden;
+  border-radius: var(--panel-radius);
+  background:
+    radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--apple-blue) 8%, transparent), transparent 72%),
+    var(--apple-background);
+  color: var(--apple-label);
+  isolation: isolate;
+  container: freight / size;
 }
 
-/* Subtle atmospheric radial glow inside cards */
-.hud-glass-card::before {
-  content: '';
-  position: absolute;
-  top: -40px;
-  left: 15%;
-  right: 15%;
-  height: 90px;
-  background: radial-gradient(ellipse at center, rgba(56, 189, 248, 0.1), transparent 70%);
-  pointer-events: none;
-  border-radius: 50%;
+.shell.appearance-light .freight-app {
+  background:
+    radial-gradient(120% 50% at 50% 0%, color-mix(in oklab, var(--apple-blue) 5%, transparent), transparent 70%),
+    var(--apple-background);
 }
 
-/* Common Card Header */
-.card-top-header {
+/* --- Floating Glass Navigation Bar --------------------------------------------------------------------- */
+
+.shell .fr-bar {
+  --text-scale: 1;
+  --fr-bar-inset: max(0px, calc((var(--panel-radius) - var(--fr-bar) / 2) * var(--corner-inset)));
+  position: relative;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-shrink: 0;
+  gap: 12px;
+  height: var(--fr-bar);
+  margin: var(--fr-bar-inset) var(--fr-bar-inset) 0;
+  padding-inline: 4px;
+  flex: none;
 }
 
-.card-title-cluster {
+.shell .fr-bar-side {
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+  height: 100%;
+}
+
+.shell .fr-bar-side.end {
+  justify-content: flex-end;
+}
+
+.shell .fr-truck-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--glass-rim) 55%, transparent);
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--apple-label);
+  white-space: nowrap;
+}
+
+.shell .fr-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--apple-green);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--apple-green) 70%, transparent);
+  flex: none;
+}
+
+.shell .fr-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--apple-orange) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--apple-orange) 42%, transparent);
+  color: var(--apple-orange);
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.shell .fr-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--fr-bar);
+  padding: 6px;
+  border-radius: calc(var(--fr-bar) / 2);
+  border: 1px solid color-mix(in oklab, var(--glass-rim) 50%, transparent);
+}
+
+.shell .fr-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 118px;
+  height: 100%;
+  padding-inline: 20px;
+  border-radius: calc((var(--fr-bar) - 12px) / 2);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--apple-label-secondary);
+  white-space: nowrap;
+  transition:
+    background-color 180ms var(--motion-ease),
+    color 180ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-tab {
+    transition:
+      background-color 180ms var(--motion-ease),
+      color 180ms var(--motion-ease),
+      box-shadow 180ms var(--motion-ease),
+      scale 150ms var(--motion-ease);
+  }
+
+  .shell .fr-tab:active {
+    scale: 0.96;
+  }
+}
+
+.shell .fr-tab[aria-selected='true'] {
+  color: var(--fr-key);
+  font-weight: 700;
+  background: color-mix(in oklab, #fff 13%, var(--apple-card));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.24),
+    var(--shadow-raised);
+}
+
+.shell.appearance-light .fr-tab[aria-selected='true'] {
+  background: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 8px rgb(0 0 0 / 0.1),
+    0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+/* Non-color selection cue (WCAG 1.4.1): crisp accent bar below active tab */
+.shell .fr-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset: auto 26% 5px;
+  border-block-end: 2.5px solid var(--fr-key);
+  border-radius: 2px;
+}
+
+.shell .fr-tab:focus-visible,
+.shell .fr-action-pill:focus-visible {
+  outline: 3px solid var(--fr-key);
+  outline-offset: 2px;
+}
+
+/* --- Scrollable Body & Panel Entrance ------------------------------------------------------------------ */
+
+.shell .fr-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  margin-top: calc(-1 * (var(--fr-bar) + var(--fr-bar-inset)));
+  padding: calc(var(--fr-bar) + var(--fr-bar-inset) + 14px) max(var(--fr-gutter), var(--fr-corner-clear))
+    max(20px, var(--fr-corner-clear));
+  mask-image: linear-gradient(
+    transparent calc(var(--fr-bar-inset) + 6px),
+    #000 calc(var(--fr-bar) + var(--fr-bar-inset) + 14px)
+  );
+}
+
+.shell .fr-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .fr-panel {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-panel {
+    animation: fr-panel-in 220ms var(--motion-ease) both;
+  }
+}
+
+@keyframes fr-panel-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.shell .fr-panel:focus {
+  outline: none;
+}
+
+/* --- Empty States -------------------------------------------------------------------------------------- */
+
+.shell .fr-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 36px 28px;
+  text-align: center;
+}
+
+.shell .fr-empty-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--apple-card);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 60%, transparent);
+  color: var(--fr-key);
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .fr-empty-title {
+  margin: 4px 0 0;
+  font-size: calc(28px * var(--text-scale, 1));
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.shell .fr-empty-desc {
+  margin: 0;
+  max-width: 34em;
+  font-size: calc(20px * var(--text-scale, 1));
+  line-height: 1.4;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.shell .fr-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 50px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: var(--apple-card);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 55%, transparent);
+  color: var(--fr-key);
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 600;
+  box-shadow: var(--shadow-raised);
+  transition: background-color 160ms var(--motion-ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-action-pill {
+    transition:
+      background-color 160ms var(--motion-ease),
+      scale 150ms var(--motion-ease);
+  }
+
+  .shell .fr-action-pill:active {
+    scale: 0.96;
+  }
+}
+
+.shell .fr-action-pill:active {
+  background: var(--apple-card-raised);
+}
+
+/* --- Twin-Card Liquid Glass Grid ----------------------------------------------------------------------- */
+
+.shell .fr-grid-2 {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-content: stretch;
+}
+
+.shell .fr-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+  padding: 20px 22px;
+  border-radius: 26px;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(180deg, #1f1f24 0%, #17171b 100%);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.13),
+    0 10px 28px rgb(0 0 0 / 0.34);
+}
+
+.shell.appearance-light .fr-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fafafc 100%);
+  border: 1px solid rgb(0 0 0 / 0.06);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 6px rgb(0 0 0 / 0.05),
+    0 12px 28px rgb(0 0 0 / 0.06);
+}
+
+/* Restrained state-aware atmospheric aura along top edge of each card */
+.shell .fr-card[data-tone]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 92px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(78% 100% at 18% 0%, var(--card-aura, transparent), transparent 72%);
+}
+
+.shell .fr-card[data-tone='neutral'] {
+  --card-aura: color-mix(in oklab, var(--apple-blue) 12%, transparent);
+}
+
+.shell .fr-card[data-tone='info'] {
+  --card-aura: color-mix(in oklab, var(--apple-cyan) 14%, transparent);
+}
+
+.shell .fr-card[data-tone='good'] {
+  --card-aura: color-mix(in oklab, var(--apple-green) 13%, transparent);
+}
+
+.shell .fr-card[data-tone='warn'] {
+  --card-aura: color-mix(in oklab, var(--apple-orange) 15%, transparent);
+}
+
+.shell .fr-card[data-tone='bad'] {
+  --card-aura: color-mix(in oklab, var(--apple-red) 16%, transparent);
+}
+
+.shell.appearance-light .fr-card[data-tone='neutral'] {
+  --card-aura: color-mix(in oklab, var(--apple-blue) 7%, transparent);
+}
+
+.shell.appearance-light .fr-card[data-tone='info'] {
+  --card-aura: color-mix(in oklab, var(--apple-cyan) 8%, transparent);
+}
+
+.shell.appearance-light .fr-card[data-tone='good'] {
+  --card-aura: color-mix(in oklab, var(--apple-green) 7%, transparent);
+}
+
+.shell.appearance-light .fr-card[data-tone='warn'] {
+  --card-aura: color-mix(in oklab, var(--apple-orange) 9%, transparent);
+}
+
+.shell.appearance-light .fr-card[data-tone='bad'] {
+  --card-aura: color-mix(in oklab, var(--apple-red) 10%, transparent);
+}
+
+.shell .fr-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: none;
+}
+
+.shell .fr-card-title-row {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.card-heading {
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  letter-spacing: -0.2px;
-}
-
-/* Icon Badges */
-.card-icon-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  flex-shrink: 0;
-}
-
-.card-icon-badge.purple {
-  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
-  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.35);
-}
-
-.card-icon-badge.cyan {
-  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);
-}
-
-.card-icon-badge.amber {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
-}
-
-/* Market Pill Badge */
-.market-pill-badge {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 9999px;
-  padding: 4px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  letter-spacing: -0.1px;
-}
-
-/* ==========================================================================
-   Left Card: Route & Cargo Details
-   ========================================================================= */
-
-.route-cities-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 20px 0 12px;
-  gap: 12px;
-}
-
-.city-block {
-  display: flex;
-  flex-direction: column;
   min-width: 0;
 }
 
-.city-block.destination {
+.shell .fr-card-heading-stack {
+  min-width: 0;
+}
+
+.shell .fr-card-title {
+  margin: 0;
+  font-size: calc(16.5px * var(--text-scale, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--apple-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .fr-card-subtitle {
+  margin-top: 2px;
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 500;
+  color: var(--apple-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* iOS Settings-style Icon Tiles */
+.shell .fr-tile {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+
+.shell .fr-tile.small {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.shell .fr-tile.blue {
+  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-blue) 88%, white), var(--apple-blue));
+}
+
+.shell .fr-tile.cyan {
+  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-cyan) 88%, white), var(--apple-cyan));
+}
+
+.shell .fr-tile.green {
+  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-green) 88%, white), var(--apple-green));
+}
+
+.shell .fr-tile.orange {
+  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-orange) 88%, white), var(--apple-orange));
+}
+
+/* Semantic Status Pills (Icon + Text, never color alone) */
+.shell .fr-status-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: calc(12.5px * var(--text-scale, 1));
+  font-weight: 650;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.shell .fr-status-pill.good {
+  background: color-mix(in oklab, var(--apple-green) 16%, transparent);
+  color: var(--apple-green);
+}
+
+.shell .fr-status-pill.info {
+  background: var(--fr-key-tint);
+  color: var(--fr-key);
+}
+
+.shell .fr-status-pill.warn {
+  background: color-mix(in oklab, var(--apple-orange) 16%, transparent);
+  color: var(--apple-orange);
+}
+
+.shell .fr-status-pill.bad {
+  background: color-mix(in oklab, var(--apple-red) 16%, transparent);
+  color: var(--apple-red);
+}
+
+.shell .fr-status-pill.neutral {
+  background: var(--apple-fill-tertiary);
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-pct-badge {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--fr-key-tint);
+  color: var(--fr-key);
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Waybill Route Stage & Cargo ----------------------------------------------------------------------- */
+
+.shell .fr-route-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: var(--apple-fill-quaternary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 50%, transparent);
+}
+
+.shell .fr-route-pair {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shell .fr-city-block {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .fr-city-block.end {
   align-items: flex-end;
   text-align: right;
 }
 
-.city-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.4px;
-  line-height: 1.15;
+.shell .fr-city-kicker {
+  font-size: calc(11.5px * var(--text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-city-name {
+  max-width: 100%;
+  font-size: calc(23px * var(--text-scale, 1));
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.city-company {
-  font-size: 14px;
-  color: #94a3b8;
-  margin-top: 3px;
-  font-weight: 400;
+.shell .fr-city-sub {
+  max-width: 100%;
+  font-size: calc(13.5px * var(--text-scale, 1));
+  color: var(--apple-label-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.route-arrow-cell {
+.shell .fr-route-connector {
+  flex: 1 1 32px;
+  min-width: 32px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #38bdf8;
-  flex-shrink: 0;
-  padding: 0 4px;
+  gap: 4px;
+  color: var(--fr-key);
+  padding-top: 12px;
 }
 
-.cargo-tagline {
-  font-size: 17px;
-  font-weight: 500;
-  color: #cbd5e1;
-  margin-bottom: 20px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.shell .fr-route-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
 }
 
-/* Financials & Status Key-Value List */
-.card-kv-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: auto;
+.shell .fr-route-dot.origin {
+  background: var(--apple-blue);
 }
 
-.card-kv-row {
+.shell .fr-route-dot.dest {
+  background: var(--apple-cyan);
+}
+
+.shell .fr-route-line {
+  flex: 1;
+  height: 2px;
+  border-top: 2px dashed color-mix(in oklab, var(--fr-key) 55%, transparent);
+}
+
+.shell .fr-cargo-chip {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 0;
+  gap: 12px;
+  padding: 9px 13px;
+  border-radius: 13px;
+  background: color-mix(in oklab, var(--apple-card) 75%, transparent);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 35%, transparent);
 }
 
-.card-kv-label {
-  font-size: 15px;
-  color: #94a3b8;
-  font-weight: 400;
+.shell .fr-cargo-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--fr-key);
 }
 
-.card-kv-label-plain {
-  font-size: 15px;
-  color: #ffffff;
-  font-weight: 600;
+.shell .fr-cargo-name {
+  font-size: calc(17px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--apple-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.card-kv-value {
-  font-size: 16px;
-  color: #ffffff;
-  font-weight: 700;
+.shell .fr-cargo-mass {
+  flex: none;
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--apple-label-secondary);
   font-variant-numeric: tabular-nums;
 }
 
-.card-kv-value.highlight-net {
-  color: #22c55e;
-  font-size: 17px;
-  font-weight: 800;
-  text-shadow: 0 0 14px rgba(34, 197, 94, 0.35);
-}
+/* --- Grouped Key-Value Plate --------------------------------------------------------------------------- */
 
-.card-kv-value.damage-alert {
-  color: #ef4444;
-}
-
-/* ==========================================================================
-   Right Card: Progress, Timing & Next Break
-   ========================================================================= */
-
-.progress-hero-text {
-  font-size: 38px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.6px;
-  margin: 20px 0 12px;
-  line-height: 1.1;
-}
-
-.sleek-progress-bar {
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 9999px;
-  overflow: hidden;
-  margin-bottom: 22px;
-}
-
-.sleek-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
-  border-radius: 9999px;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
-  transition: width 0.3s ease;
-}
-
-/* Arrival Status Pill */
-.arrival-status-pill {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 3px 11px;
-  border-radius: 9999px;
-  text-transform: lowercase;
-}
-
-.arrival-status-pill.ample {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-}
-
-.arrival-status-pill.tight {
-  background: rgba(245, 158, 11, 0.18);
-  color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.35);
-}
-
-.arrival-status-pill.late {
-  background: rgba(239, 68, 68, 0.18);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-}
-
-/* Next Break Micro-Card */
-.next-break-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 16px;
-  padding: 14px 18px;
+.shell .fr-kv-plate {
   margin-top: auto;
-  backdrop-filter: blur(12px);
+  padding: 4px 16px;
+  border-radius: 18px;
+  background: var(--apple-fill-quaternary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 42%, transparent);
 }
 
-.next-break-top-row {
+.shell .fr-kv-list {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell .fr-kv-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding: 10.5px 0;
 }
 
-.next-break-title-group {
-  display: flex;
+.shell .fr-kv-row + .fr-kv-row {
+  border-top: 1px solid color-mix(in oklab, var(--apple-separator) 75%, transparent);
+}
+
+.shell .fr-kv-row.featured {
+  padding: 12px 0;
+}
+
+.shell .fr-kv-row dt {
+  margin: 0;
+  font-size: calc(15.5px * var(--text-scale, 1));
+  font-weight: 500;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-kv-row dt.fr-kv-strong {
+  color: var(--apple-label);
+  font-weight: 650;
+}
+
+.shell .fr-kv-row dt.fr-kv-icon-label {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.next-break-title {
-  font-size: 15px;
+.shell .fr-kv-row dd {
+  margin: 0;
+  font-size: calc(16.5px * var(--text-scale, 1));
   font-weight: 700;
-  color: #ffffff;
+  color: var(--apple-label);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.next-break-timer {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff;
+.shell .fr-kv-row.featured dd {
+  font-size: calc(18.5px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .tone-good {
+  color: var(--apple-green) !important;
+}
+
+.shell .tone-warn {
+  color: var(--apple-orange) !important;
+}
+
+.shell .tone-bad {
+  color: var(--apple-red) !important;
+}
+
+/* --- Progress & Hero Metric ---------------------------------------------------------------------------- */
+
+.shell .fr-hero-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.shell .fr-hero-value {
+  font-size: calc(44px * var(--text-scale, 1));
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 
-.next-break-subtext {
-  font-size: 13px;
-  color: #94a3b8;
-  margin-top: 6px;
-  margin-left: 36px;
+.shell .fr-hero-caption {
+  font-size: calc(17px * var(--text-scale, 1));
+  font-weight: 550;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-progress-shell {
+  position: relative;
+  padding-block: 4px;
+}
+
+.shell .fr-progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--apple-fill);
+  overflow: hidden;
+}
+
+.shell .fr-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg var(--fr-in-oklch), var(--apple-blue), var(--apple-cyan));
+}
+
+.shell .fr-progress-thumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--apple-cyan);
+  box-shadow:
+    0 0 10px color-mix(in oklab, var(--apple-cyan) 65%, transparent),
+    0 2px 5px rgb(0 0 0 / 0.35);
+  translate: -50% -50%;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-progress-fill,
+  .shell .fr-progress-thumb {
+    transition:
+      width 320ms var(--motion-ease),
+      left 320ms var(--motion-ease);
+  }
+}
+
+.shell .fr-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--apple-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-progress-meta strong {
+  color: var(--apple-label);
+  font-weight: 650;
+}
+
+/* --- Raised Inset Sub-Card ----------------------------------------------------------------------------- */
+
+.shell .fr-inset-card {
+  margin-top: auto;
+  padding: 13px 16px;
+  border-radius: 18px;
+  background: var(--apple-card-raised);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 45%, transparent);
+}
+
+.shell.appearance-light .fr-inset-card {
+  background: var(--apple-fill-quaternary);
+}
+
+.shell .fr-inset-card.alert-border {
+  border-color: color-mix(in oklab, var(--apple-orange) 45%, transparent);
+}
+
+.shell .fr-inset-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shell .fr-inset-title {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+}
+
+.shell .fr-inset-value {
+  font-size: calc(17px * var(--text-scale, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-inset-sub {
+  margin-top: 5px;
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--apple-label-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.shell .fr-inset-sub-inline {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--apple-label-secondary);
+}
+
+/* --- Inspection: Semantic Health Ring, Fuel Gauge & Wear Meters ---------------------------------------- */
+
+.shell .fr-health-band {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.shell .fr-health-ring-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* Hide native <progress> chrome so conic-gradient ring renders cleanly */
+progress.fr-health-ring::-webkit-progress-bar,
+progress.fr-health-ring::-webkit-progress-value {
+  display: none;
+  background: none;
+}
+
+progress.fr-health-ring::-moz-progress-bar {
+  display: none;
+  background: none;
+}
+
+progress.fr-health-ring {
+  --size: 108px;
+  --thickness: 11px;
+  --ring-color: var(--apple-green);
+  appearance: none;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: conic-gradient(var(--ring-color) calc(var(--value) * 1%), var(--apple-fill) 0);
+  background-clip: border-area;
+  border: var(--thickness) solid transparent;
+  background-origin: border-box;
+  transition: --value 0s var(--motion-ease);
+}
+
+progress.fr-health-ring.tone-warn {
+  --ring-color: var(--apple-orange);
+}
+
+progress.fr-health-ring.tone-bad {
+  --ring-color: var(--apple-red);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  progress.fr-health-ring {
+    transition-duration: 0.4s;
+  }
+}
+
+@supports not (background-clip: border-area) {
+  progress.fr-health-ring {
+    mask-image: radial-gradient(transparent calc(50% - var(--thickness)), black calc(50% - var(--thickness) + 0.5px));
+    border: 0;
+  }
+}
+
+.shell .fr-health-ring-center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.shell .fr-health-score {
+  font-size: calc(32px * var(--text-scale, 1));
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-health-max {
+  margin-top: 2px;
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-fuel-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 13px 15px;
+  border-radius: 18px;
+  background: var(--apple-fill-quaternary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 45%, transparent);
+}
+
+.shell .fr-fuel-card.low {
+  border-color: color-mix(in oklab, var(--apple-orange) 48%, transparent);
+}
+
+.shell .fr-fuel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shell .fr-fuel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--apple-label-secondary);
+  white-space: nowrap;
+}
+
+.shell .fr-fuel-range {
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--apple-label-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.shell .fr-fuel-amount {
+  font-size: calc(24px * var(--text-scale, 1));
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.shell .fr-fuel-track {
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--apple-fill-tertiary);
+  overflow: hidden;
+}
+
+.shell .fr-fuel-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg var(--fr-in-oklch), var(--apple-blue), var(--apple-cyan));
+}
+
+.shell .fr-fuel-card.low .fr-fuel-fill {
+  background: var(--apple-orange);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-fuel-fill {
+    transition: width 300ms var(--motion-ease);
+  }
+}
+
+.shell .fr-wear-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.shell .fr-wear-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 11px;
+}
+
+.shell .fr-wear-row.grade-warn {
+  background: color-mix(in oklab, var(--apple-orange) 11%, transparent);
+}
+
+.shell .fr-wear-row.grade-bad {
+  background: color-mix(in oklab, var(--apple-red) 12%, transparent);
+}
+
+.shell .fr-wear-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shell .fr-wear-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .fr-wear-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.shell .fr-wear-dot.grade-good {
+  background: var(--apple-green);
+}
+
+.shell .fr-wear-dot.grade-warn {
+  background: var(--apple-orange);
+}
+
+.shell .fr-wear-dot.grade-bad {
+  background: var(--apple-red);
+}
+
+.shell .fr-wear-name {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 550;
+  color: var(--apple-label);
+}
+
+.shell .fr-wear-val {
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-wear-val.grade-good {
+  color: var(--apple-green);
+}
+
+.shell .fr-wear-val.grade-warn {
+  color: var(--apple-orange);
+}
+
+.shell .fr-wear-val.grade-bad {
+  color: var(--apple-red);
+}
+
+.shell .fr-wear-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--apple-fill-tertiary);
+  overflow: hidden;
+}
+
+.shell .fr-wear-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-wear-fill {
+    transition: width 300ms var(--motion-ease);
+  }
+}
+
+.shell .fr-wear-fill.grade-good {
+  background: var(--apple-green);
+}
+
+.shell .fr-wear-fill.grade-warn {
+  background: var(--apple-orange);
+}
+
+.shell .fr-wear-fill.grade-bad {
+  background: var(--apple-red);
+}
+
+.shell .fr-section-divider {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--apple-separator);
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--apple-label-secondary);
+}
+
+/* --- HOS: 11-Hour Tachograph Dial & Timeline Legend ---------------------------------------------------- */
+
+.shell .fr-tacho-wrap {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 2px 0;
+}
+
+.shell .fr-tacho-ring {
+  position: relative;
+  width: 204px;
+  height: 204px;
+  display: grid;
+  place-items: center;
+  --tacho-start: var(--apple-blue);
+  --tacho-end: var(--apple-cyan);
+}
+
+.shell .fr-tacho-ring.level-fresh {
+  --tacho-start: var(--apple-green);
+  --tacho-end: var(--apple-mint);
+}
+
+.shell .fr-tacho-ring.level-normal {
+  --tacho-start: var(--apple-blue);
+  --tacho-end: var(--apple-cyan);
+}
+
+.shell .fr-tacho-ring.level-tired {
+  --tacho-start: var(--apple-orange);
+  --tacho-end: var(--apple-red);
+}
+
+.shell .fr-tacho-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.shell .fr-tacho-tick {
+  stroke: var(--apple-label-quaternary);
+}
+
+.shell .fr-tacho-dial {
+  fill: var(--apple-fill-quaternary);
+}
+
+.shell .fr-tacho-track {
+  stroke: var(--apple-fill);
+}
+
+.shell .fr-tacho-tip {
+  fill: #fff;
+  stroke: var(--tacho-end);
+  stroke-width: 2.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-tacho-arc {
+    transition: stroke-dashoffset 400ms var(--motion-ease);
+  }
+}
+
+.shell .fr-tacho-center {
+  position: absolute;
+  inset: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.shell .fr-tacho-time {
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 800;
+  color: var(--apple-label);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.shell .fr-advice-box {
+  padding: 13px 15px;
+  border-radius: 18px;
+  border: 1px solid transparent;
+}
+
+.shell .fr-advice-box.good {
+  background: color-mix(in oklab, var(--apple-green) 12%, transparent);
+  border-color: color-mix(in oklab, var(--apple-green) 28%, transparent);
+}
+
+.shell .fr-advice-box.warn {
+  background: color-mix(in oklab, var(--apple-orange) 12%, transparent);
+  border-color: color-mix(in oklab, var(--apple-orange) 32%, transparent);
+}
+
+.shell .fr-advice-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 700;
+}
+
+.shell .fr-advice-box.good .fr-advice-head {
+  color: var(--apple-green);
+}
+
+.shell .fr-advice-box.warn .fr-advice-head {
+  color: var(--apple-orange);
+}
+
+.shell .fr-advice-text {
+  margin: 5px 0 0;
+  font-size: calc(15px * var(--text-scale, 1));
+  line-height: 1.38;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-timeline-block {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.shell .fr-timeline-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shell .fr-timeline-title {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+}
+
+.shell .fr-timeline-bar {
+  display: flex;
+  gap: 4px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--apple-fill-tertiary);
+}
+
+.shell .fr-tl-seg {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.shell .fr-tl-seg.drive,
+.shell .fr-tl-legend-item i.drive {
+  background: var(--apple-blue);
+}
+
+.shell .fr-tl-seg.rest,
+.shell .fr-tl-legend-item i.rest {
+  background: var(--apple-orange);
+}
+
+.shell .fr-tl-seg.buffer,
+.shell .fr-tl-legend-item i.buffer {
+  background: var(--apple-green);
+}
+
+.shell .fr-timeline-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.shell .fr-tl-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 550;
+  color: var(--apple-label-secondary);
+}
+
+.shell .fr-tl-legend-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.shell .fr-hos-note {
+  margin: 0;
+  font-size: calc(17px * var(--text-scale, 1));
+  line-height: 1.45;
+  color: var(--apple-label-secondary);
+}
+
+/* --- Compact & Narrow Screen Adaptation ---------------------------------------------------------------- */
+
+@container freight (max-height: 520px) {
+  .shell .freight-app {
+    --fr-bar: 56px;
+    --fr-gutter: 16px;
+  }
+
+  .shell .fr-truck-chip,
+  .shell .fr-preview-badge {
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .shell .fr-tab {
+    flex-direction: row;
+    gap: 8px;
+    min-width: 96px;
+    padding-inline: 14px;
+    font-size: 14px;
+  }
+
+  .shell .fr-tab[aria-selected='true']::after {
+    inset: auto 20% 3px;
+  }
+
+  .shell .fr-card {
+    padding: 15px 17px;
+    gap: 10px;
+    border-radius: 22px;
+  }
+
+  .shell .fr-route-stage {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .shell .fr-city-name {
+    font-size: calc(18.5px * var(--text-scale, 1));
+  }
+
+  .shell .fr-hero-value {
+    font-size: calc(32px * var(--text-scale, 1));
+  }
+
+  progress.fr-health-ring {
+    --size: 84px;
+    --thickness: 9px;
+  }
+
+  .shell .fr-health-score {
+    font-size: calc(24px * var(--text-scale, 1));
+  }
+
+  .shell .fr-kv-plate {
+    padding: 2px 12px;
+  }
+
+  .shell .fr-kv-row {
+    padding: 6px 0;
+  }
+
+  .shell .fr-tacho-ring {
+    width: 152px;
+    height: 152px;
+  }
+}
+
+@container freight (max-width: 780px) {
+  .shell .fr-grid-2 {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  .shell .fr-bar-side {
+    min-width: 48px;
+  }
+
+  .shell .fr-truck-chip span {
+    display: none;
+  }
+}
+
+/* --- Accessibility: Forced Colors Mode ----------------------------------------------------------------- */
+
+@media (forced-colors: active) {
+  .shell .fr-card,
+  .shell .fr-route-stage,
+  .shell .fr-kv-plate,
+  .shell .fr-fuel-card,
+  .shell .fr-inset-card,
+  .shell .fr-tab-bar,
+  .shell .fr-action-pill,
+  .shell .fr-status-pill,
+  .shell .fr-progress-track,
+  .shell .fr-fuel-track,
+  .shell .fr-wear-track {
+    border: 1px solid ButtonText;
+  }
+
+  progress.fr-health-ring {
+    forced-color-adjust: none;
+    --ring-color: CanvasText;
+    background: conic-gradient(CanvasText calc(var(--value) * 1%), Canvas 0);
+  }
+
+  .shell .fr-tab[aria-selected='true'] {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .shell .fr-tab[aria-selected='true']::after {
+    border-block-end-color: HighlightText;
+  }
+
+  .shell .fr-progress-fill,
+  .shell .fr-fuel-fill,
+  .shell .fr-wear-fill {
+    background: Highlight;
+  }
 }

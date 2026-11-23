@@ -1,4 +1,5 @@
 import { type ClockStyle, formatGameTime, HOURS_24 } from '../../../shared/format'
+import type { JobInfo, Telemetry, TruckInfo } from '../../../shared/host'
 import type { MapLabel } from '../../maps/mapData'
 
 /**
@@ -619,5 +620,140 @@ export function calculateOverallHealth(
     rating,
     maxWearComponent: maxComponent,
     maxWearPercent: `${(maxWear * 100).toFixed(1)}%`,
+  }
+}
+
+/**
+ * Preview mode is enabled only outside the game host when explicitly requested via `?preview` or `?demo`.
+ */
+export function isPreviewMode(inHost: boolean, isDemo: boolean, search: string): boolean {
+  if (inHost) return false
+  if (isDemo) return true
+  return new URLSearchParams(search).has('preview')
+}
+
+/** Formats remaining fuel in litres or US gallons. */
+export function formatFuel(litres: number | undefined, isMph: boolean): string {
+  if (litres === undefined || !Number.isFinite(litres) || litres < 0) return '--'
+  if (isMph) {
+    return `${Math.round(litres * 0.264172).toLocaleString()} gal`
+  }
+  return `${Math.round(litres).toLocaleString()} L`
+}
+
+/** Formats estimated fuel range in km or miles. */
+export function formatFuelRange(km: number | undefined, isMph: boolean): string {
+  if (km === undefined || !Number.isFinite(km) || km < 0) return '--'
+  if (isMph) {
+    return `${Math.round(km * 0.621371).toLocaleString()} mi`
+  }
+  return `${Math.round(km).toLocaleString()} km`
+}
+
+/**
+ * Estimates visual fuel tank fill percentage (0 or clamped 4..100) from remaining litres or range.
+ * SCS telemetry exposes fuel amount and range without tank capacity, so 900 L / 1800 km serves as reference.
+ */
+export function estimateFuelFillPercent(litres: number | undefined, rangeKm: number | undefined): number {
+  if (litres !== undefined && Number.isFinite(litres) && litres > 0) {
+    return Math.min(100, Math.max(4, Math.round((litres / 900) * 100)))
+  }
+  if (rangeKm !== undefined && Number.isFinite(rangeKm) && rangeKm > 0) {
+    return Math.min(100, Math.max(4, Math.round((rangeKm / 1800) * 100)))
+  }
+  return 0
+}
+
+/** Returns true when remaining fuel range indicates a low-fuel warning (< 250 km). */
+export function isLowFuel(rangeKm: number | undefined): boolean {
+  return rangeKm !== undefined && Number.isFinite(rangeKm) && rangeKm > 0 && rangeKm < 250
+}
+
+/** Formats brake air tank pressure in bar (metric) or psi (imperial). */
+export function formatAirPressure(psi: number | undefined, isMph: boolean): string {
+  if (psi === undefined || !Number.isFinite(psi) || psi < 0) return '--'
+  if (isMph) {
+    return `${Math.round(psi)} psi`
+  }
+  return `${(psi * 0.0689476).toFixed(1)} bar`
+}
+
+/** Returns true when a trailer is coupled (active loaded cargo or reported trailer wear). */
+export function isTrailerCoupled(telemetry: Telemetry | null, job: JobInfo | null): boolean {
+  if (job?.active && job.cargoLoaded) return true
+  if (!telemetry) return false
+  return (
+    (telemetry.wearTrailerChassis ?? 0) > 0 ||
+    (telemetry.wearTrailerWheels ?? 0) > 0 ||
+    (telemetry.wearTrailerBody ?? 0) > 0
+  )
+}
+
+/** Builds deterministic demo telemetry, job, and truck data for `?preview` / `?demo` browser previews. */
+export function createPreviewData(isZh: boolean): { job: JobInfo; telemetry: Telemetry; truck: TruckInfo } {
+  const gameTime = 3780 // Wed 15:00
+  return {
+    truck: {
+      brandId: 'daf',
+      brand: 'DAF',
+      id: 'vehicle.daf.2021',
+      name: 'XG+ 530',
+    },
+    job: {
+      active: true,
+      cargoLoaded: true,
+      special: false,
+      cargo: isZh ? '酸奶' : 'Yogurt',
+      cargoMass: 18200,
+      sourceCity: 'Duisburg',
+      sourceCompany: 'Kaarfor',
+      destinationCity: 'Amsterdam',
+      destinationCompany: 'Tree-ET',
+      deliveryTime: gameTime + 510, // Wed 23:30
+      plannedDistanceKm: 430,
+      income: 18450,
+    },
+    telemetry: {
+      x: 0,
+      y: 0,
+      z: 0,
+      heading: 0,
+      pitch: 0,
+      roll: 0,
+      speed: 22.2,
+      engineRpm: 1240,
+      gear: 12,
+      displayedGear: 12,
+      cruiseControlSpeed: 22.2,
+      fuel: 685,
+      fuelRange: 1420,
+      navigationDistance: 268000,
+      navigationTime: 11280, // 3h 08m
+      navigationSpeedLimit: 22.2,
+      gameTime,
+      multiplayerTimeOffset: 0,
+      localScale: 1,
+      dashboardBacklight: 0.8,
+      electricEnabled: true,
+      engineEnabled: true,
+      parkingBrake: false,
+      lowBeam: false,
+      highBeam: false,
+      leftBlinker: false,
+      rightBlinker: false,
+      paused: false,
+      nextRestStop: 312, // 5h 12m
+      cargoDamage: 0.01,
+      wearEngine: 0.024,
+      wearTransmission: 0.015,
+      wearCabin: 0.008,
+      wearChassis: 0.032,
+      wearWheels: 0.068,
+      wearTrailerChassis: 0.014,
+      wearTrailerWheels: 0.042,
+      wearTrailerBody: 0.011,
+      brakeAirPressure: 124,
+      brakeAirPressureWarning: false,
+    },
   }
 }

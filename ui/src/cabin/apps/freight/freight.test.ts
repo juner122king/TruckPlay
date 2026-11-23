@@ -5,13 +5,21 @@ import {
   calculateOverallHealth,
   calculateRate,
   calculateRouteProgress,
+  createPreviewData,
+  estimateFuelFillPercent,
   evaluateBuffer,
   evaluateHos,
   evaluateWear,
+  formatAirPressure,
   formatArrivalTime,
   formatCargoMass,
   formatDuration,
+  formatFuel,
+  formatFuelRange,
   formatNextBreakLocation,
+  isLowFuel,
+  isPreviewMode,
+  isTrailerCoupled,
   resolveLocalizedCity,
   resolveLocalizedCompany,
 } from './freight'
@@ -191,5 +199,58 @@ describe('freight logic helpers', () => {
     const bad = calculateOverallHealth(damagedTruck, [])
     expect(bad.rating).toBe('critical')
     expect(bad.maxWearComponent).toBe('Engine')
+  })
+
+  it('detects preview mode only outside host with ?preview or demo flag', () => {
+    expect(isPreviewMode(true, false, '?preview')).toBe(false)
+    expect(isPreviewMode(true, true, '')).toBe(false)
+    expect(isPreviewMode(false, false, '')).toBe(false)
+    expect(isPreviewMode(false, false, '?layout=daf-2021')).toBe(false)
+    expect(isPreviewMode(false, false, '?preview')).toBe(true)
+    expect(isPreviewMode(false, true, '')).toBe(true)
+  })
+
+  it('formats fuel, range, and brake air pressure in metric and imperial units', () => {
+    expect(formatFuel(685, false)).toBe('685 L')
+    expect(formatFuel(685, true)).toBe('181 gal')
+    expect(formatFuel(undefined, false)).toBe('--')
+
+    expect(formatFuelRange(1420, false)).toBe('1,420 km')
+    expect(formatFuelRange(1000, true)).toBe('621 mi')
+    expect(formatFuelRange(undefined, true)).toBe('--')
+
+    expect(formatAirPressure(125, false)).toBe('8.6 bar')
+    expect(formatAirPressure(125, true)).toBe('125 psi')
+    expect(formatAirPressure(undefined, false)).toBe('--')
+  })
+
+  it('detects trailer coupling and provides complete preview data', () => {
+    const preview = createPreviewData(true)
+    expect(preview.job.active).toBe(true)
+    expect(preview.telemetry.electricEnabled).toBe(true)
+    expect(isTrailerCoupled(preview.telemetry, preview.job)).toBe(true)
+    expect(
+      isTrailerCoupled({ ...preview.telemetry, wearTrailerBody: 0, wearTrailerChassis: 0, wearTrailerWheels: 0 }, null),
+    ).toBe(false)
+    expect(
+      isTrailerCoupled(
+        { ...preview.telemetry, wearTrailerBody: 0, wearTrailerChassis: 0, wearTrailerWheels: 0 },
+        { ...preview.job, cargoLoaded: false },
+      ),
+    ).toBe(false)
+  })
+
+  it('estimates fuel tank fill percentage and detects low fuel range', () => {
+    expect(estimateFuelFillPercent(undefined, undefined)).toBe(0)
+    expect(estimateFuelFillPercent(0, 0)).toBe(0)
+    expect(estimateFuelFillPercent(450, 800)).toBe(50)
+    expect(estimateFuelFillPercent(1200, 2000)).toBe(100)
+    expect(estimateFuelFillPercent(undefined, 900)).toBe(50)
+
+    expect(isLowFuel(undefined)).toBe(false)
+    expect(isLowFuel(0)).toBe(false)
+    expect(isLowFuel(180)).toBe(true)
+    expect(isLowFuel(250)).toBe(false)
+    expect(isLowFuel(1420)).toBe(false)
   })
 })

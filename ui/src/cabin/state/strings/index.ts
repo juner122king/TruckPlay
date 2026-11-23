@@ -556,6 +556,11 @@ export interface Strings {
     waybill: {
       noJobTitle: string
       noJobDesc: string
+      noTelemetryTitle: string
+      noTelemetryDesc: string
+      previewBadge: string
+      openInspection: string
+      openHos: string
       statusPickup: string
       statusInTransit: string
       specialTransport: string
@@ -569,6 +574,11 @@ export interface Strings {
       distanceCovered: string
       progress: string
       payout: string
+      netPayout: string
+      costsOnRoad: string
+      cargoDamage: string
+      nextBreak: string
+      enRoute: string
       ratePerKm: string
       ratePerMi: string
       deadline: string
@@ -582,6 +592,7 @@ export interface Strings {
       cargoDamage: string
       cargoDamageDesc: string
       estimatedDeduction: string
+      noCargo: string
       safe: string
       damaged: string
       overallHealth: string
@@ -594,6 +605,8 @@ export interface Strings {
       trailerWearTitle: string
       trailerConnected: string
       trailerDetached: string
+      fuelLevel: string
+      fuelRange: string
       engine: string
       transmission: string
       cabin: string
@@ -617,6 +630,9 @@ export interface Strings {
       tachographTitle: string
       restDueIn: string
       fatigueRate: string
+      fatigueSuffix: string
+      hoursAvailable: string
+      restAreaFallback: string
       statusFresh: string
       statusNormal: string
       statusTired: string
@@ -633,6 +649,9 @@ export interface Strings {
       restPunctual: string
       restTightRisk: string
       nonStopCapable: string
+      legendDrive: string
+      legendRest: string
+      legendBuffer: string
     }
   }
   /** Safari's words, as an iPad's Safari says them (iPadOS 26), in the cab's language. */
