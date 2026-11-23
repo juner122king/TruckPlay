@@ -50,4 +50,13 @@ describe('the Music bar', () => {
     const typing = barLayout({ ...sizes, end: 0 }, true)
     expect(typing.search.left + typing.search.width).toBe(1000)
   })
+
+  it('uses a smaller circle size when measured from a compact bar', () => {
+    const circle = 64
+    const closed = barLayout({ ...sizes, circle }, false)
+    const open = barLayout({ ...sizes, circle }, true)
+    expect(closed.search.width).toBe(circle)
+    expect(open.tabs.width).toBe(circle)
+    expect(open.search.left).toBe(circle + INNER)
+  })
 })

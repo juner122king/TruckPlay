@@ -1302,7 +1302,7 @@
   grid-area: art;
   align-self: center;
   justify-self: end;
-  height: min(100%, 40cqw);
+  height: min(100%, 36cqw);
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: 18px;

@@ -229,6 +229,8 @@ function useBar(parts: Record<'bar' | 'start' | 'end' | 'tabs', RefObject<HTMLDi
         start: start.current?.offsetWidth ?? 0,
         end: end.current?.offsetWidth ?? 0,
         tabs: tabs.current?.offsetWidth ?? 0,
+        // The bar's height: the circles' size (smaller on a short screen's, appleMusic.css).
+        circle: bar.current?.offsetHeight || undefined,
       })
     measure()
     const observer = new ResizeObserver(measure)
