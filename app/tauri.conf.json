@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "WestPlay",
-  "version": "2.4.0-domestic.4",
-  "identifier": "app.westplay",
+  "productName": "TruckPlay",
+  "version": "1.0.0",
+  "identifier": "io.github.juner122king.truckplay",
   "build": {
     "devUrl": "http://localhost:5173",
     "frontendDist": "../ui/dist",
@@ -20,7 +20,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "WestPlay",
+        "title": "TruckPlay",
         "width": 780,
         "height": 520,
         "minWidth": 640,
@@ -36,11 +36,11 @@
   },
   "bundle": {
     "active": false,
-    "publisher": "WestPlay",
-    "copyright": "Copyright © 2026 WestPlay. Licensed under the GPL-3.0-or-later.",
+    "publisher": "juner122king",
+    "copyright": "Copyright © 2026 TruckPlay (based on WestPlay, GPL-3.0-or-later).",
     "category": "Game",
-    "shortDescription": "国内定制版 CarPlay for Euro Truck Simulator 2 and American Truck Simulator",
-    "longDescription": "WestPlay 国内定制版 brings in-cabin maps, traffic lights, freight information, Apple Music, YouTube, Bilibili, NetEase Cloud Music, Ximalaya, Douyin, Hongguo and local playback to ETS2 and ATS.",
+    "shortDescription": "TruckPlay — CarPlay-style in-cabin screen for ETS2 and ATS",
+    "longDescription": "TruckPlay brings in-cabin maps, speed cameras, traffic lights, freight HUD, Apple Music, YouTube, Bilibili, NetEase Cloud Music, Radio and local playback to ETS2 and ATS.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -56,7 +56,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMwMDhGMEUzQzFBMzNBQzQKUldURU9xUEI0L0FJd0tMOUJHcDJTQ1NCSGtoUllVUnVOL25SejZHdC9iVmFYdlBtZ1daR0doZzcK",
       "endpoints": [
-        "https://github.com/juner122king/WestPlay/releases/latest/download/latest.json"
+        "https://github.com/juner122king/TruckPlay/releases/latest/download/latest.json"
       ],
       "requireSignedVersion": true,
       "windows": {

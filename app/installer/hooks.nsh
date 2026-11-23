@@ -73,9 +73,9 @@ FunctionEnd
 Function WestPlayWebView2Message
   ${Select} $LANGUAGE
     ${Case} 2052 ; Chinese (Simplified)
-      StrCpy $WestPlayMessage "WestPlay 需要 Microsoft Edge WebView2 Runtime，但它在这台电脑上无法运行（缺失或已损坏）。请从 Microsoft 的页面安装它，然后重新运行 WestPlay 安装程序。$\n$\n现在打开 Microsoft 的页面吗？"
+      StrCpy $WestPlayMessage "TruckPlay 需要 Microsoft Edge WebView2 Runtime，但它在这台电脑上无法运行（缺失或已损坏）。请从 Microsoft 的页面安装它，然后重新运行 TruckPlay 安装程序。$\n$\n现在打开 Microsoft 的页面吗？"
     ${CaseElse}
-      StrCpy $WestPlayMessage "WestPlay needs Microsoft Edge WebView2 Runtime, and it isn't working on this PC (it's missing or damaged). Install it from Microsoft's page, then run WestPlay's setup again.$\n$\nOpen Microsoft's page now?"
+      StrCpy $WestPlayMessage "TruckPlay needs Microsoft Edge WebView2 Runtime, and it isn't working on this PC (it's missing or damaged). Install it from Microsoft's page, then run TruckPlay's setup again.$\n$\nOpen Microsoft's page now?"
   ${EndSelect}
 FunctionEnd
 

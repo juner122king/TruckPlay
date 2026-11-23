@@ -44,7 +44,7 @@ describe('domestic edition integration', () => {
       expect(words.map.gameStopped.text).toBeTruthy()
       expect(words.update.manualOnly).toBeTruthy()
     }
-    expect(companionWords('zh_cn').about.title).toContain('国内定制版')
+    expect(companionWords('zh_cn').about.title).toContain('TruckPlay')
     expect(companionWords('zh_cn').update.manualOnly).toContain('请手动安装升级')
   })
 
@@ -52,17 +52,17 @@ describe('domestic edition integration', () => {
     const config = JSON.parse(appConfig)
     const release = JSON.parse(releaseConfig)
     const ui = JSON.parse(uiPackage)
-    expect(config.identifier).toBe('app.westplay')
-    expect(config.version).toMatch(/^\d+\.\d+\.\d+-domestic\.\d+$/)
+    expect(config.identifier).toBe('io.github.juner122king.truckplay')
+    expect(config.version).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
     expect(ui.version).toBe(config.version)
     const lockfile = JSON.parse(uiLockfile)
     expect(lockfile.version).toBe(config.version)
     expect(lockfile.packages[''].version).toBe(config.version)
     expect(__WESTPLAY_VERSION__).toBe(config.version)
-    expect(`${companionWords('zh_cn').about.title} ${config.version}`).toBe(`WestPlay 国内定制版 ${config.version}`)
+    expect(`${companionWords('zh_cn').about.title} ${config.version}`).toBe(`TruckPlay ${config.version}`)
     expect(config.app.windows[0]).toMatchObject({ resizable: true, maximizable: true, width: 780, height: 520 })
     expect(config.plugins?.updater).toMatchObject({
-      endpoints: ['https://github.com/juner122king/WestPlay/releases/latest/download/latest.json'],
+      endpoints: ['https://github.com/juner122king/TruckPlay/releases/latest/download/latest.json'],
       requireSignedVersion: true,
       windows: { installMode: 'passive' },
     })

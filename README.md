@@ -1,236 +1,104 @@
-<p align="center"><img src="ui/public/westplay.png" width="112" alt="WestPlay"></p>
+<p align="center"><img src="ui/public/westplay.png" width="112" alt="TruckPlay"></p>
 
-<h1 align="center">WestPlay</h1>
+<h1 align="center">TruckPlay</h1>
 
 <p align="center">
-  <b>A CarPlay-style screen for the trucks of Euro Truck Simulator 2 and American Truck Simulator.</b><br>
-  Your map, your music and YouTube, on your truck's own dashboard screen.
+  <b>面向 Euro Truck Simulator 2 与 American Truck Simulator 的 CarPlay 风格驾驶室车机屏幕。</b><br>
+  An independent open-source CarPlay-style in-cabin screen for ETS2 and ATS (forked from WestPlay 2.4.x under GPL-3.0-or-later).
 </p>
 
 <p align="center">
-  <a href="https://github.com/enes-less/WestPlay/releases/latest"><img alt="Download for Windows" src="https://img.shields.io/badge/download-for%20Windows-409c42?style=for-the-badge"></a>
-  <a href="https://discord.com/invite/Jt34SmwU6"><img alt="Join the WestPlay Discord" src="https://img.shields.io/badge/join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://github.com/juner122king/TruckPlay/releases/latest"><img alt="Download for Windows" src="https://img.shields.io/badge/download-for%20Windows-409c42?style=for-the-badge"></a>
+  <a href="https://github.com/juner122king/TruckPlay/issues"><img alt="GitHub Issues" src="https://img.shields.io/badge/GitHub-Issues-2b2b2b?style=for-the-badge"></a>
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2b2b2b?style=for-the-badge">
-  <img alt="Euro Truck Simulator 2 1.62" src="https://img.shields.io/badge/ETS2-1.62-2b2b2b?style=for-the-badge">
-  <img alt="American Truck Simulator 1.62" src="https://img.shields.io/badge/ATS-1.62-2b2b2b?style=for-the-badge">
+  <img alt="ETS2 & ATS" src="https://img.shields.io/badge/ETS2%20%26%20ATS-1.5x%2F1.6x-2b2b2b?style=for-the-badge">
   <a href="LICENSE"><img alt="Licence: GPL-3.0-or-later" src="https://img.shields.io/badge/licence-GPL--3.0-2b2b2b?style=for-the-badge"></a>
 </p>
-
-<p align="center">
-  <a href="#features">Features</a> ·
-  <a href="#trucks">Trucks</a> ·
-  <a href="#install">Install</a> ·
-  <a href="#privacy">Privacy</a> ·
-  <a href="#support">Support</a>
-</p>
-
-<br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/images/home-light.png">
-  <img alt="WestPlay's Home screen: Maps, Music, Spotify, YouTube and YouTube Music on the truck's screen" src="docs/images/home-dark.png" width="100%">
+  <img alt="TruckPlay Home screen" src="docs/images/home-dark.png" width="100%">
 </picture>
 
-WestPlay puts a phone-style car screen on your truck's own dashboard display, inside the game: Euro Truck
-Simulator 2 or American Truck Simulator, one WestPlay for both. Your route on a
-map made from your own game, your music, YouTube, the weather on your drive: right where a real truck has its
-screen, used with the mouse while you hold a key.
+**TruckPlay** 将完整的驾驶室智能中控带入《欧洲卡车模拟 2》（ETS2）和《美国卡车模拟》（ATS）：直接从你的本地游戏文件与 Mod（含 ProMods 等）离线构建高清导航地图，与游戏内部 GPS 路线联动，并内置国内影音、货运 HUD、测速与红绿灯辅助以及手机局域网遥控。
 
-## Features
+---
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/maps-dark.png">
-        <source media="(prefers-color-scheme: light)" srcset="docs/images/maps-light.png">
-        <img alt="Maps, around Frankfurt am Main" src="docs/images/maps-dark.png" width="100%">
-      </picture>
-      <h3>Maps from your own game</h3>
-      Drawn from your game's map, map mods included (ProMods and others), with your route, turn-by-turn
-      guidance, and search that adds stops to the game's own GPS.
-    </td>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
-        <source media="(prefers-color-scheme: light)" srcset="docs/images/dashboard-light.png">
-        <img alt="The Dashboard: the map beside what's playing" src="docs/images/dashboard-dark.png" width="100%">
-      </picture>
-      <h3>A Dashboard for the drive</h3>
-      The map beside what's playing and where you're going, the weather on your drive, all on one screen.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="YouTube Music's Now Playing" src="docs/images/youtube-music.png" width="100%">
-      <h3>Your music</h3>
-      Apple Music, Spotify and YouTube Music, with Now Playing and lyrics. A song's music video plays right in
-      Now Playing, and YouTube has its channels, playlists, captions and quality. Player plays the songs you put
-      in the game's own music folder.
-    </td>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/images/looks-light.png">
-        <source media="(prefers-color-scheme: light)" srcset="docs/images/looks-dark.png">
-        <img alt="Home in its other look" src="docs/images/looks-light.png" width="100%">
-      </picture>
-      <h3>Light and dark, and your own look</h3>
-      It turns dark at night or when you switch your headlights on, like a car's light sensor. Bring your own
-      wallpapers and app icons.
-    </td>
-  </tr>
-</table>
+## 核心特性 / Features
 
-**The companion app** on your PC sets everything up: it finds your games, ETS2, ATS or both, installs WestPlay
-into each, builds their maps, and keeps WestPlay up to date.
+- **本地离线地图与增强导航 HUD**：直接解析你的游戏与地图 Mod，支持路口放大、主车道引导箭头、固定测速相机提示、HUD 信号灯倒计时与速度动态视角；搜索目的地可直接写入游戏导航路径点。
+- **双卡货运信息（Freight HUD）**：在车机内查看当前接单与挂车货运进度、距离及收益状态。
+- **国内与国际影音娱乐**：集成 **网易云音乐**、**Bilibili**、**广播电台（HLS 直播）**，以及 Apple Music、YouTube 与本地音乐播放器，支持车内空间扬声器声道布局与浅/深色自动切换。
+- **局域网手机远程控屏（Mobile WebUI）**：可在 Companion 设置页一键开启（默认关闭），通过局域网浏览器以低延迟镜像驾驶室画面并进行单指触控/滑动操作。
+- **原车屏、挂件平板与客车适配**：
+  - **ETS2**：适配 DAF 2021、Scania 2016/2025/Smart Dash、Iveco S-Way、Renault T 2024、Volvo FH 2021/2024、Coaches DLC（Scania Touring / MAN Lion's Coach 2024），以及 Oyuncuyusbis 大巴共享 GPS 玻璃布局；其余卡车或 Mod 车型支持在改装店挂载车机平板（含大尺寸平板选项）。
+  - **ATS**：适配 Ford F-150 (2023) / Bronco (2024)（保留原生倒车影像优先权）、Volvo VNL (2025)、Freightliner Cascadia (2024)、Kenworth T680 (2022)、Western Star 57X 等原屏与平板挂件。
+- **稳定性与多账号支持**：支持 Steam 多账号登录隔离、游戏增量依赖缓存校验（热修复免盲目重打地图）、DLC/脚本变动自动重建屏幕 Mod，以及 WebView2 启动重试保护。
 
-### Mobile WebUI (Optional LAN Mirror)
+---
 
-Connect your phone and PC to the same trusted local network, then enable **Mobile WebUI** in the companion's **Setup** page. Click the pairing link to copy it and open it in your phone's browser to mirror WestPlay's cabin display and control it with single-finger taps and drags.
-
-The feature is off by default and persists across restarts. Turning it off disconnects clients and releases TCP port `8765`; turning it back on generates a new pairing link. Do not share the pairing link publicly or forward port `8765` to the public internet.
-
-## How it works
+## 工作原理 / How it works
 
 ```mermaid
 flowchart LR
-  game["Euro Truck Simulator 2<br/>or American Truck Simulator"] -- "the truck, its route" --> plugin["WestPlay's plugin<br/>(in the game)"]
-  plugin <--> app["WestPlay<br/>(on your PC)"]
-  app -- "the screen, drawn in WestPlay's own browser" --> plugin
-  plugin -- "draws it on" --> screen["The truck's own screen"]
+  game["ETS2 / ATS 游戏进程"] -- "车辆、路线与输入" --> plugin["游戏内插件 DLL"]
+  plugin <--> app["TruckPlay 宿主应用<br/>(WebView2 + 地图服务)"]
+  app -- "渲染车机页面纹理" --> plugin
+  plugin -- "直接绘制到" --> screen["驾驶室屏幕 / 车机平板"]
 ```
 
-WestPlay draws its screen in a browser of its own on your PC, and its plugin puts each frame on your truck's
-display, inside the game. The trucks' own screens and their information bars stay theirs: WestPlay takes the
-GPS's place, and its Vehicle Bar setting says whether the truck's bar stays beside it.
+---
 
-## Trucks
+## 安装与使用 / Install
 
-WestPlay shows up in two ways: on the truck's own screen, or on the WestPlay tablet.
+1. 前往 [Releases](https://github.com/juner122king/TruckPlay/releases/latest) 下载最新的 Windows 安装包（`TruckPlay_*_x64-setup.exe`）并运行。
+2. 伴侣应用（Companion）会自动识别本机已安装的 ETS2 / ATS，安装驱动插件与屏幕 Mod，并按需离线生成对应档案的地图资源。
+3. 进入游戏驾驶室即可使用（默认使用鼠标配合按键触发屏内指针，也可开启手机端 Mobile WebUI 触控）。
 
-**On the truck's own screen.** In the trucks that have CarPlay in real life, WestPlay takes the GPS's place on
-the dashboard screen, shaped to it. There's nothing to buy or fit: get in and it's there. In Euro Truck
-Simulator 2:
+**运行环境**：Windows 10 / 11 (64-bit)，Microsoft Edge WebView2 Runtime。
 
-- **DAF** XF and XG/XG+ 2021, XF Electric and XD (and Jasper's DAF 2021)
-- **Scania** S and R, with the 7" screen or the Smart Dash, and the S BEV
-- **Iveco** S-Way
-- **Renault** T (2024)
-- **Volvo** FH (2021 and 2024)
-- **Coaches DLC:** the Scania Touring and the MAN Lion's Coach (2024)
-- **Oyuncuyusbis' coaches:** the Mercedes-Benz Travego 16 SHD, the MAN Lion's Coach and the Setra S 531 DT on their
-  dashboard screens
-- **Setra S 516 HD/2** (Oyuncuyusbis'): on the coach's own GPS screen, its "Gps" part, which you fit in the truck
-  shop: the coach's own screen, as its players asked, but one you add
+---
 
-**On the WestPlay tablet.** Every other truck, the game's and mod trucks alike, gets WestPlay on a tablet you fit
-in the truck shop: under Accessories, in Hanging Items or as a dashboard set. The truck's own screen keeps the
-game's navigation. The tablet is in every truck with hanging items, including truck mods you install later (they
-get it the next time you start the game).
+## 从源码构建 / Building from Source
 
-**In American Truck Simulator**, the official Road Trip **Ford F-150 (2023), Lariat interior**, and
-**Ford Bronco (2024), standard interior**, and **Volvo VNL (2025)** have own-screen integrations on their
-navigation displays, without a tablet. While either engine or dashboard reports reverse in either Ford,
-WestPlay yields to the vehicle's original display and releases screen interaction. The game controls each Ford's
-native parking camera according to the player's settings (including the F-150's 360-degree view). Leaving reverse
-restores WestPlay's current page and playback state. These integrations are checked against installed game
-resources; in-game display and input verification is still pending. Other ATS trucks use the tablet for now.
+前置依赖：
+- Windows 10 / 11 (64-bit)
+- [Rust](https://rustup.rs) 工具链与 LLVM-MinGW 工具链（用于编译游戏内 DLL，可通过 `WESTPLAY_LLVM_MINGW` 指定或置于 `target/toolchains/llvm-mingw-20260602-ucrt-x86_64`）
+- [Node.js](https://nodejs.org) 24+ 与 Python 3
 
-|  | Truck's own screen | WestPlay tablet |
-|---|---|---|
-| Vehicles | The ETS2 vehicles above; ATS Ford F-150 (2023), Bronco (2024), and Volvo VNL (2025) | Other trucks with a suitable accessory slot |
-| To get it | Nothing: it's there | Fit it in the truck shop |
-| The game's navigation | Replaced by WestPlay | Stays on the truck's screen |
-
-### Sound
-
-Music plays from the truck's own speakers, each where it sits in the cab, in these Euro Truck Simulator 2 trucks.
-Other trucks, and American Truck Simulator's for now, play plain stereo.
-
-- **Scania S and R (2016), S BEV** — door woofers, A-pillar tweeters, roof bass
-- **Scania R (2009), Streamline** — door woofers, A-pillar tweeters
-- **DAF XF (105)** — A-pillar tweeters; two pairs on the overhead shelf in the Super Space Cab, one overhead unit in the others
-- **DAF XF Euro 6** — door woofers, A-pillar tweeters; two pairs on the overhead shelf in the Super Space Cab, one overhead unit in the others
-- **DAF XF, XG, XG+ (2021), XF Electric and XD** — door woofers, A-pillar tweeters, an overhead pair, a centre
-- **MAN TGX** — door woofers; in the XXL, two small units high in each side wall too
-- **MAN TGX Euro 6** — door woofers; in the XL, a small unit in each roof corner too
-- **MAN TGX (2020)** — a woofer and a midrange in each door, A-pillar tweeters
-- **Mercedes-Benz Actros (2014)** — door woofers, an overhead pair, A-pillar tweeters
-- **Mercedes-Benz Actros (2009)** — door woofers, a pair at the overhead shelf's front corners
-- **Volvo FH (2021, 2024), FH16 (2012)** — door woofers, back-wall bass
-- **Volvo FH16 (2009)** — a unit in each door
-- **Iveco Stralis** — a unit in each end of the overhead console, and in the high roofs a small one on the passenger's side
-- **Iveco Hi-Way** — a unit in each end of the overhead console, and one high on each side
-- **Iveco S-Way** — a woofer and a tweeter in each door
-- **Renault Magnum** — a unit in each roof corner, tweeters on the overhead console
-- **Renault Premium** — a unit in each side of the roof, lower in the low roof
-- **Renault T** — A-pillar tweeters, a back-wall pair; door woofers in the 2024 interiors
-- **Renault E-Tech T** — door woofers, A-pillar tweeters, a back-wall pair
-- **JuseeTV's Scania PGR** — the speakers of the parts you fit: doors, A-pillars, top console, rear wall
-
-## Install
-
-1. Download the installer from the [latest release](https://github.com/enes-less/WestPlay/releases/latest) and run it.
-2. The companion opens and walks you through the rest: it finds your games (ETS2, ATS or both), installs
-   WestPlay's plugin and its screens mod in each, and builds your maps.
-3. Start the game and get in a truck.
-
-WestPlay looks for updates on its own and asks before installing one.
-
-**Requirements:** Windows 10 or 11 (64-bit), Euro Truck Simulator 2 version 1.62 (or 1.61) or American Truck
-Simulator version 1.62 (other versions may work; the companion says when one is untested), and Microsoft Edge WebView2
-(part of Windows 11; the installer adds it where it's missing).
-
-## Privacy
-
-WestPlay has no servers, no accounts of its own and no analytics. It doesn't collect or send anything about you.
-
-- You sign in to Apple Music, Spotify and YouTube on their own pages, in WestPlay's own browser profile on your PC,
-  as you would in a browser. WestPlay keeps no account data of its own.
-- Your map is built from your game on your PC and stays there.
-- WestPlay talks to the services you use, to GitHub to look for updates, and to Kreosus only if you open
-  "Support me".
-
-## Support
-
-WestPlay is free. If it makes your drives better, you can support its development:
-
-<p>
-  <a href="https://kreosus.com/enes-less"><img alt="Support WestPlay on Kreosus" src="https://img.shields.io/badge/support%20on-Kreosus-409c42?style=for-the-badge"></a>
-</p>
-
-Questions, bugs and ideas: come and talk on WestPlay's Discord.
-
-<p>
-  <a href="https://discord.com/invite/Jt34SmwU6"><img alt="Join the WestPlay Discord" src="https://img.shields.io/badge/join%20us%20on-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
-</p>
-
-<details>
-<summary><b>Building from source</b></summary>
-<br>
-
-You need [Rust](https://rustup.rs) (stable) and [Node.js](https://nodejs.org) 24, on Windows.
-
-```sh
-npm install      # the companion's tools and the UI's packages
-npm run dev      # WestPlay, with the UI served live
+```powershell
+npm install                   # 安装 Tauri CLI 与 ui 前端依赖
+npm run dev                   # 启动开发调试模式
 ```
 
-`cargo test --workspace` and `npm test --prefix ui` run the tests. The game plugin is built with
-`cargo build --release -p westplay-plugin`.
+常用校验与构建命令：
 
-</details>
+```powershell
+cargo test --workspace --locked
+python -m unittest discover -s tools/tests -v
+python tools/build_plugin.py
+npm --prefix ui test -- --run
+npm --prefix ui run lint
+npm --prefix ui run build
+```
 
-## Licence
+---
 
-WestPlay is free software: you can redistribute it and modify it under the terms of the GNU General Public
-License, version 3 or (at your option) any later version. See [LICENSE](LICENSE).
+## 隐私说明 / Privacy
 
-The libraries WestPlay ships keep their own licences: see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md), and
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the work it follows.
+TruckPlay 不包含中心化统计或账号采集服务器：
+- 地图数据完全在本地由你的游戏与 Mod 文件生成；
+- 音乐/视频账号均通过各自官方网页环境在本地 WebView2 配置目录中独立登录；
+- 仅在你检查软件更新时访问 GitHub Releases（通过公钥签名校验）。
 
-<sub>WestPlay is an independent project, not affiliated with or endorsed by Apple, SCS Software, Spotify, Google or
-the truck makers. CarPlay, Apple Music, Spotify, YouTube, YouTube Music and the truck makers' names and logos are
-trademarks of their owners, used to name what WestPlay works with. The screenshots show WestPlay's preview with
-made-up songs.</sub>
+---
+
+## 开源协议与致谢 / License & Attribution
+
+TruckPlay 基于原开源项目 **WestPlay**（2.4.x，GPL-3.0）分支独立延续维护，完整保留所有上游贡献者版权与提交历史。
+
+- 本项目遵循 **GNU General Public License v3.0 or later** 发布，详见 [LICENSE](LICENSE)。
+- 内置第三方库与开源组件许可声明见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+<sub>TruckPlay is an independent open-source project, not affiliated with or endorsed by SCS Software, Apple, Google, NetEase, Bilibili, or any truck manufacturer. All trademarks belong to their respective owners.</sub>

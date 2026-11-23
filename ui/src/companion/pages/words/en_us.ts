@@ -289,7 +289,7 @@ export const words: CompanionWords = {
     doneSub: 'Thanks for driving with it.',
   },
   about: {
-    title: 'WestPlay Domestic Edition',
+    title: 'TruckPlay',
     sub: 'Live details from WestPlay and the game, for when something isn’t right.',
     version: 'Version',
     diagnostics: 'Diagnostics',
@@ -348,7 +348,7 @@ export const words: CompanionWords = {
     manualOnly: 'Domestic edition: online updates are disabled. Install upgrades manually.',
     available: '{version} available',
     badge: 'Update available',
-    title: 'WestPlay {version}',
+    title: 'TruckPlay {version}',
     sub: 'A new version of WestPlay is ready. It downloads and installs itself, then WestPlay starts again.',
     whatsNew: 'What’s new',
     later: 'Later',

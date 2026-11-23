@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Local build, sign, package, and GitHub Release publish script for WestPlay Domestic Edition.
+    Local build, sign, package, and GitHub Release publish script for TruckPlay.
 .DESCRIPTION
     Synchronizes optional version bumps, runs the test suite, builds native resources and the signed
     NSIS installer, generates `latest.json`, `.sha256`, and `domestic-build-manifest.json`, and publishes
-    the release to `juner122king/WestPlay` via `gh` CLI (unless `-DryRun` is passed).
+    the release to `juner122king/TruckPlay` via `gh` CLI (unless `-DryRun` is passed).
 #>
 [CmdletBinding()]
 param(
@@ -12,7 +12,7 @@ param(
     [switch]$BumpDomestic,
     [string]$SigningKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH,
     [string]$LlvmMingw = $env:WESTPLAY_LLVM_MINGW,
-    [string]$Repo = 'juner122king/WestPlay',
+    [string]$Repo = 'juner122king/TruckPlay',
     [switch]$DryRun,
     [switch]$Deploy,
     [switch]$SkipTests,
@@ -64,7 +64,9 @@ try {
     $env:AR = Join-Path $LlvmMingw 'bin/llvm-ar.exe'
 
     if (!$SigningKeyPath) {
-        $SigningKeyPath = Join-Path $env:USERPROFILE '.tauri/westplay-domestic.key'
+        $truckplayKey = Join-Path $env:USERPROFILE '.tauri/truckplay.key'
+        $legacyKey = Join-Path $env:USERPROFILE '.tauri/westplay-domestic.key'
+        $SigningKeyPath = if (Test-Path -LiteralPath $truckplayKey) { $truckplayKey } else { $legacyKey }
     }
     if (!$env:TAURI_SIGNING_PRIVATE_KEY) {
         if (!(Test-Path -LiteralPath $SigningKeyPath)) {
@@ -166,7 +168,7 @@ try {
 
     $existingTag = git tag -l $tag
     if (!$existingTag) {
-        Invoke-Checked "Create git tag $tag" { git tag -a $tag -m "WestPlay $Version" }
+        Invoke-Checked "Create git tag $tag" { git tag -a $tag -m "TruckPlay $Version" }
     }
     Invoke-Checked "Push git tag $tag to origin" { git push origin $tag }
 
@@ -184,12 +186,12 @@ try {
             gh release upload $tag @uploadFiles --repo $Repo --clobber
         }
         Invoke-Checked "Update release notes for $tag" {
-            gh release edit $tag --repo $Repo --title "WestPlay $Version" --notes-file $artifacts.notes
+            gh release edit $tag --repo $Repo --title "TruckPlay $Version" --notes-file $artifacts.notes
         }
     } else {
         [string[]]$createArgs = @('release', 'create', $tag) + $uploadFiles + @(
             '--repo', $Repo,
-            '--title', "WestPlay $Version",
+            '--title', "TruckPlay $Version",
             '--notes-file', $artifacts.notes
         )
         if ($PreRelease) { $createArgs += '--prerelease' }
@@ -199,7 +201,7 @@ try {
         }
     }
 
-    Write-Host "Published WestPlay $Version to https://github.com/$Repo/releases/tag/$tag" -ForegroundColor Green
+    Write-Host "Published TruckPlay $Version to https://github.com/$Repo/releases/tag/$tag" -ForegroundColor Green
 } finally {
     Pop-Location
 }

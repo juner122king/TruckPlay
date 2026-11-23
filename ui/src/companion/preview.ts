@@ -447,7 +447,7 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
       signIn('netease')
       return later(undefined)
     case 'open_support_page':
-      window.open('https://kreosus.com/enes-less', '_blank', 'noopener')
+      window.open('https://github.com/juner122king/TruckPlay', '_blank', 'noopener')
       return later(undefined)
     case 'open_social':
       window.open(

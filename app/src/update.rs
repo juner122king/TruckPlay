@@ -1,4 +1,4 @@
-//! Domestic edition updates from `juner122king/WestPlay` GitHub Releases: each release's `latest.json`
+//! TruckPlay updates from `juner122king/TruckPlay` GitHub Releases: each release's `latest.json`
 //! (configured under `plugins.updater.endpoints` in `tauri.conf.json`) names the signed NSIS installer and
 //! its minisign signature, verified here against the domestic edition's public key with
 //! `requireSignedVersion`. An update is checked shortly after startup, periodically afterwards, and when
@@ -228,7 +228,7 @@ mod tests {
             "updater".into(),
             json!({
                 "pubkey": "abc",
-                "endpoints": ["https://github.com/juner122king/WestPlay/releases/latest/download/latest.json"]
+                "endpoints": ["https://github.com/juner122king/TruckPlay/releases/latest/download/latest.json"]
             }),
         )]));
         assert!(updater_configured(&valid));
@@ -242,7 +242,7 @@ mod tests {
         let updater = &config.plugins.0["updater"];
         assert_eq!(
             updater["endpoints"][0],
-            "https://github.com/juner122king/WestPlay/releases/latest/download/latest.json"
+            "https://github.com/juner122king/TruckPlay/releases/latest/download/latest.json"
         );
         assert_eq!(updater["requireSignedVersion"], true);
         assert_eq!(updater["windows"]["installMode"], "passive");
@@ -256,16 +256,16 @@ mod tests {
     #[test]
     fn offer_and_progress_serialize_in_camel_case() {
         let offer = Offer {
-            version: "2.4.0-domestic.2".into(),
+            version: "1.0.0".into(),
             notes: "- Added auto-updater".into(),
-            date: Some("2026-11-17".into()),
+            date: Some("2026-11-23".into()),
         };
         assert_eq!(
             serde_json::to_value(&offer).unwrap(),
             json!({
-                "version": "2.4.0-domestic.2",
+                "version": "1.0.0",
                 "notes": "- Added auto-updater",
-                "date": "2026-11-17"
+                "date": "2026-11-23"
             })
         );
         let progress = Progress { done: 512, total: Some(1024) };

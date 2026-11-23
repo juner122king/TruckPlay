@@ -184,8 +184,8 @@ fn apple_music_check(accounts: State<Accounts>) {
     accounts.0.apple_music.request(AccountAction::Check);
 }
 
-/// The maker's Kreosus page, where players support WestPlay's development.
-const SUPPORT_PAGE: &str = "https://kreosus.com/enes-less";
+/// The TruckPlay project repository page.
+const SUPPORT_PAGE: &str = "https://github.com/juner122king/TruckPlay";
 
 /// Opens the support page (Support me) in the player's browser. The address is fixed here, so the companion
 /// can't open any other.

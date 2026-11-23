@@ -1,6 +1,6 @@
-//! WestPlay has one version, the workspace's (Cargo.toml), including its domestic.N suffix. The
-//! places that must repeat it (Tauri's config, which writes it into the app's file details; the UI's package)
-//! say the same, and the changelog has its release.
+//! TruckPlay has one version, the workspace's (Cargo.toml). The places that must repeat it
+//! (Tauri's config, which writes it into the app's file details; the UI's package) say the same,
+//! and the changelog has its release.
 
 use std::path::Path;
 
@@ -35,14 +35,19 @@ fn the_changelog_has_this_version_or_whats_to_come() {
 }
 
 #[test]
-fn the_domestic_version_is_accepted_by_tauris_config_and_has_a_revision() {
+fn the_version_is_accepted_by_tauris_config() {
     let config: tauri_utils::config::Config = serde_json::from_str(&read("tauri.conf.json")).unwrap();
     assert_eq!(config.version.as_deref(), Some(VERSION));
-    let (base, revision) = VERSION.split_once("-domestic.").expect("the domestic version identifier");
+    let (base, prerelease) = match VERSION.split_once('-') {
+        Some((base, pre)) => (base, Some(pre)),
+        None => (VERSION, None),
+    };
     let mut parts = base.split('.');
     assert!(
         parts.clone().count() == 3 && parts.all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit())),
         "base version `{base}` must be X.Y.Z"
     );
-    assert!(revision.parse::<u32>().is_ok_and(|revision| revision > 0));
+    if let Some(pre) = prerelease {
+        assert!(!pre.is_empty(), "prerelease suffix must not be empty");
+    }
 }

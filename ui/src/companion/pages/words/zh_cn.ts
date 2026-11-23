@@ -287,7 +287,7 @@ export const words: CompanionWords = {
     doneSub: '感谢一路相伴。',
   },
   about: {
-    title: 'WestPlay 国内定制版',
+    title: 'TruckPlay',
     sub: '出问题时可查看的 WestPlay 与游戏实时信息。',
     version: '版本',
     diagnostics: '诊断',
@@ -347,7 +347,7 @@ export const words: CompanionWords = {
     manualOnly: '国内定制版，在线更新已停用，请手动安装升级',
     available: '{version} 可用',
     badge: '有可用更新',
-    title: 'WestPlay {version}',
+    title: 'TruckPlay {version}',
     sub: 'WestPlay 的新版本已准备就绪。它会自动下载并安装，然后重新启动 WestPlay。',
     whatsNew: '新功能',
     later: '稍后',

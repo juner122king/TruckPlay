@@ -1,7 +1,13 @@
 # Changelog
 
-What changed in each release of WestPlay. The newest release's notes are what the app shows when it offers the
-update.
+What changed in each release of TruckPlay (independent GPL-3.0-or-later fork of WestPlay 2.4.x). The newest release's
+notes are what the app shows when it offers the update.
+
+## 1.0.0 (2026-11-23)
+- 成立独立个人开源项目 **TruckPlay**：基于 WestPlay 2.4.0 / 2.4.1（GPL-3.0-or-later）开源版本独立维护，应用标识切换为 `io.github.juner122king.truckplay`，内置自动更新指向 `juner122king/TruckPlay` GitHub Releases（保留既有用户数据、地图缓存与插件文件兼容以实现平滑升级）。
+- 回移植上游 2.4.1 核心稳定性修复：修复 PL Rebuilding 地图构建 99% 卡死（限制高密网格无效遍历）、游戏热修复不重复触发失败重试、Steam 多账户签名识别隔离、WebView2 `invalid_state` 启动重试等待、大巴共享 `ob-gps` 玻璃子矩形与远程触控映射、Coaches DLC 与脚本变动自动重打 `westplay.scs`、插件平板接管逻辑，以及音乐与本地播放器车机小屏自适应布局。
+- 完整保留国内与 ATS 定制能力：固定测速相机提示、HUD 信号灯倒计时与主车道引导、双卡货运 HUD、网易云音乐 / Bilibili / 广播电台、局域网手机端 WebUI（`lan`）、ATS 6 款卡车屏幕适配（含福特 F-150 / Bronco、Volvo VNL 2025 等）、大尺寸挂件平板及地图增量依赖缓存校验。
+- Independent **TruckPlay 1.0.0** release forked from WestPlay 2.4.0/2.4.1 under GPL-3.0-or-later: updated app identity (`io.github.juner122king.truckplay`) and updater repository (`juner122king/TruckPlay`), backported 2.4.1 stability/Steam/coach-GPS/UI-layout fixes, and retained all domestic media, LAN Mobile WebUI, navigation HUD, and ATS integrations.
 
 ## 2.4.0-domestic.4 国内定制版 / Domestic Edition (2026-11-19)
 - 重构网易云音乐车机端 UI（CarPlay 风格）：在「我的音乐」中新增播客电台与歌手分类标签页，修复自动连播切歌并同步真实用户头像与昵称资料。

@@ -38,12 +38,12 @@ pub fn dir() -> Option<PathBuf> {
     Some(westplay_setup::places::documents()?.join("WestPlay").join("logs"))
 }
 
-/// Where the log is kept when Documents refuses it: WestPlay's own data folder (`%LOCALAPPDATA%\app.westplay`,
-/// where the screens' browsers and the maps are, so WestPlay can write there whenever it runs at all). A
+/// Where the log is kept when Documents refuses it: the app's own data folder (`%LOCALAPPDATA%\io.github.juner122king.truckplay`,
+/// where the screens' browsers and the maps are, so logs can be written there whenever it runs at all). A
 /// player's ransomware protection (Windows Security's Controlled folder access, 2026-10-24) let the game write
 /// its `plugin.log` in Documents but not WestPlay: there was no `app.log`, and nothing said why.
 fn fallback_dir() -> Option<PathBuf> {
-    Some(PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("app.westplay").join("logs"))
+    Some(PathBuf::from(std::env::var_os("LOCALAPPDATA")?).join("io.github.juner122king.truckplay").join("logs"))
 }
 
 /// Where this run's `app.log` is (the companion's About shows it); `None` if it couldn't be made anywhere.

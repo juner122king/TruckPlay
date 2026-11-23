@@ -12,17 +12,39 @@ import re
 import sys
 
 DOMESTIC_VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)-domestic\.(\d+)$")
+SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+)\.(\d+))?$")
 WORKSPACE_VERSION_RE = re.compile(
     r'(\[workspace\.package\]\s*(?:\r?\n[^\[]*?)*?\r?\nversion\s*=\s*")([^"]+)(")',
     re.MULTILINE,
 )
 
-DEFAULT_REPO = "juner122king/WestPlay"
+DEFAULT_REPO = "juner122king/TruckPlay"
 CORE_RELEASE_RESOURCES = ("westplay.dll", "westplay-probe.exe", "westplay-maps.exe")
 
 
+def validate_version(version: str) -> tuple[int, int, int, str | None, int | None]:
+    """Validate semver `X.Y.Z` (or optional `X.Y.Z-<pre>.N` with `N >= 1`) and return its parts."""
+    match = SEMVER_RE.match(version.strip())
+    if not match:
+        raise ValueError(f"Invalid version '{version}'; expected X.Y.Z or X.Y.Z-<pre>.N")
+    major, minor, patch = (int(part) for part in match.groups()[:3])
+    pre_label = match.group(4)
+    pre_rev = int(match.group(5)) if match.group(5) is not None else None
+    if pre_rev is not None and pre_rev < 1:
+        raise ValueError(f"Invalid pre-release revision in '{version}'; revision must be >= 1")
+    return major, minor, patch, pre_label, pre_rev
+
+
+def next_version(current_version: str) -> str:
+    """Increment patch version for `X.Y.Z`, or increment the pre-release revision for `X.Y.Z-<pre>.N`."""
+    major, minor, patch, pre_label, pre_rev = validate_version(current_version)
+    if pre_label is not None and pre_rev is not None:
+        return f"{major}.{minor}.{patch}-{pre_label}.{pre_rev + 1}"
+    return f"{major}.{minor}.{patch + 1}"
+
+
 def validate_domestic_version(version: str) -> tuple[int, int, int, int]:
-    """Validate `X.Y.Z-domestic.N` (N >= 1) and return its numeric parts."""
+    """Validate legacy `X.Y.Z-domestic.N` (N >= 1) and return its numeric parts."""
     match = DOMESTIC_VERSION_RE.match(version.strip())
     if not match:
         raise ValueError(f"Invalid domestic version '{version}'; expected X.Y.Z-domestic.N")
@@ -59,7 +81,7 @@ def _write_json_preserving_newline(path: Path, data: dict) -> None:
 
 def sync_version(repo_root: Path, version: str) -> list[Path]:
     """Synchronize `version` across Cargo.toml, tauri.conf.json, ui/package.json, and ui/package-lock.json."""
-    validate_domestic_version(version)
+    validate_version(version)
     changed: list[Path] = []
 
     cargo_path = repo_root / "Cargo.toml"
@@ -97,7 +119,7 @@ def sync_version(repo_root: Path, version: str) -> list[Path]:
 
 def extract_changelog_notes(changelog_text: str, version: str) -> str:
     """Extract the Markdown body for `## <version> ...` from CHANGELOG.md."""
-    validate_domestic_version(version)
+    validate_version(version)
     lines = changelog_text.splitlines()
     heading_re = re.compile(rf"^##\s+{re.escape(version)}(?:\s|$)")
     start_idx = None
@@ -137,7 +159,7 @@ def build_latest_json(
     signature: str,
 ) -> dict:
     """Build Tauri v2 updater `latest.json` payload."""
-    validate_domestic_version(version)
+    validate_version(version)
     sig = signature.strip()
     if not sig:
         raise ValueError("Updater signature must not be empty")
@@ -208,9 +230,14 @@ def generate_release_artifacts(
     pub_date: str | None = None,
 ) -> dict[str, Path]:
     """Generate `latest.json`, `.sha256`, and `domestic-build-manifest.json` for a built NSIS release."""
-    validate_domestic_version(version)
+    validate_version(version)
     bundle_dir = repo_root / "target" / "release" / "bundle" / "nsis"
-    installer_name = f"WestPlay_{version}_x64-setup.exe"
+    tauri_conf_path = repo_root / "app" / "tauri.conf.json"
+    product_name = "TruckPlay"
+    if tauri_conf_path.is_file():
+        tauri_conf = json.loads(tauri_conf_path.read_text(encoding="utf-8"))
+        product_name = tauri_conf.get("productName") or product_name
+    installer_name = f"{product_name}_{version}_x64-setup.exe"
     installer_path = bundle_dir / installer_name
     signature_path = bundle_dir / f"{installer_name}.sig"
     if not installer_path.is_file():
@@ -281,7 +308,7 @@ def _main(argv: list[str] | None = None) -> int:
     if args.command == "current-version":
         print(read_workspace_version(args.repo_root))
     elif args.command == "next-version":
-        print(next_domestic_version(read_workspace_version(args.repo_root)))
+        print(next_version(read_workspace_version(args.repo_root)))
     elif args.command == "sync-version":
         for path in sync_version(args.repo_root, args.version):
             print(path)
