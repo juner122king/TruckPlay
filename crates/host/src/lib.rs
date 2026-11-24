@@ -2220,6 +2220,12 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 let message = serde_json::json!({ "type": "job", "data": job });
                 let _ = webview.post_json(&message.to_string());
             }
+            if game_running {
+                while let Some(event) = plugin.gameplay_events.pop() {
+                    let message = serde_json::json!({ "type": "gameplayEvent", "data": event });
+                    let _ = webview.post_json(&message.to_string());
+                }
+            }
             let layout = plugin.screen_layout.load(Ordering::Acquire);
             if last_layout != Some(layout) {
                 last_layout = Some(layout);

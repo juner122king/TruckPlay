@@ -30,7 +30,7 @@ pub fn bridge_name() -> String {
     format!("Local\\WestPlay.Bridge.v{BRIDGE_VERSION}")
 }
 pub const BRIDGE_MAGIC: u32 = u32::from_le_bytes(*b"WPB7");
-pub const BRIDGE_VERSION: u32 = 29;
+pub const BRIDGE_VERSION: u32 = 30;
 
 /// Size of the app's frames, and the base size of the screen textures in the mod (`westplay_setup::game_mod`
 /// builds them from these).
@@ -416,6 +416,8 @@ pub struct PluginBlock {
     /// Each [`Keybind`]'s holds so far ([`KEYBIND_HOLD_MS`]: the volume keys held change the song), counted as
     /// its presses are. A held key's press isn't counted: it's a hold.
     pub keybind_holds: [AtomicU32; KEYBIND_COUNT],
+    /// Discrete SCS gameplay events (job delivered/cancelled, fines, tolls, ferry/train crossings).
+    pub gameplay_events: GameplayEventQueue,
 }
 
 /// How long (ms) a volume key held is a hold, not a press (owner 2026-11-13: one second, it was two): Volume up's the
@@ -905,6 +907,86 @@ pub struct JobInfo {
     pub income: u64,
 }
 
+pub const GAMEPLAY_EVENT_JOB_DELIVERED: u32 = 1;
+pub const GAMEPLAY_EVENT_JOB_CANCELLED: u32 = 2;
+pub const GAMEPLAY_EVENT_FINED: u32 = 3;
+pub const GAMEPLAY_EVENT_TOLLGATE_PAID: u32 = 4;
+pub const GAMEPLAY_EVENT_FERRY_USED: u32 = 5;
+pub const GAMEPLAY_EVENT_TRAIN_USED: u32 = 6;
+
+pub const GAMEPLAY_FLAG_AUTO_PARK: u32 = 1 << 0;
+pub const GAMEPLAY_FLAG_AUTO_LOAD: u32 = 1 << 1;
+
+/// Discrete gameplay event emitted by the SCS Telemetry SDK (`SCS_TELEMETRY_EVENT_gameplay`).
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+pub struct GameplayEvent {
+    pub kind: u32,
+    /// In-game time (minutes since day 0, 00:00) when the event occurred.
+    pub game_time: u32,
+    /// Revenue, fine amount, toll/ferry/train payment, or cancellation penalty in native game currency.
+    pub amount: i64,
+    pub earned_xp: i32,
+    /// Total time spent on the job in game minutes.
+    pub delivery_time: u32,
+    pub distance_km: f32,
+    pub cargo_damage: f32,
+    pub flags: u32,
+    /// Fine offence code (e.g. `speeding_camera`, `red_signal`).
+    pub code: FixedStr<48>,
+    /// Ferry/train source name.
+    pub source: FixedStr<64>,
+    /// Ferry/train target name.
+    pub target: FixedStr<64>,
+}
+
+/// Single-producer, single-consumer ring buffer of `GameplayEvent` in shared memory (`N` a power of two).
+#[repr(C)]
+pub struct GameplayEventQueue<const N: usize = 16> {
+    head: AtomicU32,
+    tail: AtomicU32,
+    events: [UnsafeCell<GameplayEvent>; N],
+}
+
+// SAFETY: only the plugin writes slots before advancing `tail` with Release, and only the host reads
+// slots before advancing `head` with Release.
+unsafe impl<const N: usize> Sync for GameplayEventQueue<N> {}
+
+impl<const N: usize> GameplayEventQueue<N> {
+    const LEN: u32 = {
+        assert!(N.is_power_of_two() && N <= 1024);
+        N as u32
+    };
+
+    /// Must only be called from one writer at a time. Returns `false` if the queue is full.
+    pub fn push(&self, event: GameplayEvent) -> bool {
+        let tail = self.tail.load(Ordering::Relaxed);
+        if tail.wrapping_sub(self.head.load(Ordering::Acquire)) >= Self::LEN {
+            return false;
+        }
+        let slot = self.events[(tail % Self::LEN) as usize].get();
+        // SAFETY: single producer; this slot is not read by the consumer until `tail` advances below.
+        unsafe { std::ptr::write_volatile(slot, event) };
+        self.tail.store(tail.wrapping_add(1), Ordering::Release);
+        true
+    }
+
+    /// Must only be called from one reader at a time.
+    pub fn pop(&self) -> Option<GameplayEvent> {
+        let head = self.head.load(Ordering::Relaxed);
+        if head == self.tail.load(Ordering::Acquire) {
+            return None;
+        }
+        let slot = self.events[(head % Self::LEN) as usize].get();
+        // SAFETY: single consumer; `tail` Release-published this slot, and producer waits for `head`.
+        let event = unsafe { std::ptr::read_volatile(slot) };
+        self.head.store(head.wrapping_add(1), Ordering::Release);
+        Some(event)
+    }
+}
+
 /// A UTF-8 string stored inline in shared memory: NUL-padded, truncated at a character boundary.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -978,6 +1060,8 @@ unsafe impl Plain for JobInfo {}
 unsafe impl Plain for Nearby {}
 // SAFETY: integers and floats only (see `Plain`); a count read torn is bounded by `SemaphoresBlock::semaphores`.
 unsafe impl Plain for SemaphoresBlock {}
+// SAFETY: integers, floats, and `FixedStr` byte strings only (see `Plain`).
+unsafe impl Plain for GameplayEvent {}
 
 // SAFETY: the value is only ever written by one writer at a time (`write`'s contract) and read whole, a
 // read that overlapped a write being thrown away (`read`).
@@ -1429,5 +1513,52 @@ mod tests {
         a.bridge().host.frame_seq.store(42, Ordering::Release);
         assert_eq!(b.bridge().host.frame_seq.load(Ordering::Acquire), 42);
         assert_eq!(b.bridge().magic.load(Ordering::Acquire), BRIDGE_MAGIC);
+    }
+
+    #[test]
+    fn gameplay_event_queue_keeps_fifo_order_and_drops_when_full() {
+        // SAFETY: zeroed memory is a valid empty `GameplayEventQueue` (atomics 0, `GameplayEvent` zeroed).
+        let queue: GameplayEventQueue = unsafe { std::mem::zeroed() };
+        assert_eq!(queue.pop(), None);
+        for i in 0..16u32 {
+            let ev = GameplayEvent {
+                kind: GAMEPLAY_EVENT_FINED,
+                game_time: 100 + i,
+                amount: i64::from(i) * 50,
+                code: FixedStr::new("speeding_camera"),
+                ..Default::default()
+            };
+            assert!(queue.push(ev));
+        }
+        assert!(!queue.push(GameplayEvent { kind: GAMEPLAY_EVENT_TOLLGATE_PAID, ..Default::default() }));
+        let first = queue.pop().unwrap();
+        assert_eq!(first.game_time, 100);
+        assert_eq!(first.code.as_str(), "speeding_camera");
+        assert!(queue.push(GameplayEvent {
+            kind: GAMEPLAY_EVENT_JOB_DELIVERED,
+            game_time: 999,
+            amount: 12500,
+            earned_xp: 450,
+            ..Default::default()
+        }));
+        let rest: Vec<GameplayEvent> = std::iter::from_fn(|| queue.pop()).collect();
+        assert_eq!(rest.len(), 16);
+        assert_eq!(rest.first().unwrap().game_time, 101);
+        assert_eq!(rest.last().unwrap().kind, GAMEPLAY_EVENT_JOB_DELIVERED);
+        assert_eq!(rest.last().unwrap().game_time, 999);
+        assert_eq!(rest.last().unwrap().amount, 12500);
+    }
+
+    #[test]
+    fn gameplay_event_queue_survives_counter_wraparound() {
+        // SAFETY: zeroed memory is a valid empty `GameplayEventQueue`.
+        let queue: GameplayEventQueue = unsafe { std::mem::zeroed() };
+        queue.head.store(u32::MAX - 2, Ordering::Relaxed);
+        queue.tail.store(u32::MAX - 2, Ordering::Relaxed);
+        for i in 1..=6u32 {
+            assert!(queue.push(GameplayEvent { kind: i, game_time: i * 10, ..Default::default() }));
+        }
+        let popped: Vec<u32> = std::iter::from_fn(|| queue.pop()).map(|e| e.kind).collect();
+        assert_eq!(popped, [1, 2, 3, 4, 5, 6]);
     }
 }

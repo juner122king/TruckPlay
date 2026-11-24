@@ -56,15 +56,18 @@ pub const SCS_TELEMETRY_EVENT_FRAME_END: u32 = 2;
 pub const SCS_TELEMETRY_EVENT_PAUSED: u32 = 3;
 pub const SCS_TELEMETRY_EVENT_STARTED: u32 = 4;
 pub const SCS_TELEMETRY_EVENT_CONFIGURATION: u32 = 5;
+pub const SCS_TELEMETRY_EVENT_GAMEPLAY: u32 = 6;
 
 pub const SCS_VALUE_TYPE_BOOL: u32 = 1;
 pub const SCS_VALUE_TYPE_S32: u32 = 2;
 pub const SCS_VALUE_TYPE_U32: u32 = 3;
+pub const SCS_VALUE_TYPE_U64: u32 = 4;
 pub const SCS_VALUE_TYPE_FLOAT: u32 = 5;
 pub const SCS_VALUE_TYPE_FVECTOR: u32 = 7;
 pub const SCS_VALUE_TYPE_FPLACEMENT: u32 = 10;
 pub const SCS_VALUE_TYPE_DPLACEMENT: u32 = 11;
 pub const SCS_VALUE_TYPE_STRING: u32 = 12;
+pub const SCS_VALUE_TYPE_S64: u32 = 13;
 
 pub type EventCallback = unsafe extern "system" fn(event: u32, event_info: *const c_void, context: *mut c_void);
 pub type ChannelCallback =
@@ -130,6 +133,17 @@ impl ScsValue {
         unsafe { (self.data() as *const u64).read() }
     }
 
+    pub fn s64(&self) -> i64 {
+        match self.value_type {
+            SCS_VALUE_TYPE_S32 => i64::from(self.s32()),
+            SCS_VALUE_TYPE_U32 => i64::from(self.u32()),
+            SCS_VALUE_TYPE_U64 => self.u64() as i64,
+            // SAFETY: the union is 40 bytes, 8-aligned (`[u64; 5]`); this plain type fits it and is valid for any bits.
+            SCS_VALUE_TYPE_S64 => unsafe { (self.data() as *const i64).read() },
+            _ => unsafe { (self.data() as *const i64).read() },
+        }
+    }
+
     pub fn float(&self) -> f32 {
         // SAFETY: the union is 40 bytes, 8-aligned (`[u64; 5]`); this plain type fits it and is valid for any bits.
         unsafe { (self.data() as *const f32).read() }
@@ -184,6 +198,9 @@ pub struct ConfigurationEvent {
     pub id: *const c_char,
     pub attributes: *const ScsNamedValue,
 }
+
+/// `scs_telemetry_gameplay_event_t`: identical C layout to [`ConfigurationEvent`] (`scssdk_telemetry_event.h`).
+pub type GameplayEventInfo = ConfigurationEvent;
 
 impl ConfigurationEvent {
     /// Iterates the attributes until the terminating entry.

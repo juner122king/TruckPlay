@@ -118,11 +118,37 @@ export interface JobInfo {
 export type KeybindAction =
   'volumeUp' | 'volumeDown' | 'playPause' | 'nextTrack' | 'previousTrack' | 'brightnessDown' | 'brightnessUp'
 
+export const GAMEPLAY_EVENT_JOB_DELIVERED = 1
+export const GAMEPLAY_EVENT_JOB_CANCELLED = 2
+export const GAMEPLAY_EVENT_FINED = 3
+export const GAMEPLAY_EVENT_TOLLGATE_PAID = 4
+export const GAMEPLAY_EVENT_FERRY_USED = 5
+export const GAMEPLAY_EVENT_TRAIN_USED = 6
+
+export const GAMEPLAY_FLAG_AUTO_PARK = 1 << 0
+export const GAMEPLAY_FLAG_AUTO_LOAD = 1 << 1
+
+/** Discrete SCS gameplay event forwarded from the plugin (`westplay_shared::GameplayEvent`). */
+export interface GameplayEvent {
+  kind: 1 | 2 | 3 | 4 | 5 | 6
+  gameTime: number
+  amount: number
+  earnedXp: number
+  deliveryTime: number
+  distanceKm: number
+  cargoDamage: number
+  flags: number
+  code: string
+  source: string
+  target: string
+}
+
 export type HostMessage =
   | { type: 'mediaResource'; app: MediaApp; generation: number; resident: boolean }
   | { type: 'telemetry'; data: Telemetry }
   | { type: 'truck'; data: TruckInfo }
   | { type: 'job'; data: JobInfo }
+  | { type: 'gameplayEvent'; data: GameplayEvent }
   /** `null` until the game has drawn a WestPlay screen. Checked against the known ids on arrival. */
   | { type: 'screen'; layout: string | null }
   /** The settings the page applies: whether the truck's own strip stays beside WestPlay

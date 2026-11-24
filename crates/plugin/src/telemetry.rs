@@ -8,13 +8,18 @@ use std::ffi::{CStr, CString, c_char, c_void};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use westplay_shared::{FixedStr, JobInfo, Telemetry, TruckInfo};
+use westplay_shared::{
+    FixedStr, GAMEPLAY_EVENT_FERRY_USED, GAMEPLAY_EVENT_FINED, GAMEPLAY_EVENT_JOB_CANCELLED,
+    GAMEPLAY_EVENT_JOB_DELIVERED, GAMEPLAY_EVENT_TOLLGATE_PAID, GAMEPLAY_EVENT_TRAIN_USED, GAMEPLAY_FLAG_AUTO_LOAD,
+    GAMEPLAY_FLAG_AUTO_PARK, GameplayEvent, JobInfo, Telemetry, TruckInfo,
+};
 
 use crate::scs::{
-    ChannelCallback, ConfigurationEvent, EventCallback, SCS_RESULT_OK, SCS_TELEMETRY_EVENT_CONFIGURATION,
-    SCS_TELEMETRY_EVENT_FRAME_END, SCS_TELEMETRY_EVENT_PAUSED, SCS_TELEMETRY_EVENT_STARTED, SCS_U32_NIL,
-    SCS_VALUE_TYPE_BOOL, SCS_VALUE_TYPE_DPLACEMENT, SCS_VALUE_TYPE_FLOAT, SCS_VALUE_TYPE_FPLACEMENT,
-    SCS_VALUE_TYPE_S32, SCS_VALUE_TYPE_U32, ScsValue, TelemetryInitParamsV100,
+    ChannelCallback, ConfigurationEvent, EventCallback, GameplayEventInfo, SCS_RESULT_OK,
+    SCS_TELEMETRY_EVENT_CONFIGURATION, SCS_TELEMETRY_EVENT_FRAME_END, SCS_TELEMETRY_EVENT_GAMEPLAY,
+    SCS_TELEMETRY_EVENT_PAUSED, SCS_TELEMETRY_EVENT_STARTED, SCS_U32_NIL, SCS_VALUE_TYPE_BOOL,
+    SCS_VALUE_TYPE_DPLACEMENT, SCS_VALUE_TYPE_FLOAT, SCS_VALUE_TYPE_FPLACEMENT, SCS_VALUE_TYPE_S32,
+    SCS_VALUE_TYPE_U32, ScsValue, TelemetryInitParamsV100,
 };
 use crate::{bridge, log};
 
@@ -186,6 +191,7 @@ pub unsafe fn register(params: &TelemetryInitParamsV100) {
             SCS_TELEMETRY_EVENT_PAUSED,
             SCS_TELEMETRY_EVENT_STARTED,
             SCS_TELEMETRY_EVENT_CONFIGURATION,
+            SCS_TELEMETRY_EVENT_GAMEPLAY,
         ] {
             let result = register_event(event, on_event, std::ptr::null_mut());
             if result != SCS_RESULT_OK {
@@ -232,6 +238,12 @@ unsafe fn on_game_event(event: u32, info: *const c_void) {
         if event == SCS_TELEMETRY_EVENT_CONFIGURATION {
             if let Some(configuration) = (info as *const ConfigurationEvent).as_ref() {
                 on_configuration(configuration);
+            }
+            return;
+        }
+        if event == SCS_TELEMETRY_EVENT_GAMEPLAY {
+            if let Some(gameplay) = (info as *const GameplayEventInfo).as_ref() {
+                on_gameplay_event(gameplay);
             }
             return;
         }
@@ -408,6 +420,99 @@ unsafe fn on_job(configuration: &ConfigurationEvent) {
         );
         if let Some(bridge) = bridge::get() {
             bridge.plugin.job.write(&job);
+        }
+    }
+}
+
+/// Parses SCS gameplay events (`job.delivered`, `player.fined`, tolls, ferries, trains) into the bridge ring buffer.
+///
+/// # Safety
+/// `gameplay` is the SDK's `scs_telemetry_gameplay_event_t`, alive through the call.
+unsafe fn on_gameplay_event(gameplay: &GameplayEventInfo) {
+    // SAFETY: the event id and attribute names are the SDK's nul-terminated strings, alive through the call.
+    unsafe {
+        if gameplay.id.is_null() {
+            return;
+        }
+        let id = CStr::from_ptr(gameplay.id).to_bytes();
+        let game_time = SNAPSHOT.lock().unwrap_or_else(|e| e.into_inner()).game_time;
+        let mut ev = GameplayEvent { game_time, ..Default::default() };
+        match id {
+            b"job.delivered" | b"car_job.delivered" => {
+                ev.kind = GAMEPLAY_EVENT_JOB_DELIVERED;
+                for attr in gameplay.attributes() {
+                    if attr.name.is_null() {
+                        continue;
+                    }
+                    let v = &attr.value;
+                    match CStr::from_ptr(attr.name).to_bytes() {
+                        b"revenue" => ev.amount = v.s64(),
+                        b"earned.xp" => ev.earned_xp = v.s32(),
+                        b"cargo.damage" => ev.cargo_damage = v.float(),
+                        b"distance.km" => ev.distance_km = v.float(),
+                        b"delivery.time" => ev.delivery_time = v.u32(),
+                        b"auto.park.used" if v.bool() => ev.flags |= GAMEPLAY_FLAG_AUTO_PARK,
+                        b"auto.load.used" if v.bool() => ev.flags |= GAMEPLAY_FLAG_AUTO_LOAD,
+                        _ => {}
+                    }
+                }
+            }
+            b"job.cancelled" | b"car_job.cancelled" => {
+                ev.kind = GAMEPLAY_EVENT_JOB_CANCELLED;
+                for attr in gameplay.attributes() {
+                    if !attr.name.is_null() && CStr::from_ptr(attr.name).to_bytes() == b"cancel.penalty" {
+                        ev.amount = attr.value.s64();
+                    }
+                }
+            }
+            b"player.fined" => {
+                ev.kind = GAMEPLAY_EVENT_FINED;
+                for attr in gameplay.attributes() {
+                    if attr.name.is_null() {
+                        continue;
+                    }
+                    match CStr::from_ptr(attr.name).to_bytes() {
+                        b"fine.offence" => ev.code = FixedStr::new(&attr.value.string().unwrap_or_default()),
+                        b"fine.amount" => ev.amount = attr.value.s64(),
+                        _ => {}
+                    }
+                }
+            }
+            b"player.tollgate.paid" => {
+                ev.kind = GAMEPLAY_EVENT_TOLLGATE_PAID;
+                for attr in gameplay.attributes() {
+                    if !attr.name.is_null() && CStr::from_ptr(attr.name).to_bytes() == b"pay.amount" {
+                        ev.amount = attr.value.s64();
+                    }
+                }
+            }
+            b"player.use.ferry" | b"player.use.train" => {
+                ev.kind = if id == b"player.use.ferry" { GAMEPLAY_EVENT_FERRY_USED } else { GAMEPLAY_EVENT_TRAIN_USED };
+                for attr in gameplay.attributes() {
+                    if attr.name.is_null() {
+                        continue;
+                    }
+                    match CStr::from_ptr(attr.name).to_bytes() {
+                        b"pay.amount" => ev.amount = attr.value.s64(),
+                        b"source.name" => ev.source = FixedStr::new(&attr.value.string().unwrap_or_default()),
+                        b"target.name" => ev.target = FixedStr::new(&attr.value.string().unwrap_or_default()),
+                        _ => {}
+                    }
+                }
+            }
+            _ => return,
+        }
+        log!(
+            "gameplay: {} (kind={}, amount={}, code={:?})",
+            String::from_utf8_lossy(id),
+            ev.kind,
+            ev.amount,
+            ev.code.as_str()
+        );
+        if let Some(bridge) = bridge::get()
+            && !bridge.plugin.gameplay_events.push(ev)
+        {
+            log!("gameplay: event queue full, dropped kind {}", ev.kind);
         }
     }
 }
