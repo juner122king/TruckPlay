@@ -178,9 +178,15 @@ try {
     Invoke-Checked "Push git tag $tag to origin" { git push origin $tag }
 
     $releaseExists = $false
-    gh release view $tag --repo $Repo *> $null
-    if ($LASTEXITCODE -eq 0) {
-        $releaseExists = $true
+    $prevErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        gh release view $tag --repo $Repo *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $releaseExists = $true
+        }
+    } finally {
+        $ErrorActionPreference = $prevErrorAction
     }
 
     if ($releaseExists) {
