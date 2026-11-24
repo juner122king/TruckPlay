@@ -5,7 +5,7 @@ import { useLive } from '../state/store'
 import { useText } from '../state/text'
 import { laneHintOf } from './laneGuidance'
 import { NOW_WITHIN } from './guidance'
-import { guidanceDistancesOf } from './guidanceDistance'
+import { gameGuidanceDistancesOf, guidanceDistancesOf } from './guidanceDistance'
 
 // Advance hysteresis on telemetry/store updates, not by reading or writing refs during React render.
 const useAdvice = create<{ hint: LaneHint | null }>()(() => ({ hint: null }))
@@ -31,7 +31,7 @@ export function useLaneHint() {
   const text = useText()
   const distance = useLive((state) => {
     if (!hint) return ''
-    const distances = guidanceDistancesOf(state)
+    const distances = gameGuidanceDistancesOf(state) ?? guidanceDistancesOf(state)
     const remaining = distances?.distances[hint.node]
     if (!distances || remaining === undefined || !Number.isFinite(remaining)) return ''
     const metres = Math.max(0, distances.distanceLeft - remaining)

@@ -29,7 +29,7 @@ import {
   zoomForSpeed,
   zoomOffsetFor,
 } from './camera'
-import { guidanceFor } from './guidanceDistance'
+import { physicalGuidanceFor } from './guidanceDistance'
 import { buildingFilter, type Canopy, canopiesOver } from './buildings'
 import { labelLines, placeLabels } from './labels'
 import { NO_ENTRY_ICON, drawNoEntry, drawPlaceIcon, parsePlaceIcon } from './placeIcons'
@@ -1112,7 +1112,7 @@ export function northUpLiveMap() {
     const truck = truckAt(samples, performance.now() - FOLLOW_DELAY_MS)
     const headingBearing = truck ? bearingOf(truck.heading) : 0
     const settings = navCameraSettings()
-    const guidance = settings.autoZoom && settings.junctionZoom ? guidanceFor(useLive.getState()) : null
+    const guidance = settings.autoZoom && settings.junctionZoom ? physicalGuidanceFor(useLive.getState()) : null
     const pitch = next ? 0 : live.interactive ? navigationCameraFor(truck?.speed ?? 0, settings, guidance).pitch : PITCH
     live.map.easeTo({
       bearing: next ? 0 : headingBearing,
@@ -1381,7 +1381,7 @@ function updateCamera(target: LiveMap, now: number, dt: number) {
   let basePitch: number
   if (target.interactive) {
     const settings = navCameraSettings()
-    const guidance = settings.autoZoom && settings.junctionZoom ? guidanceFor(useLive.getState()) : null
+    const guidance = settings.autoZoom && settings.junctionZoom ? physicalGuidanceFor(useLive.getState()) : null
     const targetCam = navigationCameraFor(truck.speed, settings, guidance)
     baseZoom = targetCam.zoom
     basePitch = targetCam.pitch

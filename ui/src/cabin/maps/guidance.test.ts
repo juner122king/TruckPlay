@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { guidanceOf, type Maneuver } from './guidance'
 
-// A route of 6 nodes, 1000 m apart (physical distances): 5000 m from the first to the destination.
+// A route of 6 nodes, 1000 m apart: 5000 m from the first to the destination.
 const distances = [5000, 4000, 3000, 2000, 1000, 0]
 const turn = (node: number, kind: Maneuver['turn'] = 'right'): Maneuver => ({ node, turn: kind, angle: 90, exit: null })
 
@@ -32,6 +32,12 @@ describe('guidanceOf', () => {
     })
     // The destination right after the last turn.
     expect(guidanceOf([5000, 4000, 3000, 2000, 300, 0], [turn(4)], 3, 1500)?.then).toEqual({ kind: 'arrive' })
+    // Independent physical gap distances can trigger "then" even when game-scaled gap exceeds THEN_WITHIN.
+    const highwayGame = [20_000, 15_000, 10_000, 6_000, 2_000, 0]
+    const highwayPhysical = [1000, 750, 500, 300, 100, 0]
+    const separated = guidanceOf(highwayGame, [turn(2), turn(3, 'left')], 1, 16_000, highwayPhysical, 800)
+    expect(separated?.distance).toBe(6_000)
+    expect(separated?.then).toEqual({ kind: 'turn', maneuver: turn(3, 'left') })
   })
 
   it('leads to the destination after the last turn, and nothing without a route', () => {
