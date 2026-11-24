@@ -80,9 +80,21 @@
     }
   }
 
+  const formatPlayCount = (value) => {
+    const n = Number(value)
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    if (n >= 100000000) return `${(n / 100000000).toFixed(1)}亿`
+    if (n >= 10000) return `${(n / 10000).toFixed(1)}万`
+    return String(Math.round(n))
+  }
+
   const toCoverUrl = (item) => {
     if (!item) return null
     let url =
+      (typeof item === 'string' ? item : null) ||
+      item.albumCoverPath ||
+      item.trackCoverPath ||
+      item.itemCoverUrl ||
       item.coverLarge ||
       item.coverPath ||
       item.cover_path ||
@@ -401,13 +413,47 @@
     return el
   }
   let lastState = ''
-  const checkStatus = () => {
-    const signedIn = document.cookie.includes('1&_token') || document.cookie.includes('1_l_flag')
-    const value = JSON.stringify({ signedIn, playing: isPlaying })
+  let signedInKnown = null
+  let checkingAuth = false
+  let lastAuthCheckAt = 0
+
+  const emitState = () => {
+    if (signedInKnown === null) return
+    const value = JSON.stringify({ signedIn: signedInKnown, playing: isPlaying })
     if (value !== lastState) {
       lastState = value
       post({ type: 'state', state: JSON.parse(value) })
     }
+  }
+
+  const refreshAuth = async (force = false) => {
+    const now = Date.now()
+    if (checkingAuth) return
+    if (!force && signedInKnown !== null && now - lastAuthCheckAt < 30000) return
+    checkingAuth = true
+    lastAuthCheckAt = now
+    try {
+      const res = await fetch('https://www.ximalaya.com/revision/main/getCurrentUser', {
+        credentials: 'include',
+        signal: AbortSignal.timeout(10000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        signedInKnown = Boolean(data?.ret === 200 && data?.data?.uid)
+      }
+    } catch {
+      if (signedInKnown === null) {
+        signedInKnown = document.cookie.includes('1_l_flag')
+      }
+    } finally {
+      checkingAuth = false
+      emitState()
+    }
+  }
+
+  const checkStatus = () => {
+    emitState()
+    void refreshAuth(false)
   }
   const sendPlayback = () => {
     if (!currentTrack) return
@@ -421,6 +467,9 @@
         position: currentTrack.radio ? 0 : finite(currentAudio?.currentTime),
         status,
         owner: currentTrack.radio ? 'radio' : 'ximalaya',
+        trackId: currentTrack.radio ? undefined : String(currentTrack.id || ''),
+        albumId: currentTrack.radio ? undefined : currentTrack.albumId || undefined,
+        isSample: currentTrack.radio ? undefined : Boolean(currentTrack.isSample),
         radioId: currentTrack.radioId,
         isLive: Boolean(currentTrack.radio),
         requestId,
@@ -445,72 +494,16 @@
     }
   })
 
-  const FALLBACK_AUDIO_STREAMS = {
-    scifi: 'https://aod.cos.tx.xmcdn.com/storages/ceef-audiofreehighqps/F2/8F/GKwRIUEH8NbRAZlykgIFt-eo-aacv2-48K.m4a',
-    xiangsheng: 'https://aod.cos.tx.xmcdn.com/storages/1825-audiofreehighqps/F1/1F/GKwRIDoOW5CKAREisgTJPcGU.m4a',
-    pingshu: 'https://aod.cos.tx.xmcdn.com/storages/a152-audiofreehighqps/D5/4C/GMCoOR4I0hiHACAAAAJYCShV.mp3',
-    radio: 'https://aod.cos.tx.xmcdn.com/storages/a71e-audiofreehighqps/12/7A/GKwRIJIOu5J4AD4AjATy-pqV.m4a',
-    dj: 'https://aod.cos.tx.xmcdn.com/storages/8551-audiofreehighqps/97/E4/GKwRIRwOjplnBPxIiwTeclL2.m4a',
-    relax: 'https://aod.cos.tx.xmcdn.com/storages/aea8-audiofreehighqps/A4/17/GKwRIRwOx0GdAFzXCgT4dSWb.m4a',
-    general: 'https://aod.cos.tx.xmcdn.com/group39/M07/34/82/wKgJnlqChT2jRXU8AEn2S2TpSzo586.m4a',
-  }
-
-  const getFallbackUrl = (track) => {
-    if (!track) return FALLBACK_AUDIO_STREAMS.general
-    const str = ((track.title || '') + ' ' + (track.album || '') + ' ' + (track.artist || '')).toLowerCase()
-    if (
-      str.includes('相声') ||
-      str.includes('郭德纲') ||
-      str.includes('于谦') ||
-      str.includes('德云') ||
-      str.includes('段子')
-    ) {
-      return FALLBACK_AUDIO_STREAMS.xiangsheng
-    }
-    if (
-      str.includes('评书') ||
-      str.includes('三国') ||
-      str.includes('单田芳') ||
-      str.includes('明朝') ||
-      str.includes('历史')
-    ) {
-      return FALLBACK_AUDIO_STREAMS.pingshu
-    }
-    if (
-      str.includes('三体') ||
-      str.includes('科幻') ||
-      str.includes('鬼吹灯') ||
-      str.includes('盗墓') ||
-      str.includes('修仙')
-    ) {
-      return FALLBACK_AUDIO_STREAMS.scifi
-    }
-    if (str.includes('dj') || str.includes('慢摇') || str.includes('重低音') || str.includes('电音')) {
-      return FALLBACK_AUDIO_STREAMS.dj
-    }
-    if (
-      str.includes('白噪') ||
-      str.includes('雨夜') ||
-      str.includes('治愈') ||
-      str.includes('古典') ||
-      str.includes('静心')
-    ) {
-      return FALLBACK_AUDIO_STREAMS.relax
-    }
-    if (str.includes('电台') || str.includes('晚安') || str.includes('夜行') || str.includes('卡车')) {
-      return FALLBACK_AUDIO_STREAMS.radio
-    }
-    return FALLBACK_AUDIO_STREAMS.general
-  }
-
   const resolveAudioUrl = async (track, signal) => {
-    if (!track) return null
+    if (!track) return { url: null, isSample: false, error: '无效的声音条目' }
     const trackId = track.id || track.trackId
     const hasRealId = trackId && /^\d+$/.test(String(trackId))
     if (!hasRealId && track.url && (track.url.startsWith('http://') || track.url.startsWith('https://'))) {
-      return track.url
+      return { url: track.url, isSample: false, error: null }
     }
-    if (!trackId) return null
+    if (!trackId) return { url: null, isSample: false, error: '缺少声音 ID' }
+
+    let paidLocked = false
 
     // 1. Modern Web & H5 play info API: mobile-playpage/track/v3/baseInfo
     try {
@@ -520,32 +513,41 @@
         {
           signal,
           credentials: 'include',
-          signal,
         },
       )
       if (res.ok) {
         const data = await res.json()
         const trackInfo = data?.trackInfo
         if (trackInfo) {
-          if (currentTrack === track && !signal?.aborted && !track.artwork) {
-            const art = toCoverUrl(trackInfo)
-            if (art && currentTrack) {
-              currentTrack.artwork = art
-              sendPlayback()
+          if (currentTrack === track && !signal?.aborted) {
+            if (!track.artwork) {
+              const art = toCoverUrl(trackInfo)
+              if (art && currentTrack) {
+                currentTrack.artwork = art
+                sendPlayback()
+              }
             }
           }
+          const isPaid = Boolean(trackInfo.isPaid || trackInfo.paidType > 0)
+          const isAuthorized = !isPaid || trackInfo.isFree === true || trackInfo.isAuthorized === true
+          const isSample = Boolean(trackInfo.isSample || (isPaid && !isAuthorized && trackInfo.sampleDuration > 0))
           const list = trackInfo.playUrlList
           if (Array.isArray(list) && list.length > 0) {
             for (const item of list) {
               if (item?.url) {
-                if (item.url.startsWith('http')) return item.url
+                if (item.url.startsWith('http')) return { url: item.url, isSample, error: null }
                 const dec = aesDecryptEcbHexKey(item.url, 'aaad3e4fd540b0f79dca95606e72bf93')
-                if (dec && dec.startsWith('http')) return dec
+                if (dec && dec.startsWith('http')) return { url: dec, isSample, error: null }
               }
             }
           }
-          if (trackInfo.playPath && trackInfo.playPath.startsWith('http')) return trackInfo.playPath
-          if (trackInfo.downloadUrl && trackInfo.downloadUrl.startsWith('http')) return trackInfo.downloadUrl
+          if (trackInfo.playPath && trackInfo.playPath.startsWith('http')) {
+            return { url: trackInfo.playPath, isSample, error: null }
+          }
+          if (trackInfo.downloadUrl && trackInfo.downloadUrl.startsWith('http')) {
+            return { url: trackInfo.downloadUrl, isSample, error: null }
+          }
+          if (isPaid && !isAuthorized) paidLocked = true
         }
       }
     } catch (e) {
@@ -553,35 +555,7 @@
       console.warn('[ximalaya] mobile-playpage error', e)
     }
 
-    // 2. Mobile album track stream (if albumId is known)
-    const albumId = track.albumId || track.album_id
-    if (albumId) {
-      try {
-        const res = await fetch(
-          `https://mobile.ximalaya.com/mobile/v1/album/track/?albumId=${encodeURIComponent(albumId)}&device=android&isAsc=true&pageId=1&pageSize=50`,
-          { signal },
-        )
-        if (res.ok) {
-          const data = await res.json()
-          const list = data?.data?.list || []
-          const found = list.find((t) => String(t.trackId) === String(trackId))
-          if (found) {
-            const stream =
-              found.playPathAacv224 ||
-              found.playPathAacv164 ||
-              found.playPath64 ||
-              found.playPath32 ||
-              found.downloadUrl
-            if (stream && stream.startsWith('http')) return stream
-          }
-        }
-      } catch (e) {
-        if (signal?.aborted) throw e
-        console.warn('[ximalaya] mobile album resolve error', e)
-      }
-    }
-
-    // 3. Revision play APIs
+    // 2. Revision play APIs (effective when signed in with www.ximalaya.com cookies)
     try {
       const res = await fetch(
         `https://www.ximalaya.com/revision/play/v1/audio?id=${encodeURIComponent(trackId)}&ptype=1`,
@@ -590,9 +564,14 @@
       if (res.ok) {
         const data = await res.json()
         const src = data?.data?.src || data?.src
-        if (src && src.startsWith('http')) return src
+        if (src && src.startsWith('http')) {
+          return { url: src, isSample: Boolean(data?.data?.hasBuy === false && data?.data?.isPaid), error: null }
+        }
+        if (data?.data?.isPaid && data?.data?.hasBuy === false) paidLocked = true
       }
-    } catch {}
+    } catch (e) {
+      if (signal?.aborted) throw e
+    }
 
     try {
       const res = await fetch(`https://www.ximalaya.com/revision/play/v1/show?id=${encodeURIComponent(trackId)}`, {
@@ -602,11 +581,20 @@
       if (res.ok) {
         const data = await res.json()
         const src = data?.data?.src || data?.src
-        if (src && src.startsWith('http')) return src
+        if (src && src.startsWith('http')) return { url: src, isSample: false, error: null }
       }
-    } catch {}
+    } catch (e) {
+      if (signal?.aborted) throw e
+    }
 
-    return null
+    return {
+      url: null,
+      isSample: false,
+      error:
+        paidLocked || track.isPaid
+          ? '该声音为喜马拉雅 VIP/付费内容，请在桌面扫码登录会员账号后收听'
+          : '无法获取该声音播放地址，请稍后重试',
+    }
   }
 
   const stopHls = () => {
@@ -725,10 +713,15 @@
         }
       } else {
         const hasRealId = /^\d+$/.test(String(track.id))
-        if (!streamUrl || (hasRealId && /archive.org|audiofreehighqps/.test(streamUrl)))
-          streamUrl = await resolveAudioUrl(track, signal)
-        if (!valid(seq, track)) return
-        if (!streamUrl) streamUrl = getFallbackUrl(track)
+        if (!streamUrl || hasRealId) {
+          const resolved = await resolveAudioUrl(track, signal)
+          if (!valid(seq, track)) return
+          if (!resolved.url) {
+            throw new Error(resolved.error || '无法获取音频播放地址')
+          }
+          streamUrl = resolved.url
+          track.isSample = Boolean(resolved.isSample)
+        }
       }
       if (!valid(seq, track)) return
       audio.src = streamUrl
@@ -754,7 +747,9 @@
   const handleHost = async (cmd) => {
     if (!cmd || typeof cmd !== 'object') return
     const { action } = cmd
-    if (action === 'play') {
+    if (action === 'start') {
+      void refreshAuth(true)
+    } else if (action === 'play') {
       requestId = cmd.requestId ?? null
       if (cmd.track || currentTrack?.radio || !currentAudio?.src) {
         if (cmd.track || currentTrack) await playTrack(cmd.track || currentTrack)
@@ -805,6 +800,108 @@
     }
   }, 60000)
 
+  const CATEGORY_SLUG_MAP = {
+    youshengshu: 3,
+    book: 3,
+    xiangsheng: 12,
+    comic: 12,
+    lishi: 9,
+    culture: 9,
+    shangye: 8,
+    finance: 8,
+    renwen: 39,
+    yinyue: 2,
+    music: 2,
+    qinggan: 10,
+    emotion: 10,
+    toutiao: 1,
+    news: 1,
+    ertong: 6,
+    kid: 6,
+    yule: 4,
+    entertainment: 4,
+    duanzi: 48,
+    keji: 18,
+    it: 18,
+    guangbojv: 46,
+    diantai: 10,
+  }
+
+  const fetchJson = async (url, options = {}) => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000), ...options })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    return res.json()
+  }
+
+  const mapCategoryAlbum = (a) => ({
+    id: String(a.albumId || a.id),
+    title: a.albumTitle || a.title || '有声专辑',
+    artist: a.albumUserNickName || a.anchorName || a.nickname || '喜马拉雅主播',
+    artwork: toCoverUrl(a),
+    description: a.intro || a.description || '',
+    episodeCount: Number(a.albumTrackCount || a.trackCount || 0) || undefined,
+    playCount: formatPlayCount(a.albumPlayCount || a.playCount),
+    completed: a.isFinished === 2 ? true : a.isFinished === 1 ? false : undefined,
+    isPaid: Boolean(a.isPaid),
+    vipType: typeof a.vipType === 'number' ? a.vipType : undefined,
+    tag: a.isPaid ? 'VIP' : a.isFinished === 2 ? '完结' : undefined,
+  })
+
+  const mapRankAlbum = (item) => {
+    const info = item?.albumInfo || item || {}
+    const stats = item?.statCountInfo || {}
+    const uri = item?.pageUriInfo || {}
+    const isPaid = Boolean(info.albumPayType > 0 || info.albumVipPayType > 0 || info.isPaid)
+    return {
+      id: String(info.id || item?.id),
+      title: info.title || '热门专辑',
+      artist: info.anchorName || uri.categoryName || '喜马拉雅精选',
+      artwork: toCoverUrl(info),
+      description: info.customTitle || info.shortIntro || info.salePoint || '',
+      episodeCount: Number(stats.trackCount || 0) || undefined,
+      playCount: formatPlayCount(stats.playCount),
+      category: uri.categoryName || undefined,
+      completed: info.albumFinishTag === 2 ? true : info.albumFinishTag === 1 ? false : undefined,
+      isPaid,
+      tag: isPaid ? 'VIP' : uri.categoryName || undefined,
+    }
+  }
+
+  const fetchCategories = async () => {
+    const data = await fetchJson('https://www.ximalaya.com/revision/category/allCategoryInfo', {
+      credentials: 'include',
+    })
+    const groups = Array.isArray(data?.data) ? data.data : []
+    const seen = new Set()
+    const list = []
+    for (const group of groups) {
+      for (const cat of group?.categories || []) {
+        const id = Number(cat.id)
+        if (!id || seen.has(id)) continue
+        seen.add(id)
+        const linkSlug = String(cat.link || '')
+          .replace(/^\/|\/$/g, '')
+          .split('/')[0]
+        list.push({
+          id,
+          name: cat.displayName || cat.name || '分类',
+          code: linkSlug || cat.name || String(id),
+          group: group.name || undefined,
+        })
+      }
+    }
+    return list
+  }
+
+  const fetchRankAlbums = async (cluster = 'free', categoryCode = 'all', page = 1, pageSize = 30) => {
+    const data = await fetchJson(
+      `https://www.ximalaya.com/m-revision/page/rank/queryRank?clusterCode=${encodeURIComponent(cluster)}&categoryCode=${encodeURIComponent(categoryCode)}&page=${page}&pageSize=${pageSize}`,
+      { credentials: 'include' },
+    )
+    const raw = data?.data?.rankModuleInfoList || []
+    return raw.map(mapRankAlbum).filter((a) => a.id && a.id !== 'undefined')
+  }
+
   const handleAsk = async (id, question) => {
     try {
       if (
@@ -838,132 +935,323 @@
         const payload = await response.json()
         if (payload.ret !== 0 && payload.ret !== '0000') throw new Error(payload.msg || '电台接口请求失败')
         post({ type: 'answer', answer: { id, radio: { kind, data: payload.data ?? payload.result ?? null } } })
-      } else if (question.ask === 'search') {
-        const res = await fetch(
-          `https://www.ximalaya.com/revision/search/main?core=all&spellchecker=true&device=iPhone&kw=${encodeURIComponent(question.query)}&page=1&rows=30`,
-          {
-            credentials: 'include',
-          },
+      } else if (question.ask === 'categories') {
+        const categories = await fetchCategories()
+        post({ type: 'answer', answer: { id, categories } })
+      } else if (question.ask === 'home' || question.ask === 'recommend') {
+        const [freeRes, riseRes, catRes] = await Promise.allSettled([
+          fetchRankAlbums('free', 'all', 1, 24),
+          fetchRankAlbums('rise', 'all', 1, 18),
+          fetchCategories(),
+        ])
+        const albums = freeRes.status === 'fulfilled' ? freeRes.value : []
+        const riseAlbums = riseRes.status === 'fulfilled' ? riseRes.value : []
+        const categories = catRes.status === 'fulfilled' ? catRes.value : []
+        if (!albums.length && !riseAlbums.length) {
+          const fallback = await fetchJson(
+            'https://www.ximalaya.com/revision/category/v2/albums?pageNum=1&pageSize=24&sort=1',
+            { credentials: 'include' },
+          )
+          const list = (fallback?.data?.albums || []).map(mapCategoryAlbum)
+          post({ type: 'answer', answer: { id, albums: list, riseAlbums: [], categories } })
+        } else {
+          post({ type: 'answer', answer: { id, albums, riseAlbums, categories } })
+        }
+      } else if (question.ask === 'category') {
+        const page = Math.max(1, Number(question.page) || 1)
+        const sort = typeof question.sort === 'number' ? question.sort : 1
+        const slug = String(question.category || '').toLowerCase()
+        const categoryId = Number(question.categoryId) || CATEGORY_SLUG_MAP[slug] || 0
+        const params = new URLSearchParams({
+          pageNum: String(page),
+          pageSize: '24',
+          sort: String(sort),
+        })
+        if (categoryId > 0) params.set('categoryId', String(categoryId))
+        const data = await fetchJson(`https://www.ximalaya.com/revision/category/v2/albums?${params.toString()}`, {
+          credentials: 'include',
+        })
+        const list = (data?.data?.albums || data?.data?.albumList || []).map(mapCategoryAlbum)
+        const totalCount = Number(data?.data?.total || list.length)
+        const maxPage = Math.max(1, Math.ceil(totalCount / 24))
+        post({ type: 'answer', answer: { id, albums: list, totalCount, page, maxPage } })
+      } else if (question.ask === 'rank') {
+        const cluster = question.cluster || 'free'
+        const categoryCode = question.categoryCode || 'all'
+        const page = Math.max(1, Number(question.page) || 1)
+        const albums = await fetchRankAlbums(cluster, categoryCode, page, 30)
+        post({ type: 'answer', answer: { id, albums, page } })
+      } else if (question.ask === 'albumDetail') {
+        const data = await fetchJson(
+          `https://www.ximalaya.com/m-revision/page/album/v2/queryAlbumPage/${encodeURIComponent(question.albumId)}`,
+          { credentials: 'include' },
         )
-        const data = await res.json()
-        const docs = data?.data?.track?.docs || data?.data?.result?.response?.docs || data?.data?.trackInfo?.docs || []
-        const tracks = docs.map((t) => ({
-          id: String(t.trackId || t.id),
+        const detail = data?.data?.albumDetailInfo || {}
+        const info = detail.albumInfo || {}
+        const stats = detail.statCountInfo || {}
+        const anchor = detail.anchorInfo || {}
+        const album = {
+          id: String(info.id || question.albumId),
+          title: info.title || '有声专辑',
+          artist: anchor.nickname || info.anchorName || '喜马拉雅主播',
+          artwork: toCoverUrl(info),
+          description: info.shortIntro || info.customTitle || info.detailRichIntro?.replace(/<[^>]+>/g, '') || '',
+          episodeCount: Number(stats.trackCount || 0) || undefined,
+          playCount: formatPlayCount(stats.playCount),
+          completed: info.albumFinishTag === 2 ? true : info.albumFinishTag === 1 ? false : undefined,
+          isPaid: Boolean(info.albumPayType > 0 || info.price),
+          category: info.categoryName || undefined,
+        }
+        post({ type: 'answer', answer: { id, album } })
+      } else if (question.ask === 'albumTracks') {
+        const page = Math.max(1, Number(question.page) || 1)
+        const asc = question.asc !== false
+        const sort = asc ? 0 : 1
+        let tracks = []
+        let totalCount = 0
+        let maxPage = 1
+
+        // 1. Same-origin authenticated track list (full metadata + exact trackTotalCount when signed in)
+        try {
+          const data = await fetchJson(
+            `https://www.ximalaya.com/revision/album/v1/getTracksList?albumId=${encodeURIComponent(question.albumId)}&pageNum=${page}&pageSize=50&sort=${sort}`,
+            { credentials: 'include' },
+          )
+          const list = data?.ret === 200 ? data?.data?.tracks || [] : []
+          if (list.length > 0) {
+            totalCount = Number(data?.data?.trackTotalCount || list.length)
+            maxPage = Math.max(1, Math.ceil(totalCount / 50))
+            tracks = list.map((t, idx) => ({
+              id: String(t.trackId),
+              title: t.title || `第${idx + 1}集`,
+              artist: t.anchorName || '喜马拉雅主播',
+              album: t.albumTitle || undefined,
+              albumId: String(question.albumId),
+              duration: Number(t.duration || 0),
+              artwork: toCoverUrl(t),
+              episodeNumber: Number(t.index || (page - 1) * 50 + idx + 1),
+              playCount: formatPlayCount(t.playCount),
+              isPaid: Boolean(t.isPaid),
+              isFree: !t.isPaid,
+              isAuthorized: !t.isPaid || Boolean(t.isAuthorized),
+            }))
+          }
+        } catch (e) {
+          console.warn('[ximalaya] revision getTracksList error', e)
+        }
+
+        // 2. Universal same-origin track list (works both signed-in and anonymous, zero CORS issues)
+        if (tracks.length === 0) {
+          const [showRes, pageRes] = await Promise.allSettled([
+            fetchJson(
+              `https://www.ximalaya.com/revision/play/v1/show?id=${encodeURIComponent(question.albumId)}&num=${page}&sort=${sort}&size=50&ptype=0`,
+              { credentials: 'include' },
+            ),
+            fetchJson(
+              `https://www.ximalaya.com/m-revision/page/album/v2/queryAlbumPage/${encodeURIComponent(question.albumId)}`,
+              { credentials: 'include' },
+            ),
+          ])
+          if (showRes.status === 'rejected') throw showRes.reason
+          const showData = showRes.value?.data || {}
+          const list = showData.tracksAudioPlay || []
+          const pageDetail = pageRes.status === 'fulfilled' ? pageRes.value?.data?.albumDetailInfo || {} : {}
+          const anchorName = pageDetail?.anchorInfo?.nickname || pageDetail?.albumInfo?.anchorName || '喜马拉雅主播'
+          const albumTotal = Number(pageDetail?.statCountInfo?.trackCount || 0)
+          totalCount = albumTotal || (showData.hasMore ? page * 50 + 1 : (page - 1) * 50 + list.length)
+          maxPage = Math.max(1, Math.ceil(totalCount / 50))
+          tracks = list.map((t, idx) => ({
+            id: String(t.trackId),
+            title: t.trackName || t.title || `第${idx + 1}集`,
+            artist: anchorName,
+            album: t.albumName || pageDetail?.albumInfo?.title || undefined,
+            albumId: String(question.albumId),
+            duration: Number(t.duration || 0),
+            artwork: toCoverUrl(t),
+            episodeNumber: Number(t.index || (page - 1) * 50 + idx + 1),
+            isPaid: Boolean(t.isPaid),
+            isFree: t.isPaid ? Boolean(t.isFree) : true,
+            isAuthorized: !t.isPaid || Boolean(t.isAuthorized),
+          }))
+        }
+
+        post({ type: 'answer', answer: { id, tracks, totalCount, page, maxPage } })
+      } else if (question.ask === 'search') {
+        const kw = encodeURIComponent(question.query || '')
+        const page = Math.max(1, Number(question.page) || 1)
+        const [albRes, trkRes] = await Promise.allSettled([
+          fetchJson(`https://search.ximalaya.com/front/v1?kw=${kw}&core=album&page=${page}&rows=18&device=iPhone`),
+          fetchJson(`https://search.ximalaya.com/front/v1?kw=${kw}&core=track&page=${page}&rows=24&device=iPhone`),
+        ])
+        const albDocs = albRes.status === 'fulfilled' ? albRes.value?.response?.docs || [] : []
+        const trkDocs = trkRes.status === 'fulfilled' ? trkRes.value?.response?.docs || [] : []
+        const albums = albDocs.map((a) => ({
+          id: String(a.id || a.albumId),
+          title: a.title || '有声专辑',
+          artist: a.nickname || a.anchorName || '喜马拉雅主播',
+          artwork: toCoverUrl(a),
+          description: a.intro || a.custom_title || '',
+          episodeCount: Number(a.tracks || 0) || undefined,
+          playCount: formatPlayCount(a.play),
+          category: a.category_title || undefined,
+          completed: a.is_finished === 2 ? true : a.is_finished === 1 ? false : undefined,
+          isPaid: Boolean(a.is_paid),
+          tag: a.is_paid ? 'VIP' : a.category_title || undefined,
+        }))
+        const tracks = trkDocs.map((t) => ({
+          id: String(t.id || t.trackId),
           title: t.title || '声音片段',
           artist: t.nickname || t.anchorName || '喜马拉雅主播',
-          album: t.albumTitle || '',
-          albumId: t.albumId ? String(t.albumId) : undefined,
+          album: t.album_title || t.albumTitle || '',
+          albumId: t.album_id ? String(t.album_id) : undefined,
           artwork: toCoverUrl(t),
-          duration: t.duration || 0,
+          duration: Number(t.duration || 0),
+          playCount: formatPlayCount(t.count_play),
+          isPaid: Boolean(t.is_paid),
         }))
-        post({ type: 'answer', answer: { id, tracks } })
-      } else if (question.ask === 'recommend' || question.ask === 'category') {
-        const category = question.category || 'xiangsheng'
-        let albums = []
-
-        try {
-          const res = await fetch(
-            `https://www.ximalaya.com/revision/category/v2/albums?pageNum=1&pageSize=20&sort=1&category=${encodeURIComponent(category)}`,
-            {
-              credentials: 'include',
-            },
-          )
-          if (res.ok) {
-            const data = await res.json()
-            const list = data?.data?.albums || data?.data?.albumList || []
-            if (list.length > 0) {
-              albums = list.map((a) => ({
-                id: String(a.albumId || a.id),
-                title: a.albumTitle || a.title || '有声专辑',
-                artist: a.anchorName || a.nickname || '喜马拉雅主播',
-                artwork: toCoverUrl(a),
-                description: a.intro || a.description || '',
-              }))
-            }
-          }
-        } catch (e) {
-          console.warn('[ximalaya] category fetch error', e)
-        }
-
-        if (albums.length === 0 && (question.ask === 'recommend' || category === 'featured')) {
-          try {
-            const rankRes = await fetch(
-              `https://www.ximalaya.com/revision/rank/v2/element/rankingList?rankingId=1&pageSize=20`,
-              { credentials: 'include' },
-            )
-            if (rankRes.ok) {
-              const rankData = await rankRes.json()
-              const list = rankData?.data?.albums || []
-              if (list.length > 0) {
-                albums = list.map((a) => ({
-                  id: String(a.albumId || a.id),
-                  title: a.albumTitle || a.title || '热门专辑',
-                  artist: a.anchorName || a.nickname || '喜马拉雅主播',
-                  artwork: toCoverUrl(a),
-                  description: a.intro || '',
-                }))
+        post({ type: 'answer', answer: { id, albums, tracks, page } })
+      } else if (question.ask === 'hotSearch') {
+        const data = await fetchJson('https://search.ximalaya.com/hotWordBillboard/list/2.0?categoryId=-1&size=12')
+        const hotWords = (data?.hotWordResultList || [])
+          .map((item) => item.display_word || item.word)
+          .filter(Boolean)
+        post({ type: 'answer', answer: { id, hotWords } })
+      } else if (question.ask === 'userProfile') {
+        const data = await fetchJson('https://www.ximalaya.com/revision/main/getCurrentUser', {
+          credentials: 'include',
+        })
+        const u = data?.data
+        const user =
+          data?.ret === 200 && u
+            ? {
+                uid: u.uid ? String(u.uid) : undefined,
+                nickname: u.nickname || u.userName || '喜马拉雅用户',
+                avatar: toCoverUrl({ cover: u.logoPic || u.avatar }),
+                isVip: Boolean(u.isVip || u.vipType > 0),
               }
-            }
-          } catch {}
-        }
-
-        post({ type: 'answer', answer: { id, albums } })
-      } else if (question.ask === 'albumTracks') {
-        let tracks = []
-
-        try {
-          const res = await fetch(
-            `https://mobile.ximalaya.com/mobile/v1/album/track/?albumId=${encodeURIComponent(question.albumId)}&device=android&isAsc=true&pageId=1&pageSize=50`,
+            : undefined
+        post({ type: 'answer', answer: { id, user } })
+      } else if (question.ask === 'mySection') {
+        const section = question.section || 'subscribed'
+        const page = Math.max(1, Number(question.page) || 1)
+        if (section === 'subscribed') {
+          let data = await fetchJson(
+            `https://www.ximalaya.com/revision/album/v1/sub/comprehensive?num=${page}&size=30&subType=2&category=all`,
+            { credentials: 'include' },
           )
-          if (res.ok) {
-            const data = await res.json()
-            const list = data?.data?.list || []
-            if (list.length > 0) {
-              tracks = list.map((t, idx) => ({
-                id: String(t.trackId),
-                title: t.title || t.trackName || `第${idx + 1}集`,
-                artist: t.nickname || t.anchorName || '喜马拉雅主播',
-                duration: t.duration || 0,
-                artwork: toCoverUrl(t),
-                albumId: String(question.albumId),
-                url:
-                  t.playPathAacv224 || t.playPathAacv164 || t.playPath64 || t.playPath32 || t.downloadUrl || undefined,
-              }))
-            }
+          if (data?.ret === 401 || data?.isNeedLogin) {
+            post({ type: 'answer', answer: { id, needLogin: true, albums: [], totalCount: 0, page, maxPage: 1 } })
+            return
           }
-        } catch (e) {
-          console.warn('[ximalaya] mobile albumTracks error', e)
-        }
-
-        if (tracks.length === 0) {
-          try {
-            const res = await fetch(
-              `https://www.ximalaya.com/revision/album/v1/getTracksList?albumId=${encodeURIComponent(question.albumId)}&pageNum=1&pageSize=50`,
-              {
-                credentials: 'include',
-              },
-            )
-            if (res.ok) {
-              const data = await res.json()
-              const list = data?.data?.tracks || []
-              tracks = list.map((t, idx) => ({
-                id: String(t.trackId),
-                title: t.title || `第${idx + 1}集`,
-                artist: t.anchorName || '喜马拉雅主播',
-                duration: t.duration || 0,
-                artwork: toCoverUrl(t),
-                albumId: String(question.albumId),
-              }))
-            }
-          } catch (e) {
-            console.warn('[ximalaya] revision albumTracks error', e)
+          let raw = data?.data?.albumResultList || data?.data?.albumsInfo || data?.data?.list || []
+          if (raw.length === 0 && page === 1) {
+            try {
+              const alt = await fetchJson(
+                `https://www.ximalaya.com/revision/my/getSubscriptionSynthesize?pageNum=${page}&pageSize=30`,
+                { credentials: 'include' },
+              )
+              if (alt?.ret === 200) {
+                data = alt
+                raw = alt?.data?.albumsInfo || alt?.data?.albumResultList || alt?.data?.list || []
+              }
+            } catch {}
           }
+          const totalCount = Number(data?.data?.totalCount || data?.data?.total || raw.length)
+          const maxPage = Math.max(1, Math.ceil(totalCount / 30))
+          const albums = raw.map((a) => ({
+            id: String(a.albumId || a.id),
+            title: a.albumTitle || a.title || '订阅专辑',
+            artist: a.anchorName || a.nickname || a.albumUserNickName || '喜马拉雅主播',
+            artwork: toCoverUrl(a),
+            description: a.description || a.intro || '',
+            episodeCount: Number(a.trackCount || a.albumTrackCount || 0) || undefined,
+            playCount: formatPlayCount(a.playCount || a.albumPlayCount),
+            completed: a.isFinished === 2 || a.isFinish === 2 ? true : a.isFinished === 1 || a.isFinish === 1 ? false : undefined,
+            isPaid: Boolean(a.isPaid),
+            tag: a.isPaid ? 'VIP' : undefined,
+          }))
+          post({ type: 'answer', answer: { id, albums, totalCount, page, maxPage } })
+        } else if (section === 'listened') {
+          const data = await fetchJson(
+            'https://www.ximalaya.com/revision/track/history/listen?includeChannel=false&includeRadio=false',
+            { credentials: 'include' },
+          )
+          if (data?.ret === 401 || data?.isNeedLogin) {
+            post({ type: 'answer', answer: { id, needLogin: true, tracks: [], totalCount: 0, page: 1, maxPage: 1 } })
+            return
+          }
+          const payload = data?.data || {}
+          const merged = [
+            ...(Array.isArray(payload.today) ? payload.today : []),
+            ...(Array.isArray(payload.yesterday) ? payload.yesterday : []),
+            ...(Array.isArray(payload.earlier) ? payload.earlier : []),
+          ]
+          const tracks = merged
+            .filter((item) => item && (item.childId || item.trackId))
+            .map((item) => ({
+              id: String(item.childId || item.trackId),
+              title: item.childTitle || item.trackTitle || item.title || '收听记录',
+              artist: item.userName || item.anchorName || '喜马拉雅主播',
+              album: item.itemTitle || item.albumName || undefined,
+              albumId: item.itemId || item.albumId ? String(item.itemId || item.albumId) : undefined,
+              artwork: toCoverUrl(item),
+              duration: Number(item.length || item.duration || 0),
+              playCount: item.startedAtFormatText || undefined,
+            }))
+          post({ type: 'answer', answer: { id, tracks, totalCount: tracks.length, page: 1, maxPage: 1 } })
+        } else if (section === 'like') {
+          const data = await fetchJson(
+            `https://www.ximalaya.com/revision/my/getLikeTracks?pageNum=${page}&pageSize=30`,
+            { credentials: 'include' },
+          )
+          if (data?.ret === 401 || data?.isNeedLogin) {
+            post({ type: 'answer', answer: { id, needLogin: true, tracks: [], totalCount: 0, page, maxPage: 1 } })
+            return
+          }
+          const raw = data?.data?.tracksList || data?.data?.list || []
+          const totalCount = Number(data?.data?.totalCount || raw.length)
+          const maxPage = Math.max(1, Math.ceil(totalCount / 30))
+          const tracks = raw.map((t) => ({
+            id: String(t.trackId || t.id),
+            title: t.title || t.trackName || '喜欢的声音',
+            artist: t.anchorName || t.nickname || '喜马拉雅主播',
+            album: t.albumTitle || t.albumName || undefined,
+            albumId: t.albumId ? String(t.albumId) : undefined,
+            artwork: toCoverUrl(t),
+            duration: Number(t.duration || 0),
+            playCount: formatPlayCount(t.playCount),
+            isPaid: Boolean(t.isPaid),
+          }))
+          post({ type: 'answer', answer: { id, tracks, totalCount, page, maxPage } })
+        } else if (section === 'buy') {
+          const data = await fetchJson(
+            `https://www.ximalaya.com/revision/my/getHasBroughtAlbums?pageNum=${page}&pageSize=30`,
+            { credentials: 'include' },
+          )
+          if (data?.ret === 401 || data?.isNeedLogin) {
+            post({ type: 'answer', answer: { id, needLogin: true, albums: [], totalCount: 0, page, maxPage: 1 } })
+            return
+          }
+          const raw = data?.data?.albumList || data?.data?.list || []
+          const totalCount = Number(data?.data?.totalCount || raw.length)
+          const maxPage = Math.max(1, Math.ceil(totalCount / 30))
+          const albums = raw.map((a) => ({
+            id: String(a.albumId || a.id),
+            title: a.albumTitle || a.title || '已购专辑',
+            artist: a.anchorName || a.nickname || '喜马拉雅主播',
+            artwork: toCoverUrl(a),
+            description: a.intro || a.description || '',
+            episodeCount: Number(a.trackCount || a.albumTrackCount || 0) || undefined,
+            playCount: formatPlayCount(a.playCount),
+            completed: a.isFinish === 2 || a.isFinished === 2 ? true : a.isFinish === 1 || a.isFinished === 1 ? false : undefined,
+            isPaid: true,
+            tag: '已购',
+          }))
+          post({ type: 'answer', answer: { id, albums, totalCount, page, maxPage } })
         }
-
-        post({ type: 'answer', answer: { id, tracks } })
       }
     } catch (err) {
-      post({ type: 'answer', answer: { id, failed: true, error: String(err) } })
+      post({ type: 'answer', answer: { id, failed: true, error: String(err?.message || err) } })
     }
   }
 

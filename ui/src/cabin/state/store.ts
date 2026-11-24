@@ -783,9 +783,11 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
       case 'ximalaya':
         receiveXimalayaState(message.signedIn, message.playing, message.signingIn)
         break
-      case 'ximalayaAnswer':
-        receiveXimalayaAnswer(message.id, message.failed, message.error, message.tracks, message.albums, message.radio)
+      case 'ximalayaAnswer': {
+        const { type: _, id, ...answer } = message
+        receiveXimalayaAnswer(id, answer)
         break
+      }
       case 'ximalayaPlayback':
         receiveXimalayaPlayback(message.playback)
         break

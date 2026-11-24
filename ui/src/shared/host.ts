@@ -733,10 +733,17 @@ export type XimalayaCommand =
   | { action: 'ask'; id: number; question: XimalayaQuestion }
 
 export type XimalayaQuestion =
-  | { ask: 'search'; query: string }
+  | { ask: 'search'; query: string; page?: number }
+  | { ask: 'home' }
+  | { ask: 'categories' }
   | { ask: 'recommend' }
-  | { ask: 'category'; category: string }
-  | { ask: 'albumTracks'; albumId: string }
+  | { ask: 'category'; categoryId?: number; category?: string; sort?: number; page?: number }
+  | { ask: 'rank'; cluster: string; categoryCode?: string; page?: number }
+  | { ask: 'albumDetail'; albumId: string }
+  | { ask: 'albumTracks'; albumId: string; page?: number; asc?: boolean }
+  | { ask: 'hotSearch' }
+  | { ask: 'userProfile' }
+  | { ask: 'mySection'; section: 'subscribed' | 'listened' | 'like' | 'buy'; page?: number }
   | { ask: 'radioHome' }
   | { ask: 'radioList'; locationId: number; locationTypeId: number; categoryId: number; pageNum: number }
   | { ask: 'radioDetail'; radioId: number }
@@ -747,9 +754,15 @@ export interface XimalayaTrack {
   title: string
   artist: string
   album?: string
+  albumId?: string
   artwork?: string
   duration?: number
   url?: string
+  episodeNumber?: number
+  playCount?: string
+  isPaid?: boolean
+  isFree?: boolean
+  isAuthorized?: boolean
   radio?: boolean
   radioId?: number
 }
@@ -760,6 +773,27 @@ export interface XimalayaAlbum {
   artist: string
   artwork?: string
   description?: string
+  episodeCount?: number
+  playCount?: string
+  tag?: string
+  category?: string
+  completed?: boolean
+  isPaid?: boolean
+  vipType?: number
+}
+
+export interface XimalayaCategory {
+  id: number
+  name: string
+  code: string
+  group?: string
+}
+
+export interface XimalayaUser {
+  uid?: string
+  nickname: string
+  avatar?: string
+  isVip?: boolean
 }
 
 export interface XimalayaPlayback {
@@ -770,6 +804,9 @@ export interface XimalayaPlayback {
   position: number
   status: string
   owner?: 'ximalaya' | 'radio'
+  trackId?: string
+  albumId?: string
+  isSample?: boolean
   radioId?: number
   isLive?: boolean
   requestId?: number
@@ -777,8 +814,19 @@ export interface XimalayaPlayback {
 }
 
 export interface XimalayaAnswers {
+  failed?: boolean
+  error?: string
   tracks?: XimalayaTrack[]
   albums?: XimalayaAlbum[]
+  album?: XimalayaAlbum
+  riseAlbums?: XimalayaAlbum[]
+  categories?: XimalayaCategory[]
+  hotWords?: string[]
+  user?: XimalayaUser
+  totalCount?: number
+  page?: number
+  maxPage?: number
+  needLogin?: boolean
   radio?: { kind: string; data: unknown }
 }
 

@@ -1,32 +1,98 @@
-/**
- * Specialized SVG glyphs for Ximalaya Automotive Infotainment.
- * Designed with truck dashboard ergonomics (high contrast, clean lines).
- */
+import type { ReactNode } from 'react'
 
-export function Rewind15Glyph() {
+interface GlyphProps {
+  size?: number
+  on?: boolean
+}
+
+function Line({ size = 24, children }: { size?: number; children: ReactNode }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="22"
-      height="22"
+      width={size}
+      height={size}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.9"
+      strokeWidth={2.1}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M11 4.5A8 8 0 1 0 19.5 12" />
-      <polyline points="11 1 11 5 15 5" />
+      {children}
+    </svg>
+  )
+}
+
+export function DiscoverGlyph({ size = 24, on }: GlyphProps) {
+  return (
+    <Line size={size}>
+      <circle cx="12" cy="12" r="9" fill={on ? 'currentColor' : 'none'} fillOpacity={on ? 0.18 : 0} />
+      <polygon
+        points="15.8 8.2 13.6 13.6 8.2 15.8 10.4 10.4 15.8 8.2"
+        fill={on ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={1.8}
+      />
+    </Line>
+  )
+}
+
+export function CategoryGlyph({ size = 24, on }: GlyphProps) {
+  return (
+    <Line size={size}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="2" fill={on ? 'currentColor' : 'none'} />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="2" fill={on ? 'currentColor' : 'none'} />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="2" fill={on ? 'currentColor' : 'none'} />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="2" fill={on ? 'currentColor' : 'none'} />
+    </Line>
+  )
+}
+
+export function ChartGlyph({ size = 24, on }: GlyphProps) {
+  return (
+    <Line size={size}>
+      <rect x="3.5" y="11" width="4.5" height="9.5" rx="1.4" fill={on ? 'currentColor' : 'none'} />
+      <rect x="9.75" y="4.5" width="4.5" height="16" rx="1.4" fill={on ? 'currentColor' : 'none'} />
+      <rect x="16" y="8" width="4.5" height="12.5" rx="1.4" fill={on ? 'currentColor' : 'none'} />
+    </Line>
+  )
+}
+
+export function AudioBookGlyph({ size = 36 }: GlyphProps) {
+  return (
+    <Line size={size}>
+      <path d="M4.5 14v-1a7.5 7.5 0 0 1 15 0v1" />
+      <rect x="3.5" y="13.5" width="3.8" height="6.5" rx="1.8" />
+      <rect x="16.7" y="13.5" width="3.8" height="6.5" rx="1.8" />
+      <path d="M10 13.5v4M14 11.5v6" />
+    </Line>
+  )
+}
+
+export function Rewind15Glyph({ size = 32 }: GlyphProps) {
+  return (
+    <svg
+      viewBox="0 0 28 28"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.1}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M7.5 8.5A9 9 0 1 1 5.2 16" />
+      <polyline points="7.5 4.2 7.5 8.8 12.1 8.8" />
       <text
-        x="11.5"
-        y="15.2"
-        fontSize="7.5"
-        fontWeight="700"
+        x="14"
+        y="17.8"
+        textAnchor="middle"
+        fontSize="8.8"
+        fontWeight="750"
         fill="currentColor"
         stroke="none"
-        textAnchor="middle"
-        dominantBaseline="middle"
+        fontFamily="system-ui, -apple-system, sans-serif"
       >
         15
       </text>
@@ -34,30 +100,30 @@ export function Rewind15Glyph() {
   )
 }
 
-export function Forward30Glyph() {
+export function Forward30Glyph({ size = 32 }: GlyphProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
-      width="22"
-      height="22"
+      viewBox="0 0 28 28"
+      width={size}
+      height={size}
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.9"
+      strokeWidth={2.1}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M13 4.5A8 8 0 1 1 4.5 12" />
-      <polyline points="13 1 13 5 9 5" />
+      <path d="M20.5 8.5A9 9 0 1 0 22.8 16" />
+      <polyline points="20.5 4.2 20.5 8.8 15.9 8.8" />
       <text
-        x="12.5"
-        y="15.2"
-        fontSize="7.5"
-        fontWeight="700"
+        x="14"
+        y="17.8"
+        textAnchor="middle"
+        fontSize="8.8"
+        fontWeight="750"
         fill="currentColor"
         stroke="none"
-        textAnchor="middle"
-        dominantBaseline="middle"
+        fontFamily="system-ui, -apple-system, sans-serif"
       >
         30
       </text>
@@ -65,147 +131,85 @@ export function Forward30Glyph() {
   )
 }
 
-export function SpeedGlyph() {
+export function SpeedGlyph({ size = 22 }: GlyphProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 4a9 9 0 0 0-9 9c0 2.8 1.3 5.3 3.3 6.9" />
-      <path d="M21 13a9 9 0 0 0-3.3-6.9" />
-      <line x1="12" y1="13" x2="16" y2="9" />
-      <circle cx="12" cy="13" r="2" fill="currentColor" />
+    <Line size={size}>
+      <path d="M4 16a8 8 0 1 1 16 0" />
+      <path d="M12 16l4-5" />
+      <circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none" />
+    </Line>
+  )
+}
+
+export function TimerGlyph({ size = 22 }: GlyphProps) {
+  return (
+    <Line size={size}>
+      <circle cx="12" cy="13" r="7.5" />
+      <path d="M12 9.2V13l2.6 1.8" />
+      <path d="M9.5 3h5" />
+    </Line>
+  )
+}
+
+export function SortGlyph({ size = 20 }: GlyphProps) {
+  return (
+    <Line size={size}>
+      <path d="M7 5v14M7 19l-3-3M7 19l3-3" />
+      <path d="M17 19V5M17 5l-3 3M17 5l3 3" />
+    </Line>
+  )
+}
+
+export function FlameGlyph({ size = 16 }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true">
+      <path d="M12.7 2.4c.2 3.3-2 5.4-3.7 7.1-1.3 1.3-2.5 2.7-2.5 4.9A5.5 5.5 0 0 0 12 20a5.5 5.5 0 0 0 5.5-5.6c0-2.6-1.4-4.7-2.9-6.6-.4-.5-1.1-.1-1 .6.2 1.2-.2 2.4-1.1 3.1.4-2.2 1.8-5.1.2-9.1z" />
     </svg>
   )
 }
 
-export function TimerGlyph() {
+export function HeadphonesGlyph({ size = 16 }: GlyphProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="13" r="8" />
-      <polyline points="12 9 12 13 15 15" />
-      <line x1="10" y1="2" x2="14" y2="2" />
+    <Line size={size}>
+      <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+      <rect x="3" y="14" width="3.6" height="6" rx="1.6" />
+      <rect x="17.4" y="14" width="3.6" height="6" rx="1.6" />
+    </Line>
+  )
+}
+
+export function CrownGlyph({ size = 16 }: GlyphProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true">
+      <path d="M3.5 18.5h17l1-10.5-5.3 4-4.2-6.5L7.8 12l-5.3-4 1 10.5z" />
     </svg>
   )
 }
 
-export function PlaylistGlyph() {
+export function QrCodeGlyph({ size = 24 }: GlyphProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="14" y2="12" />
-      <line x1="4" y1="18" x2="11" y2="18" />
-      <polygon points="17 12 21 14.5 17 17 17 12" fill="currentColor" />
-    </svg>
+    <Line size={size}>
+      <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1" />
+      <rect x="14" y="3.5" width="6.5" height="6.5" rx="1" />
+      <rect x="3.5" y="14" width="6.5" height="6.5" rx="1" />
+      <path d="M14 14h2.5v2.5H14zM18 14h2.5M14 18.5h2.5M18 18v2.5h2.5" />
+    </Line>
   )
 }
 
-export function StarGlyph({ filled = false }: { filled?: boolean }) {
+export function SignOutGlyph({ size = 20 }: GlyphProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill={filled ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
+    <Line size={size}>
+      <path d="M10 4.5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h4" />
+      <path d="M15 8l4 4-4 4M19 12H9.5" />
+    </Line>
   )
 }
 
-export function VolumeGlyph({ muted = false }: { muted?: boolean }) {
-  if (muted) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        width="20"
-        height="20"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-        <line x1="23" y1="9" x2="17" y2="15" />
-        <line x1="17" y1="9" x2="23" y2="15" />
-      </svg>
-    )
-  }
+export function TrashGlyph({ size = 18 }: GlyphProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
-      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-    </svg>
-  )
-}
-
-export function HeadphoneGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V10a9 9 0 0 1 18 0v9a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3" />
-    </svg>
-  )
-}
-
-export function FireGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-      <path d="M12 23c4.97 0 9-4.03 9-9 0-4.08-2.73-7.53-6.5-8.62-.23-.07-.46.12-.42.36.4 2.21-.49 4.38-2.25 5.61C10.59 12.22 9.5 13.78 9.5 15.5c0 .28.22.5.5.5s.5-.22.5-.5c0-1.12.63-2.14 1.63-2.65.25-.13.56.03.58.31.25 3.19-2.09 5.84-5.21 5.84-1.28 0-2.47-.45-3.41-1.2-.23-.18-.57-.02-.57.27C3.52 19.92 7.37 23 12 23z" />
-    </svg>
+    <Line size={size}>
+      <path d="M4.5 7h15M9.5 7V4.5h5V7M7 7l1 12.5h8L17 7" />
+    </Line>
   )
 }

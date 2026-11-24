@@ -1,133 +1,236 @@
-import { backToBrowse, play, playAlbum, toggleFavorite, useXimalaya, type ExtendedXimalayaAlbum } from './ximalaya'
+import { useLanguage } from '../../state/text'
+import { PauseGlyph, PlayGlyph, StarGlyph } from '../music/glyphs'
 import { CoverImage } from './CoverImage'
-import { FireGlyph, HeadphoneGlyph, StarGlyph } from './glyphs'
+import { AudioBookGlyph, CrownGlyph, HeadphonesGlyph, SortGlyph } from './glyphs'
+import { XmBars } from './NowPlaying'
+import {
+  loadAlbumPage,
+  play,
+  playAlbum,
+  playOrPause,
+  toggleAlbumOrder,
+  toggleFavorite,
+  useXimalaya,
+  type ExtendedXimalayaAlbum,
+} from './ximalaya'
 
-function formatSeconds(secs: number): string {
-  if (!Number.isFinite(secs) || secs < 0) return '0:00'
-  const m = Math.floor(secs / 60)
+function formatDuration(secs?: number): string {
+  if (!secs || !Number.isFinite(secs) || secs <= 0) return ''
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
   const s = Math.floor(secs % 60)
+  if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
 export function AlbumDetailView({ album }: { album: ExtendedXimalayaAlbum }) {
+  const chinese = useLanguage().startsWith('zh')
+  const t = (zh: string, en: string) => (chinese ? zh : en)
+
   const albumTracks = useXimalaya((s) => s.albumTracks)
-  const loading = useXimalaya((s) => s.loading)
+  const albumPage = useXimalaya((s) => s.albumPage)
+  const albumMaxPage = useXimalaya((s) => s.albumMaxPage)
+  const albumTotalTracks = useXimalaya((s) => s.albumTotalTracks)
+  const albumAsc = useXimalaya((s) => s.albumAsc)
+  const loading = useXimalaya((s) => s.albumLoading)
+  const error = useXimalaya((s) => s.albumError)
   const playback = useXimalaya((s) => s.playback)
-  const playing = useXimalaya((s) => s.playing)
+  const playing = useXimalaya((s) => Boolean(s.playing))
   const favorites = useXimalaya((s) => s.favorites)
+  const progress = useXimalaya((s) => s.progressMap[album.id] ?? null)
 
   const isFavorited = favorites.some((f) => f.id === album.id)
+  const vod = playback && playback.owner !== 'radio' ? playback : null
+  const isAlbumActive = Boolean(vod && vod.albumId === album.id)
+  const totalCount = albumTotalTracks || album.episodeCount || albumTracks.length
+  const pageCount = Math.min(albumMaxPage, 20)
+
+  const handlePrimaryPlay = () => {
+    if (isAlbumActive) {
+      playOrPause()
+      return
+    }
+    if (progress) {
+      const idx = albumTracks.findIndex((tr) => tr.id === progress.trackId)
+      if (idx >= 0) {
+        play(albumTracks[idx], albumTracks, progress.position)
+        return
+      }
+    }
+    void playAlbum(album, 0)
+  }
 
   return (
-    <div className="xima-detail-view" aria-label={`专辑详情：${album.title}`}>
-      {/* Top Navigation */}
-      <div className="xima-detail-nav">
-        <button type="button" className="xima-back-btn" onClick={backToBrowse} aria-label="返回专辑列表">
-          ‹ 返回浏览
-        </button>
-        <span className="xima-detail-category-badge">{album.category || '喜马拉雅有声精选'}</span>
-      </div>
-
-      {/* Album Hero Info Card */}
-      <section className="xima-detail-hero">
-        <div className="xima-detail-cover">
-          <CoverImage src={album.artwork} alt={album.title} fallback="🎙️" />
-          <span className="xima-cover-badge">{album.tag || '独家精品'}</span>
+    <div className="xm-detail" aria-label={`${t('专辑详情', 'Album')}: ${album.title}`}>
+      <section className="xm-collection-head">
+        <div className="xm-collection-cover">
+          <CoverImage src={album.artwork} alt={album.title} fallback={<AudioBookGlyph size={64} />} />
         </div>
 
-        <div className="xima-detail-meta">
-          <div className="xima-detail-title-row">
-            <h1 className="xima-detail-title">{album.title}</h1>
-          </div>
-
-          <div className="xima-detail-author-row">
-            <span className="xima-detail-author">🎙️ {album.artist}</span>
+        <div className="xm-collection-text">
+          <div className="xm-eyebrow-row">
+            {album.category && <span className="xm-eyebrow">{album.category}</span>}
+            {album.isPaid && (
+              <span className="xm-pill-tag vip">
+                <CrownGlyph size={13} />
+                VIP
+              </span>
+            )}
             {album.completed !== undefined && (
-              <span className={`xima-status-pill ${album.completed ? 'completed' : 'ongoing'}`}>
-                {album.completed ? '已完结' : '连载中'}
+              <span className={`xm-pill-tag${album.completed ? ' done' : ''}`}>
+                {album.completed ? t('已完结', 'Completed') : t('连载中', 'Ongoing')}
               </span>
             )}
           </div>
 
-          <div className="xima-detail-stats">
+          <h1>{album.title}</h1>
+          <p className="xm-collection-artist">{album.artist}</p>
+
+          <div className="xm-collection-stats">
             {album.playCount && (
-              <span className="xima-stat-item">
-                <FireGlyph /> {album.playCount} 次播放
+              <span>
+                <HeadphonesGlyph size={16} />
+                {album.playCount}
               </span>
             )}
-            <span className="xima-stat-item">
-              <HeadphoneGlyph /> 共 {album.episodeCount || albumTracks.length || 60} 集
-            </span>
+            {totalCount > 0 && <span>{t(`共 ${totalCount} 集`, `${totalCount} episodes`)}</span>}
+            {progress && (
+              <span className="xm-resume-hint">
+                {t(
+                  `上次听到第 ${progress.episodeNumber ?? 1} 集`,
+                  `Last played Ep. ${progress.episodeNumber ?? 1}`,
+                )}
+              </span>
+            )}
           </div>
 
-          {album.description && <p className="xima-detail-desc">{album.description}</p>}
+          {album.description && <p className="xm-collection-desc">{album.description}</p>}
 
-          <div className="xima-detail-actions">
-            <button type="button" className="xima-btn-primary" onClick={() => playAlbum(album, 0)}>
-              ▶ 立即播放全部
+          <div className="xm-actions">
+            <button type="button" className="xm-pill key" onClick={handlePrimaryPlay}>
+              {isAlbumActive && playing ? <PauseGlyph size={24} /> : <PlayGlyph size={24} />}
+              <span>
+                {isAlbumActive && playing
+                  ? t('暂停播放', 'Pause')
+                  : progress
+                    ? t(`继续收听 · 第${progress.episodeNumber ?? 1}集`, `Resume Ep. ${progress.episodeNumber ?? 1}`)
+                    : t('立即播放', 'Play All')}
+              </span>
             </button>
             <button
               type="button"
-              className={`xima-btn-secondary ${isFavorited ? 'favorited' : ''}`}
+              className={`xm-pill${isFavorited ? ' active' : ''}`}
+              aria-pressed={isFavorited}
               onClick={() => toggleFavorite(album)}
             >
-              <StarGlyph filled={isFavorited} />
-              <span>{isFavorited ? '已收藏' : '收藏专辑'}</span>
+              <StarGlyph size={22} on={isFavorited} />
+              <span>{isFavorited ? t('已收藏', 'Favorited') : t('收藏专辑', 'Favorite')}</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* Episode / Tracks List */}
-      <section className="xima-detail-tracks-section">
-        <div className="xima-tracks-header">
-          <h2 className="xima-tracks-title">章节节目单 ({albumTracks.length}集)</h2>
-          <span className="xima-tracks-sub">点击即可立即播放并连续畅听</span>
+      <section className="xm-episodes-section" aria-label={t('剧集列表', 'Episodes')}>
+        <div className="xm-episodes-head">
+          <div className="xm-episodes-title-group">
+            <h2>{t('选集列表', 'Episodes')}</h2>
+            {totalCount > 0 && <span className="xm-count">{t(`${totalCount} 集`, `${totalCount}`)}</span>}
+          </div>
+
+          <button
+            type="button"
+            className="xm-order-btn"
+            onClick={toggleAlbumOrder}
+            aria-label={albumAsc ? t('切换为倒序', 'Sort newest first') : t('切换为正序', 'Sort oldest first')}
+          >
+            <SortGlyph size={18} />
+            <span>{albumAsc ? t('正序', 'Oldest') : t('倒序', 'Newest')}</span>
+          </button>
         </div>
 
-        {loading ? (
-          <div className="xima-loading-box">
-            <span className="xima-spinner" />
-            <span>正在加载剧集列表...</span>
+        {pageCount > 1 && (
+          <div className="xm-range-strip xm-fade-scroller" role="group" aria-label={t('选集分段', 'Episode ranges')}>
+            {Array.from({ length: pageCount }, (_, i) => {
+              const p = i + 1
+              const start = (p - 1) * 50 + 1
+              const end = totalCount > 0 ? Math.min(totalCount, p * 50) : p * 50
+              const active = p === albumPage
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  className={`xm-chip${active ? ' active' : ''}`}
+                  aria-pressed={active}
+                  onClick={(e) => {
+                    e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+                    loadAlbumPage(p)
+                  }}
+                >
+                  {start}–{end}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {error && (
+          <div className="xm-feedback" role="alert">
+            <span>
+              {t('剧集加载失败', 'Failed to load episodes')}: {error}
+            </span>
+            <button type="button" className="xm-pill" onClick={() => loadAlbumPage(albumPage)}>
+              {t('重试', 'Retry')}
+            </button>
+          </div>
+        )}
+
+        {loading && albumTracks.length === 0 ? (
+          <div className="xm-list-skeleton" aria-busy="true">
+            {Array.from({ length: 6 }, (_, idx) => (
+              <div key={idx} className="xm-row-skel" aria-hidden="true" />
+            ))}
           </div>
         ) : albumTracks.length === 0 ? (
-          <div className="xima-empty-tracks">暂无剧集数据</div>
+          <div className="xm-empty">
+            <AudioBookGlyph size={44} />
+            <p>{t('暂无剧集数据', 'No episodes available')}</p>
+          </div>
         ) : (
-          <div className="xima-episodes-list">
+          <div className={`xm-episode-list${loading ? ' refreshing' : ''}`}>
             {albumTracks.map((track, idx) => {
-              const isCurrent = playback?.title === track.title
+              const isCurrent = Boolean(vod && (vod.trackId ? vod.trackId === track.id : vod.title === track.title))
+              const num = track.episodeNumber ?? (albumPage - 1) * 50 + idx + 1
+              const dur = formatDuration(track.duration)
+              const locked = Boolean(track.isPaid && track.isFree === false && track.isAuthorized === false)
               return (
-                <div
+                <button
                   key={`${track.id}-${idx}`}
-                  className={`xima-episode-row ${isCurrent ? 'active' : ''}`}
-                  onClick={() => play(track, albumTracks)}
-                  role="button"
-                  tabIndex={0}
+                  type="button"
+                  className={`xm-episode-row${isCurrent ? ' active' : ''}`}
+                  onClick={() =>
+                    isCurrent
+                      ? playOrPause()
+                      : play(track, albumTracks, progress?.trackId === track.id ? progress.position : 0)
+                  }
                 >
-                  <div className="xima-ep-num">
-                    {isCurrent ? (
-                      <div className="xima-wave-icon">
-                        <span className={`bar b1 ${playing ? 'anim' : ''}`} />
-                        <span className={`bar b2 ${playing ? 'anim' : ''}`} />
-                        <span className={`bar b3 ${playing ? 'anim' : ''}`} />
-                      </div>
-                    ) : (
-                      <span>{(track.episodeNumber || idx + 1).toString().padStart(2, '0')}</span>
-                    )}
-                  </div>
+                  <span className="xm-ep-index">
+                    {isCurrent ? <XmBars playing={playing} /> : String(num).padStart(2, '0')}
+                  </span>
 
-                  <div className="xima-ep-content">
-                    <span className="xima-ep-title">{track.title}</span>
-                    <span className="xima-ep-author">{track.artist}</span>
-                  </div>
+                  <span className="xm-ep-body">
+                    <span className="xm-ep-title">{track.title}</span>
+                    <span className="xm-ep-meta">
+                      {dur && <span>{dur}</span>}
+                      {track.playCount && <span>· {track.playCount}</span>}
+                      {locked && <em className="xm-ep-badge vip">VIP</em>}
+                      {track.isPaid && track.isFree && <em className="xm-ep-badge free">{t('试听', 'Sample')}</em>}
+                    </span>
+                  </span>
 
-                  <div className="xima-ep-meta">
-                    <span className="xima-ep-duration">{formatSeconds(track.duration || 1800)}</span>
-                    <button type="button" className="xima-ep-play-btn" aria-label="播放此章节">
-                      {isCurrent && playing ? '⏸' : '▶'}
-                    </button>
-                  </div>
-                </div>
+                  <span className="xm-ep-action" aria-hidden="true">
+                    {isCurrent && playing ? <PauseGlyph size={24} /> : <PlayGlyph size={24} />}
+                  </span>
+                </button>
               )
             })}
           </div>

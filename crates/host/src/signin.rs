@@ -87,7 +87,7 @@ pub const XIMALAYA: Site = Site {
     home: "https://www.ximalaya.com/",
     not_yet: Some("login"),
     page_says: Some(include_str!("ximalaya_sign_in.js")),
-    cookie: Some("1&_token"),
+    cookie: None,
 };
 
 /// Douyin's sign-in with desktop QR code/SMS.
@@ -417,8 +417,13 @@ impl SignInWindow {
                         cookie.Name(&mut named)?;
                         let name_str = webview2_com::take_pwstr(named);
                         if name_str == wanted || name_str.starts_with(&wanted) {
-                            seen.set(true);
-                            break;
+                            let mut valued = PWSTR::null();
+                            cookie.Value(&mut valued)?;
+                            let val_str = webview2_com::take_pwstr(valued);
+                            if !val_str.is_empty() {
+                                seen.set(true);
+                                break;
+                            }
                         }
                     }
                 }

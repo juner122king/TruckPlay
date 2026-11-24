@@ -93,17 +93,19 @@ function harness(native = false) {
     westplayXimalayaCommand: undefined as unknown,
   }
   window.top = window
-  const fetch = vi.fn(
-    (url: string, options?: { signal?: AbortSignal }) =>
-      new Promise((resolve, reject) =>
-        requests.push({
-          url,
-          signal: options?.signal,
-          resolve: (data) => resolve({ ok: true, json: async () => ({ ret: 0, data }) }),
-          reject,
-        }),
-      ),
-  )
+  const fetch = vi.fn((url: string, options?: { signal?: AbortSignal }) => {
+    if (url.includes('/revision/main/getCurrentUser')) {
+      return Promise.resolve({ ok: true, json: async () => ({ ret: 401, isNeedLogin: true }) })
+    }
+    return new Promise((resolve, reject) =>
+      requests.push({
+        url,
+        signal: options?.signal,
+        resolve: (data) => resolve({ ok: true, json: async () => ({ ret: 0, data }) }),
+        reject,
+      }),
+    )
+  })
   const location = { hostname: 'www.ximalaya.com' }
   const document = {
     cookie: '',

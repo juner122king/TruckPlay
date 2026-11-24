@@ -18,9 +18,19 @@ describe('domestic edition integration', () => {
 
   it('keeps the released domestic apps, freight and existing retained players, while hiding deferred ones', () => {
     expect(RELEASED_APP_IDS).toEqual(
-      expect.arrayContaining(['netease', 'bilibili', 'radio', 'freight', 'safari', 'music', 'youtube', 'player']),
+      expect.arrayContaining([
+        'netease',
+        'bilibili',
+        'ximalaya',
+        'radio',
+        'freight',
+        'safari',
+        'music',
+        'youtube',
+        'player',
+      ]),
     )
-    expect(RELEASED_APP_IDS).not.toContain('ximalaya')
+    expect(RELEASED_APP_IDS).toContain('ximalaya')
     expect(RELEASED_APP_IDS).not.toContain('douyin')
     expect(RELEASED_APP_IDS).not.toContain('hongguo')
     expect(isAppId('ximalaya')).toBe(true)

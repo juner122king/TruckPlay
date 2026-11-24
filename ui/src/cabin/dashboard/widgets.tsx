@@ -18,6 +18,7 @@ import {
   useXimalaya,
   useXimalayaSource,
 } from '../apps/ximalaya/ximalaya'
+import { setRadioNowPlaying } from '../apps/radio/radio'
 import { playOrPause as playOrPauseDouyin, skip as skipDouyin, useDouyin, useDouyinSource } from '../apps/douyin/douyin'
 import {
   playOrPause as playOrPauseNetease,
@@ -82,15 +83,20 @@ function AppleMusicWidget({ appleMusic }: { appleMusic: NonNullable<ReturnType<t
   )
 }
 
-/** Ximalaya audio: what plays, its controls, opening Ximalaya on Now Playing. */
+/** Ximalaya audio: what plays, its controls, opening Ximalaya or Radio on Now Playing. */
 function XimalayaWidget({ ximalaya }: { ximalaya: NonNullable<ReturnType<typeof useXimalayaSource>> }) {
   return (
     <MusicWidget
       source={ximalaya.source}
       artwork={ximalaya.artwork}
       onOpen={() => {
-        useXimalaya.setState({ nowPlaying: true })
-        go({ type: 'openApp', app: ximalaya.radio || !isReleasedApp('ximalaya') ? 'radio' : 'ximalaya' })
+        if (ximalaya.radio || !isReleasedApp('ximalaya')) {
+          setRadioNowPlaying(true)
+          go({ type: 'openApp', app: 'radio' })
+        } else {
+          useXimalaya.setState({ nowPlaying: true })
+          go({ type: 'openApp', app: 'ximalaya' })
+        }
       }}
       onControl={(action) => {
         if (action === 'playPause') playOrPauseXimalaya()

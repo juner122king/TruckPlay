@@ -46,17 +46,55 @@ pub enum Command {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "ask", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Question {
-    Search { query: String },
+    Search {
+        query: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<u32>,
+    },
+    Home,
+    Categories,
     Recommend,
-    Category { category: String },
-    AlbumTracks { album_id: String },
+    Category {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category_id: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sort: Option<u8>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<u32>,
+    },
+    Rank {
+        cluster: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category_code: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<u32>,
+    },
+    AlbumDetail {
+        album_id: String,
+    },
+    AlbumTracks {
+        album_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        asc: Option<bool>,
+    },
+    HotSearch,
+    UserProfile,
+    MySection {
+        section: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<u32>,
+    },
     RadioHome,
     RadioList { location_id: u32, location_type_id: u8, category_id: u32, page_num: u32 },
     RadioDetail { radio_id: u32 },
     RadioSchedule { radio_id: u32 },
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Track {
     pub id: String,
@@ -65,11 +103,23 @@ pub struct Track {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub album: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artwork: Option<String>,
     #[serde(default)]
     pub duration: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub episode_number: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub play_count: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_paid: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_free: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_authorized: Option<bool>,
     #[serde(default)]
     pub radio: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -86,6 +136,42 @@ pub struct Album {
     pub artwork: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub episode_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub play_count: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_paid: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vip_type: Option<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryInfo {
+    pub id: u32,
+    pub name: String,
+    pub code: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    pub nickname: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_vip: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -100,6 +186,12 @@ pub struct Playback {
     pub status: String,
     #[serde(default)]
     pub owner: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_sample: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radio_id: Option<u32>,
     #[serde(default)]
@@ -129,6 +221,24 @@ pub struct Answer {
     pub tracks: Option<Vec<Track>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub albums: Option<Vec<Album>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album: Option<Album>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rise_albums: Option<Vec<Album>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub categories: Option<Vec<CategoryInfo>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hot_words: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<UserInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_page: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub need_login: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub radio: Option<serde_json::Value>,
 }
@@ -333,16 +443,12 @@ pub fn playback_message(playback: Option<&Playback>) -> String {
 }
 
 pub fn answer_message(answer: &Answer) -> String {
-    serde_json::json!({
-        "type": "ximalayaAnswer",
-        "id": answer.id,
-        "failed": answer.failed,
-        "error": answer.error,
-        "tracks": answer.tracks,
-        "albums": answer.albums,
-        "radio": answer.radio,
-    })
-    .to_string()
+    let mut map = match serde_json::to_value(answer) {
+        Ok(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    map.insert("type".to_string(), serde_json::Value::String("ximalayaAnswer".to_string()));
+    serde_json::Value::Object(map).to_string()
 }
 
 #[cfg(test)]
@@ -356,12 +462,9 @@ mod tests {
                 id: "radio-1011".into(),
                 title: "Music".into(),
                 artist: "Station".into(),
-                album: None,
-                artwork: None,
-                duration: 0.0,
-                url: None,
                 radio: true,
                 radio_id: Some(1011),
+                ..Default::default()
             }),
             request_id: Some(42),
         };
@@ -413,12 +516,9 @@ mod tests {
                     id: format!("radio-{id}"),
                     title: "Live probe".into(),
                     artist: "Radio".into(),
-                    album: None,
-                    artwork: None,
-                    duration: 0.0,
-                    url: None,
                     radio: true,
                     radio_id: Some(id),
+                    ..Default::default()
                 }),
             });
             assert!(wait(&player, 45, |report| matches!(report, Report::Playback(Some(p)) if p.request_id == Some(request) && p.status == "playing" && p.radio_id == Some(id))), "station {id} did not start: {}", player.view.evaluate("({url: location.href, ready: document.readyState, audio: [...document.querySelectorAll('audio')].map(a=>({src:a.currentSrc, paused:a.paused, state:a.readyState,error:a.error?.message}))})").unwrap());
@@ -442,5 +542,46 @@ mod tests {
         assert_eq!(old.owner, "");
         assert!(!old.is_live);
         assert_eq!(old.radio_id, None);
+    }
+
+    #[test]
+    fn new_ximalaya_questions_serialize_camel_case() {
+        let cat = serde_json::to_value(Question::Category {
+            category_id: Some(12),
+            category: None,
+            sort: Some(1),
+            page: Some(2),
+        })
+        .unwrap();
+        assert_eq!(cat, serde_json::json!({ "ask": "category", "categoryId": 12, "sort": 1, "page": 2 }));
+
+        let tracks = serde_json::to_value(Question::AlbumTracks {
+            album_id: "70299661".into(),
+            page: Some(3),
+            asc: Some(false),
+        })
+        .unwrap();
+        assert_eq!(
+            tracks,
+            serde_json::json!({ "ask": "albumTracks", "albumId": "70299661", "page": 3, "asc": false })
+        );
+
+        let rank = serde_json::to_value(Question::Rank {
+            cluster: "rise".into(),
+            category_code: Some("xiangsheng".into()),
+            page: Some(1),
+        })
+        .unwrap();
+        assert_eq!(
+            rank,
+            serde_json::json!({ "ask": "rank", "cluster": "rise", "categoryCode": "xiangsheng", "page": 1 })
+        );
+
+        let my_sec = serde_json::to_value(Question::MySection {
+            section: "subscribed".into(),
+            page: Some(2),
+        })
+        .unwrap();
+        assert_eq!(my_sec, serde_json::json!({ "ask": "mySection", "section": "subscribed", "page": 2 }));
     }
 }

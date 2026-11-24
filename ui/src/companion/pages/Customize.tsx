@@ -30,6 +30,7 @@ const ICON_FILES: [AppIconRole, string][] = [
   ['maps', 'maps'],
   ['music', 'music'],
   ['bilibili', 'bilibili'],
+  ['ximalaya', 'ximalaya'],
   ['radio', 'radio'],
   ['netease', 'netease'],
   ['podcasts', 'podcasts'],
