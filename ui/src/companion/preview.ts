@@ -93,7 +93,7 @@ let settings: Settings = {
 // The player's own, made up from WestPlay's files (the preview's address: `FILES_BASE` is `/` here).
 const custom: Customizations = query.has('custom')
   ? {
-      wallpapers: [{ id: 'custom:Logo', name: 'Logo', dark: 'westplay.png', light: 'westplay.png' }],
+      wallpapers: [{ id: 'custom:Logo', name: 'Logo', dark: 'truckplay.png', light: 'truckplay.png' }],
       iconSets: [
         {
           name: 'Sample icons',
@@ -312,7 +312,7 @@ const CHECK: GameCheck = {
     { id: 'volvo-fh-2024', name: 'Volvo FH (2024)', fit: 'ready', fromMod: false },
     { id: 'scania-touring', name: 'Scania Touring', fit: 'ready', fromMod: false },
     { id: 'man-lions-coach-2024', name: "MAN Lion's Coach (2024)", fit: 'ready', fromMod: false },
-    { id: 'any-truck-tablet', name: 'Any truck – with the WestPlay tablet', fit: 'ready', fromMod: false },
+    { id: 'any-truck-tablet', name: 'Any truck – with the TruckPlay tablet', fit: 'ready', fromMod: false },
   ],
   modProblem: null,
   plugin: 'current',
@@ -332,7 +332,7 @@ const ATS_CHECK: GameCheck = {
     { id: 'volvo-vnl-2025', name: 'Volvo VNL (2025)', fit: 'ready', fromMod: false },
     { id: 'western-star-57x', name: 'Western Star 57X', fit: 'notYet', fromMod: false },
     { id: 'peterbilt-579', name: 'Peterbilt 579', fit: 'notInGame', fromMod: false },
-    { id: 'any-truck-tablet', name: 'Any truck – with the WestPlay tablet', fit: 'ready', fromMod: false },
+    { id: 'any-truck-tablet', name: 'Any truck – with the TruckPlay tablet', fit: 'ready', fromMod: false },
   ],
 }
 
@@ -531,7 +531,7 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
       // The picker closes, then the files take a while.
       setTimeout(() => emit('customize-adding', null), 400)
       const name = `Sample ${custom.wallpapers.length + 1}`
-      custom.wallpapers.push({ id: `custom:${name}`, name, dark: 'westplay.png', light: 'westplay.png' })
+      custom.wallpapers.push({ id: `custom:${name}`, name, dark: 'truckplay.png', light: 'truckplay.png' })
       return later<Added>({ added: [name], problems: [{ file: 'notes.txt', reason: 'notAnImage' }] }, 2400)
     }
     case 'add_icon_set': {

@@ -49,7 +49,7 @@ export function TruckScreen({
               <iframe
                 ref={frame}
                 src="/cabin.html?demo&power"
-                title="WestPlay"
+                title="TruckPlay"
                 tabIndex={-1}
                 data-ready={ready || undefined}
               />
@@ -101,7 +101,7 @@ function BannerView({ banner }: { banner: Banner | null }) {
     >
       {text && (
         <>
-          <img src="/westplay.png" alt="" />
+          <img src="/truckplay.png" alt="" />
           <div className="ts-banner-words">
             {leaving && <BannerWords banner={leaving} leaving />}
             <BannerWords key={text.title} banner={text} entering={messages > 0} />

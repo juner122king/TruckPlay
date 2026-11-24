@@ -6,7 +6,7 @@ export const words: Words = {
   continue: 'Continue',
   welcome: {
     title: 'CarPlay in your cab',
-    sub: 'WestPlay brings CarPlay to your truck’s screen in Euro Truck Simulator 2 and American Truck Simulator. Setup only takes a few minutes.',
+    sub: 'TruckPlay brings CarPlay to your truck’s screen in Euro Truck Simulator 2 and American Truck Simulator. Setup only takes a few minutes.',
     start: 'Get Started',
   },
   summary: {
@@ -21,10 +21,10 @@ export const words: Words = {
     title: 'Your game',
     titleBoth: 'Your games',
     titleMissing: 'Where’s your game?',
-    found: 'WestPlay found your game on this PC.',
+    found: 'TruckPlay found your game on this PC.',
     foundMany: 'Your game is installed in more than one place. Choose the one you play.',
-    foundBoth: 'WestPlay found both games on this PC, and sets itself up in each.',
-    missing: 'WestPlay couldn’t find the game. Choose the folder you installed it in, the one with base.scs inside.',
+    foundBoth: 'TruckPlay found both games on this PC, and sets itself up in each.',
+    missing: 'TruckPlay couldn’t find the game. Choose the folder you installed it in, the one with base.scs inside.',
     chooseAnother: 'Use a Different Folder…',
     chooseFolder: 'Choose Folder…',
     picker: 'Choose your game’s folder',
@@ -33,7 +33,7 @@ export const words: Words = {
     gameGone: 'The game is no longer in this folder.',
     closeToGoOn: {
       title: 'Please close the game.',
-      text: 'WestPlay can only set itself up while the game isn’t running.',
+      text: 'TruckPlay can only set itself up while the game isn’t running.',
     },
   },
   check: {
@@ -44,16 +44,16 @@ export const words: Words = {
     notYet: 'Not supported yet',
     title: 'Here’s your setup',
     titleNotYet: 'Not supported yet',
-    cantInstall: 'WestPlay doesn’t support this version of the game yet.',
+    cantInstall: 'TruckPlay doesn’t support this version of the game yet.',
     version: 'Version',
     unknown: 'Unknown',
     dlcs: 'DLCs',
     mapDlcs: 'Map DLCs',
     noMapDlcs: 'None',
-    untested: 'WestPlay hasn’t been tried with this version yet, but it will most likely work.',
+    untested: 'TruckPlay hasn’t been tried with this version yet, but it will most likely work.',
     otherCarPlay: {
       title: 'Remove YMN One',
-      text: 'Another CarPlay mod, YMN One, is installed in your game (YamanDriveBridge.dll, in its plugins folder). It takes over your truck’s GPS screen, so WestPlay can’t show there, and the screen turns pink whenever YMN One isn’t running. Close the game and delete that file.',
+      text: 'Another CarPlay mod, YMN One, is installed in your game (YamanDriveBridge.dll, in its plugins folder). It takes over your truck’s GPS screen, so TruckPlay can’t show there, and the screen turns pink whenever YMN One isn’t running. Close the game and delete that file.',
     },
     trucks: 'Trucks',
     truckNotYet: 'Not supported yet',
@@ -62,7 +62,7 @@ export const words: Words = {
     notInGame: 'Not in your game',
     scania7: 'Scania S and R – 7" screen',
     scaniaSmartDash: 'Scania S and R – Smart Dash',
-    anyTruckTablet: 'Any truck – with the WestPlay tablet',
+    anyTruckTablet: 'Any truck – with the TruckPlay tablet',
     profiles: 'Profiles',
     profileCount: { one: '{n} profile', other: '{n} profiles' },
     noProfiles: 'No profiles yet',
@@ -78,17 +78,17 @@ export const words: Words = {
       'Only games and profiles you enable are maintained automatically. You can also choose Prepare once. Maps are prepared while the game is closed, with recently played profiles first.',
   },
   install: {
-    title: 'Install WestPlay',
-    titleDone: 'WestPlay is installed',
-    sub: 'WestPlay adds a plugin to your game, and it brings in WestPlay’s truck screens each time you play: nothing to turn on in Mod Manager. Your game’s own files stay untouched, and uninstalling WestPlay removes it all.',
+    title: 'Install TruckPlay',
+    titleDone: 'TruckPlay is installed',
+    sub: 'TruckPlay adds a plugin to your game, and it brings in TruckPlay’s truck screens each time you play: nothing to turn on in Mod Manager. Your game’s own files stay untouched, and uninstalling TruckPlay removes it all.',
     install: 'Install',
     tryAgain: 'Try Again',
     asAdministrator: 'Install as Administrator',
     plugin: 'Plugin',
-    pluginDetail: 'Shows WestPlay on your truck’s screen',
+    pluginDetail: 'Shows TruckPlay on your truck’s screen',
     banners: {
       installing: { title: 'Installing…' },
-      done: { title: 'WestPlay is installed', text: 'Your game is ready' },
+      done: { title: 'TruckPlay is installed', text: 'Your game is ready' },
       permission: { title: 'Permission needed', text: 'Windows will ask once' },
       inUse: { title: 'Close the game', text: 'It’s using the plugin' },
       failed: { title: 'Installation didn’t finish', text: 'See the details on the left' },
@@ -96,7 +96,7 @@ export const words: Words = {
     },
     closeToInstall: {
       title: 'Please close the game.',
-      text: 'WestPlay can’t be installed while the game is running.',
+      text: 'TruckPlay can’t be installed while the game is running.',
     },
     inUse: {
       title: 'Please close the game.',
@@ -111,8 +111,8 @@ export const words: Words = {
       text: 'The plugin can’t be installed without it. Try again and choose Yes.',
     },
     pluginFailed: 'The plugin couldn’t be installed.',
-    modFailed: 'WestPlay’s truck screens couldn’t be prepared from your game.',
-    noPlugin: 'This copy of WestPlay is missing its plugin. Please reinstall WestPlay.',
+    modFailed: 'TruckPlay’s truck screens couldn’t be prepared from your game.',
+    noPlugin: 'This copy of TruckPlay is missing its plugin. Please reinstall TruckPlay.',
     noDocuments: 'Your Documents folder couldn’t be found.',
   },
   speed: {
@@ -136,7 +136,7 @@ export const words: Words = {
     },
     waiting: {
       title: 'Please close the game.',
-      text: 'Preparing the map takes a lot of memory, so WestPlay waits until the game isn’t running.',
+      text: 'Preparing the map takes a lot of memory, so TruckPlay waits until the game isn’t running.',
     },
     stages: {
       reading: { now: 'Reading your game’s map', done: 'Map read from your game' },
@@ -159,7 +159,7 @@ export const words: Words = {
   },
   accounts: {
     title: 'Sign in to YouTube',
-    sub: 'Optional. Sign in to see your own recommendations, subscriptions and history on the truck’s screen. You sign in with Google in a separate window, and WestPlay never sees your account.',
+    sub: 'Optional. Sign in to see your own recommendations, subscriptions and history on the truck’s screen. You sign in with Google in a separate window, and TruckPlay never sees your account.',
     signIn: 'Sign In',
     signOut: 'Sign Out',
     signedIn: 'Signed in',
@@ -170,13 +170,13 @@ export const words: Words = {
   },
   spotify: {
     title: 'Sign in to Spotify',
-    sub: 'Optional. Sign in to play Spotify on the truck’s screen, with your own playlists and library. You sign in to Spotify in a separate window, and WestPlay never sees your account.',
+    sub: 'Optional. Sign in to play Spotify on the truck’s screen, with your own playlists and library. You sign in to Spotify in a separate window, and TruckPlay never sees your account.',
     finishInWindow: 'Finish signing in in the Spotify window',
     signingIn: { title: 'Signing in to Spotify', text: 'Continue in the Spotify window' },
   },
   appleMusic: {
     title: 'Sign in to Apple Music',
-    sub: 'Optional. Sign in to play Apple Music on the truck’s screen, with your own playlists and library. You sign in to Apple Music in a separate window, and WestPlay never sees your account.',
+    sub: 'Optional. Sign in to play Apple Music on the truck’s screen, with your own playlists and library. You sign in to Apple Music in a separate window, and TruckPlay never sees your account.',
     finishInWindow: 'Finish signing in in the Apple Music window',
     signingIn: { title: 'Signing in to Apple Music', text: 'Continue in the Apple Music window' },
   },
@@ -186,11 +186,11 @@ export const words: Words = {
     steps: [
       {
         title: 'Start the game',
-        text: 'When it says “Request to use advanced SDK features detected,” choose OK. That’s WestPlay.',
+        text: 'When it says “Request to use advanced SDK features detected,” choose OK. That’s TruckPlay.',
       },
       {
         title: 'Get in your truck',
-        text: 'Turn on the electrics, and WestPlay appears on the screen. Keep WestPlay open while you play.',
+        text: 'Turn on the electrics, and TruckPlay appears on the screen. Keep TruckPlay open while you play.',
       },
       {
         title: 'Hit the road',

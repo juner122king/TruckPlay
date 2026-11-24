@@ -558,11 +558,11 @@ function SectionList({
 
   let place = 2
   return (
-    <nav className="cp-list" aria-label="WestPlay">
+    <nav className="cp-list" aria-label="TruckPlay">
       <header className="cp-brand ob-in" style={n(0)}>
-        <img src="/westplay.png" alt="" />
+        <img src="/truckplay.png" alt="" />
         <span>
-          <b>WestPlay</b>
+          <b>TruckPlay</b>
           <span className="cp-state" data-state={state}>
             <i />
             {cw.state[state]}

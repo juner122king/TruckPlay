@@ -216,8 +216,8 @@ export function RadioApp() {
               <span>
                 {state.notice === 'host'
                   ? t(
-                      '开发预览提供真实目录与节目表；直播请在 WestPlay 主机中播放。',
-                      'Live playback is available in the WestPlay host. This preview shows the real directory and schedules.',
+                      '开发预览提供真实目录与节目表；直播请在 TruckPlay 主机中播放。',
+                      'Live playback is available in the TruckPlay host. This preview shows the real directory and schedules.',
                     )
                   : t('无法保存收藏，请检查本机存储空间。', 'Unable to save favorites. Check local storage.')}
               </span>

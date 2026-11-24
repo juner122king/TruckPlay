@@ -2383,8 +2383,8 @@ pub fn tell_already_running() {
     unsafe {
         MessageBoxW(
             None,
-            windows::core::w!("WestPlay is already running. Find it in the taskbar or the notification area."),
-            windows::core::w!("WestPlay"),
+            windows::core::w!("TruckPlay is already running. Find it in the taskbar or the notification area."),
+            windows::core::w!("TruckPlay"),
             MB_OK | MB_ICONINFORMATION,
         );
     }

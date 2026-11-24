@@ -1,4 +1,4 @@
-<p align="center"><img src="ui/public/westplay.png" width="112" alt="TruckPlay"></p>
+<p align="center"><img src="ui/public/truckplay.png" width="112" alt="TruckPlay"></p>
 
 <h1 align="center">TruckPlay</h1>
 

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#090b0e">
 <meta name="referrer" content="no-referrer">
-<title>WestPlay · LAN Mirror</title>
+<title>TruckPlay · LAN Mirror</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <div id="stage">
-  <div id="viewer"><img id="mirror" alt="WestPlay live cabin screen" draggable="false"></div>
+  <div id="viewer"><img id="mirror" alt="TruckPlay live cabin screen" draggable="false"></div>
   <div id="status" role="status" aria-live="polite">正在连接…</div>
   <button id="fs-btn" type="button" aria-label="进入全屏横屏" hidden>全屏横屏</button>
   <div id="enter-gate" hidden>
@@ -247,7 +247,7 @@ if (!token) {
   syncFullscreenUi();
   mirror.src = '/stream?token=' + encodeURIComponent(token);
   socket = new WebSocket('ws://' + location.host + '/ws?token=' + encodeURIComponent(token));
-  socket.onopen = () => { status.textContent = '已连接 · WestPlay 镜像'; setTimeout(() => { if (socket.readyState === WebSocket.OPEN) status.hidden = true; }, 1800); };
+  socket.onopen = () => { status.textContent = '已连接 · TruckPlay 镜像'; setTimeout(() => { if (socket.readyState === WebSocket.OPEN) status.hidden = true; }, 1800); };
   socket.onclose = () => { activePointer = null; status.hidden = false; status.textContent = '触控连接已断开，请刷新页面'; };
   socket.onerror = () => { status.hidden = false; status.textContent = '连接失败：检查电脑防火墙与配对地址'; };
   // The server releases held buttons if these heartbeats stop for 3 seconds.

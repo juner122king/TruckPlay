@@ -5,8 +5,8 @@
  * The game shows Silesian players Polish (pl_si), and so does this.
  */
 export const HVT_MAP_MESSAGES: Record<string, string> = {
-  en_us: 'Maps by HVT are not allowed in WestPlay. Contact WestPlay to learn more.',
-  zh_cn: 'WestPlay 不允许使用 HVT 的地图。如需了解详情，请联系 WestPlay。',
+  en_us: 'Maps by HVT are not allowed in TruckPlay. Contact TruckPlay to learn more.',
+  zh_cn: 'TruckPlay 不允许使用 HVT 的地图。如需了解详情，请联系 TruckPlay。',
 }
 
 /** The message in the game's `language`, or English for one not listed (a mod's). */

@@ -6,7 +6,7 @@ export const words: Words = {
   continue: '继续',
   welcome: {
     title: '把 CarPlay 带进驾驶室',
-    sub: 'WestPlay 把 CarPlay 搬到 Euro Truck Simulator 2 和 American Truck Simulator 的卡车屏幕上。设置只需几分钟。',
+    sub: 'TruckPlay 把 CarPlay 搬到 Euro Truck Simulator 2 和 American Truck Simulator 的卡车屏幕上。设置只需几分钟。',
     start: '开始',
   },
   summary: {
@@ -21,10 +21,10 @@ export const words: Words = {
     title: '游戏',
     titleBoth: '两款游戏',
     titleMissing: '游戏在哪里？',
-    found: 'WestPlay 在这台电脑上找到了游戏。',
+    found: 'TruckPlay 在这台电脑上找到了游戏。',
     foundMany: '游戏安装在多个位置，请选择你在玩的那一个。',
-    foundBoth: 'WestPlay 在这台电脑上找到了两款游戏，会分别完成设置。',
-    missing: 'WestPlay 没有找到游戏。请选择游戏的安装文件夹（里面有 base.scs）。',
+    foundBoth: 'TruckPlay 在这台电脑上找到了两款游戏，会分别完成设置。',
+    missing: 'TruckPlay 没有找到游戏。请选择游戏的安装文件夹（里面有 base.scs）。',
     chooseAnother: '使用其他文件夹…',
     chooseFolder: '选择文件夹…',
     picker: '选择游戏文件夹',
@@ -33,7 +33,7 @@ export const words: Words = {
     gameGone: '游戏已不在这个文件夹中。',
     closeToGoOn: {
       title: '请关闭游戏。',
-      text: 'WestPlay 只能在游戏关闭时完成设置。',
+      text: 'TruckPlay 只能在游戏关闭时完成设置。',
     },
   },
   check: {
@@ -44,16 +44,16 @@ export const words: Words = {
     notYet: '暂不支持',
     title: '检查结果',
     titleNotYet: '暂不支持',
-    cantInstall: 'WestPlay 暂不支持此版本的游戏。',
+    cantInstall: 'TruckPlay 暂不支持此版本的游戏。',
     version: '版本',
     unknown: '未知',
     dlcs: 'DLC',
     mapDlcs: '地图 DLC',
     noMapDlcs: '无',
-    untested: 'WestPlay 尚未在这个版本上测试过，但多半可以正常运行。',
+    untested: 'TruckPlay 尚未在这个版本上测试过，但多半可以正常运行。',
     otherCarPlay: {
       title: '请移除 YMN One',
-      text: '游戏里装有另一个 CarPlay 模组 YMN One（plugins 文件夹中的 YamanDriveBridge.dll）。它占用了卡车的 GPS 屏幕，所以 WestPlay 无法显示在那里；YMN One 没有运行时，屏幕还会变成粉色。请关闭游戏并删除该文件。',
+      text: '游戏里装有另一个 CarPlay 模组 YMN One（plugins 文件夹中的 YamanDriveBridge.dll）。它占用了卡车的 GPS 屏幕，所以 TruckPlay 无法显示在那里；YMN One 没有运行时，屏幕还会变成粉色。请关闭游戏并删除该文件。',
     },
     trucks: '卡车',
     truckNotYet: '暂不支持',
@@ -62,7 +62,7 @@ export const words: Words = {
     notInGame: '游戏中没有',
     scania7: 'Scania S 和 R – 7 英寸屏幕',
     scaniaSmartDash: 'Scania S 和 R – Smart Dash',
-    anyTruckTablet: '任意卡车 – 配备 WestPlay 平板',
+    anyTruckTablet: '任意卡车 – 配备 TruckPlay 平板',
     profiles: '档案',
     profileCount: { other: '{n} 个档案' },
     noProfiles: '还没有档案',
@@ -73,17 +73,17 @@ export const words: Words = {
     mapNote: '只会自动维护你开启的游戏和档案，也可以随时选择“准备一次”。地图在游戏关闭时准备，优先处理最近玩过的档案。',
   },
   install: {
-    title: '安装 WestPlay',
-    titleDone: 'WestPlay 已安装',
-    sub: 'WestPlay 会给游戏添加一个插件，每次启动游戏时由插件载入 WestPlay 的卡车屏幕，无需在模组管理器中启用任何东西。游戏自身的文件不会被改动，卸载 WestPlay 即可全部移除。',
+    title: '安装 TruckPlay',
+    titleDone: 'TruckPlay 已安装',
+    sub: 'TruckPlay 会给游戏添加一个插件，每次启动游戏时由插件载入 TruckPlay 的卡车屏幕，无需在模组管理器中启用任何东西。游戏自身的文件不会被改动，卸载 TruckPlay 即可全部移除。',
     install: '安装',
     tryAgain: '重试',
     asAdministrator: '以管理员身份安装',
     plugin: '插件',
-    pluginDetail: '在卡车屏幕上显示 WestPlay',
+    pluginDetail: '在卡车屏幕上显示 TruckPlay',
     banners: {
       installing: { title: '正在安装…' },
-      done: { title: 'WestPlay 已安装', text: '游戏已准备就绪' },
+      done: { title: 'TruckPlay 已安装', text: '游戏已准备就绪' },
       permission: { title: '需要权限', text: 'Windows 会询问一次' },
       inUse: { title: '请关闭游戏', text: '游戏正在使用插件' },
       failed: { title: '安装未完成', text: '详细信息见左侧' },
@@ -91,7 +91,7 @@ export const words: Words = {
     },
     closeToInstall: {
       title: '请关闭游戏。',
-      text: '游戏运行时无法安装 WestPlay。',
+      text: '游戏运行时无法安装 TruckPlay。',
     },
     inUse: {
       title: '请关闭游戏。',
@@ -106,8 +106,8 @@ export const words: Words = {
       text: '没有权限就无法安装插件。请重试并选择“是”。',
     },
     pluginFailed: '无法安装插件。',
-    modFailed: '无法从游戏文件中准备 WestPlay 的卡车屏幕。',
-    noPlugin: '此 WestPlay 缺少插件。请重新安装 WestPlay。',
+    modFailed: '无法从游戏文件中准备 TruckPlay 的卡车屏幕。',
+    noPlugin: '此 TruckPlay 缺少插件。请重新安装 TruckPlay。',
     noDocuments: '找不到“文档”文件夹。',
   },
   speed: {
@@ -128,7 +128,7 @@ export const words: Words = {
     },
     waiting: {
       title: '请关闭游戏。',
-      text: '准备地图需要大量内存，所以 WestPlay 会等游戏关闭后再开始。',
+      text: '准备地图需要大量内存，所以 TruckPlay 会等游戏关闭后再开始。',
     },
     stages: {
       reading: { now: '正在读取游戏地图', done: '已读取游戏地图' },
@@ -151,7 +151,7 @@ export const words: Words = {
   },
   accounts: {
     title: '登录 YouTube',
-    sub: '可选。登录后，卡车屏幕上会显示你的推荐、订阅内容和观看记录。登录在单独的 Google 窗口中进行，WestPlay 看不到你的账号信息。',
+    sub: '可选。登录后，卡车屏幕上会显示你的推荐、订阅内容和观看记录。登录在单独的 Google 窗口中进行，TruckPlay 看不到你的账号信息。',
     signIn: '登录',
     signOut: '退出登录',
     signedIn: '已登录',
@@ -162,13 +162,13 @@ export const words: Words = {
   },
   spotify: {
     title: '登录 Spotify',
-    sub: '可选。登录后，就能在卡车屏幕上用自己的歌单和音乐库收听 Spotify。登录在单独的 Spotify 窗口中进行，WestPlay 看不到你的账号信息。',
+    sub: '可选。登录后，就能在卡车屏幕上用自己的歌单和音乐库收听 Spotify。登录在单独的 Spotify 窗口中进行，TruckPlay 看不到你的账号信息。',
     finishInWindow: '请在 Spotify 窗口中完成登录',
     signingIn: { title: '正在登录 Spotify', text: '请在 Spotify 窗口中继续' },
   },
   appleMusic: {
     title: '登录 Apple Music',
-    sub: '可选。登录后，就能在卡车屏幕上用自己的歌单和资料库收听 Apple Music。登录在单独的 Apple Music 窗口中进行，WestPlay 看不到你的账号信息。',
+    sub: '可选。登录后，就能在卡车屏幕上用自己的歌单和资料库收听 Apple Music。登录在单独的 Apple Music 窗口中进行，TruckPlay 看不到你的账号信息。',
     finishInWindow: '请在 Apple Music 窗口中完成登录',
     signingIn: { title: '正在登录 Apple Music', text: '请在 Apple Music 窗口中继续' },
   },
@@ -178,11 +178,11 @@ export const words: Words = {
     steps: [
       {
         title: '启动游戏',
-        text: '游戏提示“检测到使用高阶 SDK 配置的请求。”时，选择“确定”。这个提示是 WestPlay 引起的。',
+        text: '游戏提示“检测到使用高阶 SDK 配置的请求。”时，选择“确定”。这个提示是 TruckPlay 引起的。',
       },
       {
         title: '坐进驾驶室',
-        text: '打开电源，WestPlay 就会出现在屏幕上。游戏期间请保持 WestPlay 开启。',
+        text: '打开电源，TruckPlay 就会出现在屏幕上。游戏期间请保持 TruckPlay 开启。',
       },
       {
         title: '出发吧',
