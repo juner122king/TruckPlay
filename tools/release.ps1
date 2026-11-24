@@ -167,7 +167,12 @@ try {
     )
 
     $existingTag = git tag -l $tag
-    if (!$existingTag) {
+    if ($existingTag) {
+        $tagCommit = (git rev-parse "$tag^{commit}").Trim()
+        if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $commit) {
+            throw "Local git tag '$tag' already exists at $tagCommit, which does not match HEAD ($commit). Rename or remove the stale local tag first."
+        }
+    } else {
         Invoke-Checked "Create git tag $tag" { git tag -a $tag -m "TruckPlay $Version" }
     }
     Invoke-Checked "Push git tag $tag to origin" { git push origin $tag }
