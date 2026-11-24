@@ -153,3 +153,13 @@ export function SunGlyph({ large = false }: { large?: boolean }) {
     </svg>
   )
 }
+
+/** Notifications / Do Not Disturb: a bell. */
+export function NotificationsGlyph() {
+  return (
+    <TileGlyph>
+      <path d="M12 3.5a5 5 0 0 0-5 5v3.1c0 1.4-.5 2.7-1.4 3.7l-.6.7h14l-.6-.7a5.4 5.4 0 0 1-1.4-3.7V8.5a5 5 0 0 0-5-5Z" />
+      <path d="M10 18a2 2 0 0 0 4 0" />
+    </TileGlyph>
+  )
+}

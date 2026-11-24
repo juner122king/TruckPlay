@@ -12,6 +12,7 @@ export type SettingsPage =
   | 'sound'
   | 'equalizer'
   | 'dateTime'
+  | 'notifications'
   | 'maps'
   | 'safari'
   | 'searchEngine'

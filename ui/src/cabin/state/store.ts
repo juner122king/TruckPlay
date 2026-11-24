@@ -88,6 +88,8 @@ import type { OemMode } from './oem'
 import { INITIAL_POWER, power, type PowerEvent, type PowerState } from './power'
 import { isScreenLayoutId, type ScreenLayoutId } from './screen'
 import { DEFAULT_TEXT_SIZE, STEPS_ADDED_BELOW, toTextSize } from './textSize'
+import { languageOf, stringsFor } from './strings'
+import { clockStyleFor, resetSimulationTracker, type SuppressOptions, useSimulation } from './simulation'
 
 /** The Dashboard's widgets the player can turn off (turn-by-turn always shows while there's a route). */
 export type DashboardWidget = 'nowPlaying' | 'destination' | 'weather'
@@ -504,6 +506,19 @@ export function connectHost(now: () => number = () => performance.now()): () => 
   }
 }
 
+function simStrings() {
+  const live = useLive.getState()
+  return stringsFor(languageOf(live.chosenLanguage ?? live.gameLanguage))
+}
+
+function simOptions(): SuppressOptions {
+  const cabin = useCabin.getState()
+  const sim = useSimulation.getState()
+  const viewingMessages =
+    !cabin.truckScreen && cabin.navigation.route.kind === 'app' && cabin.navigation.route.app === 'messages'
+  return { viewingThread: viewingMessages ? sim.activeThread : null }
+}
+
 function receiveHostMessage(now: () => number): (message: HostMessage) => void {
   return (message) => {
     switch (message.type) {
@@ -520,14 +535,40 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
             .getState()
             .powerEvent({ type: 'electrics', on: message.data.electricEnabled, at: now(), truckScreen })
         }
+        const live = useLive.getState()
+        useSimulation
+          .getState()
+          .ingestTelemetry(message.data, live.job, live.clockShift, live.mph, simStrings(), simOptions())
         break
       }
       case 'truck':
         useLive.setState({ truck: hasTruck(message.data) ? message.data : null })
         break
-      case 'job':
+      case 'job': {
         useLive.setState({ job: message.data.active ? message.data : null })
+        const live = useLive.getState()
+        const strings = simStrings()
+        const clockStyle = clockStyleFor(useCabin.getState().hours24, strings)
+        useSimulation
+          .getState()
+          .ingestJob(message.data, live.telemetry, live.clockShift, clockStyle, strings, simOptions())
         break
+      }
+      case 'gameplayEvent': {
+        const live = useLive.getState()
+        useSimulation
+          .getState()
+          .ingestGameplayEvent(
+            message.data,
+            live.job,
+            live.telemetry,
+            live.clockShift,
+            live.mph,
+            simStrings(),
+            simOptions(),
+          )
+        break
+      }
       case 'garages':
         useLive.setState({ ownedGarages: message.owned, headquarters: message.headquarters })
         break
@@ -615,9 +656,14 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
       case 'routeNext':
         useLive.setState({ routeNext: message.next })
         break
-      case 'weather':
+      case 'weather': {
         useLive.setState({ weather: message.weather })
+        const live = useLive.getState()
+        useSimulation
+          .getState()
+          .ingestWeather(message.weather, live.telemetry, live.clockShift, simStrings(), simOptions())
         break
+      }
       case 'screen':
         // A layout this UI doesn't know yet (newer plugin) is treated like a screen without a profile.
         useLive.setState({ screenLayout: isScreenLayoutId(message.layout) ? message.layout : null })
@@ -665,21 +711,40 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
       case 'keybind':
         useLive.setState((live) => ({ keybind: { action: message.action, count: (live.keybind?.count ?? 0) + 1 } }))
         break
-      case 'truckersmp':
+      case 'truckersmp': {
         useLive.setState({
           truckersmp: message.on,
           truckersmpGame: message.game ?? null,
           ...(message.on ? {} : { nearby: null }),
         })
+        const live = useLive.getState()
+        useSimulation
+          .getState()
+          .ingestTruckersMp(
+            message.on,
+            live.nearby?.players.length ?? 0,
+            live.telemetry,
+            live.clockShift,
+            simStrings(),
+            simOptions(),
+          )
         break
-      case 'nearby':
+      }
+      case 'nearby': {
         useLive.setState({
           nearby:
             message.server === null || message.local === null
               ? null
               : { server: message.server, local: message.local, players: message.players, at: now() },
         })
+        const live = useLive.getState()
+        if (live.truckersmp) {
+          useSimulation
+            .getState()
+            .ingestTruckersMp(true, message.players.length, live.telemetry, live.clockShift, simStrings(), simOptions())
+        }
         break
+      }
       case 'semaphores':
         useLive.setState({ semaphores: message.data })
         break
@@ -689,6 +754,7 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         if (!message.running) {
           useLive.setState({ telemetry: null, semaphores: [] })
           useCabin.getState().powerEvent({ type: 'electrics', on: false, at: now() })
+          resetSimulationTracker()
         }
         break
       case 'youtubeAccount':

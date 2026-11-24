@@ -1,0 +1,179 @@
+/* Floating CarPlay notification banner (NotificationBanner.tsx) */
+
+.notify-banner-slot {
+  position: absolute;
+  left: var(--content-left, 170px);
+  right: var(--edge, 16px);
+  top: 18px;
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 220ms var(--motion-ease),
+    visibility 0s linear 220ms;
+}
+
+.notify-banner-slot.shown {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+  transition-duration: 180ms;
+}
+
+.notify-banner {
+  --banner-accent: var(--apple-blue);
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(560px, 92%);
+  padding: 10px 12px 10px 14px;
+  border-radius: 26px;
+  background: color-mix(in oklab, var(--apple-card, #1c1c1e) 84%, transparent);
+  border: 1px solid color-mix(in oklab, var(--banner-accent) 28%, var(--glass-rim));
+  backdrop-filter: blur(30px) saturate(165%);
+  box-shadow: var(--shadow-raised-large);
+  color: var(--apple-label, var(--text));
+}
+
+.shell.appearance-light .notify-banner {
+  background: color-mix(in oklab, #fff 88%, transparent);
+}
+
+.notify-banner[data-thread='dispatch'] {
+  --banner-accent: var(--apple-blue);
+}
+
+.notify-banner[data-thread='traffic'] {
+  --banner-accent: var(--apple-red);
+}
+
+.notify-banner[data-thread='fleet'] {
+  --banner-accent: var(--apple-green);
+}
+
+.notify-banner[data-thread='convoy'] {
+  --banner-accent: var(--apple-purple);
+}
+
+.shell .notify-banner-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 18px;
+  text-align: left;
+  transition: background-color 150ms var(--motion-ease);
+}
+
+.shell .notify-banner-main:hover {
+  background: var(--apple-fill-quaternary);
+}
+
+.notify-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.notify-banner-icon.tone-dispatch {
+  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-blue) 82%, white), var(--apple-indigo));
+}
+
+.notify-banner-icon.tone-traffic {
+  background: linear-gradient(155deg, var(--apple-orange), var(--apple-red));
+}
+
+.notify-banner-icon.tone-fleet {
+  background: linear-gradient(155deg, var(--apple-green), var(--apple-teal));
+}
+
+.notify-banner-icon.tone-convoy {
+  background: linear-gradient(155deg, var(--apple-purple), var(--apple-indigo));
+}
+
+.notify-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notify-banner-title {
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.notify-banner-body {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--apple-label-secondary, var(--text-dim));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .notify-banner-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--apple-label-secondary, var(--text-dim));
+  background: var(--apple-fill-tertiary, rgb(120 120 128 / 0.24));
+  flex: none;
+  transition:
+    background-color 150ms var(--motion-ease),
+    color 150ms var(--motion-ease);
+}
+
+.shell .notify-banner-close:hover {
+  background: var(--apple-fill-secondary);
+  color: var(--apple-label);
+}
+
+.shell .notify-banner button:focus-visible {
+  outline: 3px solid var(--apple-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .notify-banner-slot {
+    translate: 0 -14px;
+    scale: 0.96;
+    transition:
+      opacity 260ms var(--motion-ease),
+      translate 260ms var(--motion-ease),
+      scale 260ms var(--motion-ease),
+      visibility 0s linear 260ms;
+  }
+
+  .notify-banner-slot.shown {
+    translate: 0 0;
+    scale: 1;
+    transition-delay: 0s;
+    transition-duration: 200ms;
+  }
+
+  .shell .notify-banner-close {
+    transition:
+      background-color 150ms var(--motion-ease),
+      color 150ms var(--motion-ease),
+      scale 140ms var(--motion-ease);
+  }
+
+  .shell .notify-banner-close:active {
+    scale: 0.9;
+  }
+}

@@ -2,6 +2,7 @@ import { type PointerEvent as ReactPointerEvent, useLayoutEffect, useRef, useSta
 import { useAppIcon } from '../state/hooks'
 import { type AppId, APPS, RELEASED_APP_IDS } from '../state/apps'
 import { useLaunchStyle } from '../state/launch'
+import { useMessagesUnreadCount } from '../state/simulation'
 import { go, useCabin } from '../state/store'
 import { useText } from '../state/text'
 import { textScale } from '../state/textSize'
@@ -231,9 +232,18 @@ function HomeApp({ app }: { app: AppId }) {
   const launch = useLaunchStyle(app, { kind: 'icon', origin: 'home' })
   const text = useText()
   const icon = useAppIcon(APPS[app].icon)
+  const unread = useMessagesUnreadCount()
+  const badge = app === 'messages' ? unread : 0
   return (
     <button type="button" className="app" data-app={app} onClick={() => go({ type: 'openApp', app }, 'home')}>
-      <img src={icon} alt="" style={launch} />
+      <span className="app-icon-wrap">
+        <img src={icon} alt="" style={launch} />
+        {badge > 0 && (
+          <span className="app-badge" aria-label={text.messages.unreadBadge(badge)}>
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
       <span className="label">{text.apps[app]}</span>
     </button>
   )

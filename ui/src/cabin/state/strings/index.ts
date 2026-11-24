@@ -487,6 +487,171 @@ export interface Strings {
     mapZoomIntensity: string
     mapZoomIntensityFooter: string
     zoomIntensities: Record<MapZoomIntensity, string>
+    notifications: string
+    doNotDisturb: string
+    doNotDisturbFooter: string
+  }
+  /** Messages app: dispatcher, traffic/tolls, fleet assist, convoy, quick replies, and 14 SCS offences. */
+  messages: {
+    title: string
+    emptyTitle: string
+    emptyDesc: string
+    previewBadge: string
+    back: string
+    clearAll: string
+    confirmClear: string
+    cancel: string
+    dndBadge: string
+    dndToggleOn: string
+    dndToggleOff: string
+    today: string
+    jumpToLatest: string
+    newMessages: (count: number) => string
+    unreadBadge: (count: number) => string
+    noMessagesInThread: string
+    quickReplyHeading: string
+    threads: {
+      dispatch: { name: string; role: string }
+      traffic: { name: string; role: string }
+      fleet: { name: string; role: string }
+      convoy: { name: string; role: string }
+    }
+    emptyByThread: {
+      dispatch: string
+      traffic: string
+      fleet: string
+      convoy: string
+    }
+    alerts: {
+      critical: string
+      warning: string
+      notice: string
+      completed: string
+    }
+    status: {
+      idle: string
+      fleetOk: string
+      trafficClear: string
+      convoyOnline: string
+      convoyNearby: (count: number) => string
+      rangeLeft: (range: string) => string
+      recordCount: (count: number) => string
+    }
+    actions: {
+      addFuelStop: string
+      addRestStop: string
+      addServiceStop: string
+      addingStop: string
+      stopAddedLabel: string
+      viewOnMap: string
+      addedStop: (name: string) => string
+      addedStopDistance: (name: string, distance: string) => string
+      stopNoPlaces: string
+      stopFailed: string
+    }
+    quickReplies: {
+      ackOnWay: string
+      planRest: string
+      findFuel: string
+      findRest: string
+      findService: string
+      confirmFine: string
+      driveSafe: string
+    }
+    events: {
+      jobAssigned: (from: string, to: string, cargo: string, deadline: string) => string
+      cargoLoaded: (cargo: string, to: string) => string
+      scheduleTight: (buffer: string) => string
+      scheduleLate: string
+      cargoDamageSpike: (percent: number) => string
+      jobDeliveredReceipt: (
+        from: string,
+        to: string,
+        cargo: string,
+        distance: string,
+        income: string,
+        xp: number,
+        parkNote: string,
+      ) => string
+      jobDeliveredSimple: (from: string, to: string, cargo: string) => string
+      autoParkNote: string
+      manualParkNote: string
+      jobCancelled: (penalty: string) => string
+      fineTicket: (offence: string, amount: string) => string
+      tollPaid: (amount: string) => string
+      ferryTicket: (from: string, to: string, amount: string) => string
+      trainTicket: (from: string, to: string, amount: string) => string
+      lowFuel: (range: string) => string
+      restSoon: (remaining: string) => string
+      restOverdue: string
+      airPressureLow: string
+      highWear: (component: string, percent: string) => string
+      rainTurning: string
+      rainStarted: string
+      convoyJoined: string
+      convoyBusy: (count: number) => string
+      bannerTitle: (sender: string) => string
+    }
+    offences: Record<string, string>
+  }
+  /** Calendar app: 7-day week strip, live journey schedule, and persisted driving logbook. */
+  calendar: {
+    title: string
+    today: string
+    tomorrow: string
+    yesterday: string
+    thisWeek: string
+    selectedDay: string
+    previewBadge: string
+    clearLogbook: string
+    liveSchedule: string
+    historyLog: string
+    noEventsDay: string
+    summaryTitle: string
+    weeklySummaryTitle: string
+    jobsDelivered: string
+    totalDistance: string
+    grossIncome: string
+    roadExpenses: string
+    netProfit: string
+    addRestStop: string
+    addServiceStop: string
+    status: {
+      active: string
+      tight: string
+      late: string
+      recommended: string
+      completed: string
+      cancelled: string
+      recorded: string
+    }
+    events: {
+      activeJobTitle: (cargo: string) => string
+      activeJobRoute: (from: string, to: string) => string
+      activeJobMeta: (eta: string, deadline: string) => string
+      deadlineMilestone: (cargo: string, to: string) => string
+      deadlineMilestoneMeta: (deadline: string) => string
+      restWindowTitle: string
+      restWindowPunctual: string
+      restWindowTight: string
+      restWindowOverdue: string
+      restNoteTitle: string
+      restNoteSubtitle: string
+      maintenanceTitle: (component: string, percent: string) => string
+      maintenanceSubtitle: string
+      weatherShiftTitle: (sky: string) => string
+      weatherShiftSubtitle: (time: string) => string
+      routeStopsTitle: (count: number) => string
+      routeStopsSubtitle: string
+      deliveredTitle: (from: string, to: string) => string
+      deliveredSubtitle: (cargo: string, distance: string, damage: string) => string
+      cancelledTitle: (from: string, to: string) => string
+      cancelledSubtitle: (penalty: string) => string
+      ferryTitle: (from: string, to: string) => string
+      trainTitle: (from: string, to: string) => string
+      fineTitle: (offence: string) => string
+      tollTitle: string
+    }
   }
   /** Apps. */
   apps: Record<string, string>

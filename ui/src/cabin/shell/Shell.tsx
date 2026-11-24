@@ -18,6 +18,7 @@ import { Keyboard } from '../keyboard/Keyboard'
 import { useCabin, useLive } from '../state/store'
 import { Sidebar } from './Sidebar'
 import { useSidebarPeek } from './sidebarPeek'
+import { NotificationBanner } from './NotificationBanner'
 import { VolumeHud } from './VolumeHud'
 import './transitions.css'
 import { Wallpaper } from './Wallpaper'
@@ -154,6 +155,7 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
           <BilibiliPlayer />
           <HongguoPlayer />
           <Keyboard />
+          <NotificationBanner />
           <VolumeHud />
           <div ref={corners} className="screen-corners" aria-hidden />
         </div>

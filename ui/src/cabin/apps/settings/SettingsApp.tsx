@@ -19,6 +19,7 @@ import {
 } from '../safari/safari'
 import { timeframeName } from '../safari/SafariApp'
 import { DASHBOARD_WIDGETS, type DashboardWidget, useCabin, useLive } from '../../state/store'
+import { useSimulation } from '../../state/simulation'
 import { MAP_ZOOM_INTENSITIES } from '../../maps/camera'
 import { useText } from '../../state/text'
 import { TEXT_SIZES } from '../../state/textSize'
@@ -28,6 +29,7 @@ import {
   ChevronGlyph,
   ClockGlyph,
   DashboardGlyph,
+  NotificationsGlyph,
   NowPlayingGlyph,
   SoundGlyph,
   SunGlyph,
@@ -80,6 +82,8 @@ function PageContent({ page }: { page: SettingsPage }) {
       return <TextSizePage />
     case 'dateTime':
       return <DateTimePage />
+    case 'notifications':
+      return <NotificationsPage />
     case 'maps':
       return <MapsPage />
     case 'safari':
@@ -108,6 +112,7 @@ function ListPage() {
   const wanted = useWantedAppearance()
   const mapAutoZoom = useCabin((state) => state.mapAutoZoom)
   const mapZoomIntensity = useCabin((state) => state.mapZoomIntensity)
+  const dnd = useSimulation((state) => state.dnd)
   return (
     <Page title={text.apps.settings} list>
       <Group>
@@ -153,6 +158,13 @@ function ListPage() {
           icon={<ClockGlyph />}
           label={text.settings.dateTime}
           onOpen={() => open('dateTime')}
+        />
+        <NavRow
+          tile="var(--apple-indigo)"
+          icon={<NotificationsGlyph />}
+          label={text.settings.notifications}
+          value={dnd ? text.messages.dndBadge : undefined}
+          onOpen={() => open('notifications')}
         />
       </Group>
       <Group>
@@ -295,6 +307,19 @@ function DateTimePage() {
     <Page title={text.settings.dateTime}>
       <Group>
         <SwitchRow label={text.settings.hours24} on={hours24} onToggle={setHours24} />
+      </Group>
+    </Page>
+  )
+}
+
+function NotificationsPage() {
+  const text = useText()
+  const dnd = useSimulation((state) => state.dnd)
+  const setDnd = useSimulation((state) => state.setDnd)
+  return (
+    <Page title={text.settings.notifications}>
+      <Group footer={text.settings.doNotDisturbFooter}>
+        <SwitchRow label={text.settings.doNotDisturb} on={dnd} onToggle={setDnd} />
       </Group>
     </Page>
   )

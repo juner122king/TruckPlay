@@ -6,6 +6,7 @@ import { homeButtonTarget, sidebarApps } from '../state/navigation'
 import { go, useCabin, useLive } from '../state/store'
 import { useText } from '../state/text'
 import { cabClock } from '../../shared/host'
+import { useMessagesUnreadCount } from '../state/simulation'
 
 /**
  * The CarPlay sidebar: clock and signal, Maps pinned first followed by the most recently used apps
@@ -71,6 +72,8 @@ function RecentApp({ app, current }: { app: AppId; current: boolean }) {
   const launching = useCarriesLaunch(app, { kind: 'icon', origin: 'sidebar' })
   const icon = useAppIcon(APPS[app].icon)
   const text = useText()
+  const unread = useMessagesUnreadCount()
+  const badge = app === 'messages' ? unread : 0
   return (
     <button
       type="button"
@@ -80,6 +83,11 @@ function RecentApp({ app, current }: { app: AppId; current: boolean }) {
     >
       <img src={icon} alt="" style={{ viewTransitionName: `recent-${app}`, viewTransitionClass: 'recent' }} />
       {launching && <img className="launch-copy" src={icon} alt="" style={LAUNCH_STYLE} />}
+      {badge > 0 && (
+        <span className="sidebar-badge" aria-label={text.messages.unreadBadge(badge)}>
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </button>
   )
 }

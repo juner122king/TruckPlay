@@ -1,0 +1,1169 @@
+/* ==========================================================================
+   Messages App — Apple CarPlay iOS 26 Liquid Glass Styling
+   Two-column layout (conversation list + active thread), floating frosted
+   header, corner-safe geometry, iMessage bubble clusters, semantic priority
+   badges, structured stop cards, and single-row swipeable quick replies.
+   ========================================================================== */
+
+.shell .messages-app {
+  --msg-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 10px);
+  --msg-head-h: 78px;
+  --msg-aura-color: var(--apple-blue);
+
+  border-radius: var(--panel-radius);
+  background: var(--apple-background);
+  color: var(--apple-label);
+  overflow: hidden;
+  isolation: isolate;
+  container: messages / size;
+}
+
+.shell .msg-layout {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(304px, 35%) 1fr;
+}
+
+.shell .messages-app[data-thread='dispatch'] {
+  --msg-aura-color: var(--apple-blue);
+}
+
+.shell .messages-app[data-thread='fleet'] {
+  --msg-aura-color: var(--apple-green);
+}
+
+.shell .messages-app[data-thread='traffic'] {
+  --msg-aura-color: var(--apple-orange);
+}
+
+.shell .messages-app[data-thread='convoy'] {
+  --msg-aura-color: var(--apple-purple);
+}
+
+/* Subtle top-right atmospheric glow keyed to active channel */
+.shell .messages-app::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 180px;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    70% 100% at 72% 0%,
+    color-mix(in oklab, var(--msg-aura-color) 11%, transparent),
+    transparent 74%
+  );
+}
+
+.shell.appearance-light .messages-app::before {
+  background: radial-gradient(
+    70% 100% at 72% 0%,
+    color-mix(in oklab, var(--msg-aura-color) 6%, transparent),
+    transparent 74%
+  );
+}
+
+/* --- Left Sidebar: Thread List & Controls --------------------------------- */
+
+.shell .msg-sidebar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: color-mix(in oklab, var(--apple-card) 74%, var(--apple-background));
+  border-right: 1px solid color-mix(in oklab, var(--apple-separator) 75%, transparent);
+}
+
+.shell.appearance-light .msg-sidebar {
+  background: color-mix(in oklab, var(--apple-card) 86%, var(--apple-background));
+}
+
+.shell .msg-side-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: max(20px, calc(var(--msg-corner-clear) * 0.78)) 14px 12px max(22px, var(--msg-corner-clear));
+  flex: none;
+}
+
+.shell .msg-side-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .msg-side-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.shell .msg-side-title {
+  margin: 0;
+  font-size: calc(28px * var(--text-scale, 1));
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell .msg-preview-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--apple-orange) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--apple-orange) 38%, transparent);
+  color: var(--apple-orange);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.shell .msg-side-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.shell .msg-dnd-btn,
+.shell .msg-clear-btn {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--apple-label-secondary);
+  background: var(--apple-fill-tertiary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 40%, transparent);
+  transition:
+    background-color 160ms var(--motion-ease),
+    color 160ms var(--motion-ease);
+}
+
+.shell .msg-dnd-btn {
+  padding: 0 11px;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.shell .msg-dnd-btn:not(.active) {
+  padding: 0;
+  width: 40px;
+}
+
+.shell .msg-dnd-btn.active {
+  background: color-mix(in oklab, var(--apple-indigo) 22%, transparent);
+  border-color: color-mix(in oklab, var(--apple-indigo) 48%, transparent);
+  color: var(--apple-indigo);
+}
+
+.shell .msg-dnd-btn:hover,
+.shell .msg-clear-btn:hover {
+  background: var(--apple-fill-secondary);
+  color: var(--apple-label);
+}
+
+.shell .msg-clear-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--apple-fill-tertiary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 55%, transparent);
+}
+
+.shell .msg-confirm-clear-btn,
+.shell .msg-cancel-clear-btn {
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: background-color 150ms var(--motion-ease);
+}
+
+.shell .msg-confirm-clear-btn {
+  background: var(--apple-red);
+  color: #fff;
+}
+
+.shell .msg-confirm-clear-btn:hover {
+  background: color-mix(in oklab, var(--apple-red) 86%, black);
+}
+
+.shell .msg-cancel-clear-btn {
+  color: var(--apple-label-secondary);
+}
+
+.shell .msg-cancel-clear-btn:hover {
+  background: var(--apple-fill-secondary);
+  color: var(--apple-label);
+}
+
+.shell .msg-thread-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 6px 12px max(18px, var(--msg-corner-clear));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shell .msg-thread-list::-webkit-scrollbar,
+.shell .msg-stream::-webkit-scrollbar,
+.shell .msg-reply-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .msg-thread-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 76px;
+  padding: 11px 14px 11px 10px;
+  border-radius: 20px;
+  text-align: left;
+  border: 1px solid transparent;
+  transition:
+    background-color 180ms var(--motion-ease),
+    border-color 180ms var(--motion-ease);
+}
+
+.shell .msg-thread-row.selected {
+  background: color-mix(in oklab, var(--apple-blue) 18%, var(--apple-card-raised));
+  border-color: color-mix(in oklab, var(--apple-blue) 36%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    var(--shadow-raised);
+}
+
+.shell.appearance-light .msg-thread-row.selected {
+  background: #fff;
+  border-color: color-mix(in oklab, var(--apple-blue) 32%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 10px rgb(0 0 0 / 0.08);
+}
+
+.shell .msg-thread-row.selected::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 18px;
+  bottom: 18px;
+  width: 3.5px;
+  border-radius: 999px;
+  background: var(--apple-blue);
+}
+
+.shell .msg-thread-row:not(.selected):hover {
+  background: var(--apple-fill-quaternary);
+}
+
+/* Signature CarPlay / iOS Messages left unread dot */
+.shell .msg-unread-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: transparent;
+}
+
+.shell .msg-unread-dot.active {
+  background: var(--apple-blue);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--apple-blue) 60%, transparent);
+}
+
+.shell .msg-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex: none;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    var(--shadow-raised);
+}
+
+.shell .msg-avatar.small {
+  width: 38px;
+  height: 38px;
+}
+
+.shell .msg-avatar.large {
+  width: 72px;
+  height: 72px;
+}
+
+.shell .msg-avatar.tone-dispatch {
+  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-blue) 82%, white), var(--apple-indigo));
+}
+
+.shell .msg-avatar.tone-traffic {
+  background: linear-gradient(155deg, var(--apple-orange), var(--apple-red));
+}
+
+.shell .msg-avatar.tone-fleet {
+  background: linear-gradient(155deg, var(--apple-green), var(--apple-teal));
+}
+
+.shell .msg-avatar.tone-convoy {
+  background: linear-gradient(155deg, var(--apple-purple), var(--apple-indigo));
+}
+
+.shell .msg-thread-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.shell .msg-thread-top,
+.shell .msg-thread-bottom {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .msg-thread-name {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--apple-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .msg-thread-row.unread .msg-thread-name {
+  font-weight: 750;
+}
+
+.shell .msg-thread-time {
+  font-size: calc(12.5px * var(--text-scale, 1));
+  font-variant-numeric: tabular-nums;
+  color: var(--apple-label-secondary);
+  white-space: nowrap;
+  flex: none;
+  padding-top: 2px;
+}
+
+.shell .msg-thread-row.unread .msg-thread-time {
+  color: var(--apple-blue);
+  font-weight: 650;
+}
+
+.shell .msg-thread-snippet {
+  flex: 1;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: calc(14px * var(--text-scale, 1));
+  line-height: 1.32;
+  color: var(--apple-label-secondary);
+}
+
+.shell .msg-thread-row.unread .msg-thread-snippet {
+  color: var(--apple-label);
+  font-weight: 550;
+}
+
+.shell .msg-unread-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--apple-blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  display: grid;
+  place-items: center;
+  flex: none;
+  margin-top: 1px;
+}
+
+/* --- Right Column: Active Conversation & Floating Header ------------------ */
+
+.shell .msg-detail {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.shell .msg-detail-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  min-height: var(--msg-head-h);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px max(22px, var(--msg-corner-clear)) 12px 20px;
+  border-radius: 0;
+  background: color-mix(in oklab, var(--apple-card) 74%, transparent);
+  backdrop-filter: blur(28px) saturate(175%);
+  border-bottom: 1px solid color-mix(in oklab, var(--apple-separator) 65%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+.shell.appearance-light .msg-detail-head {
+  background: color-mix(in oklab, var(--apple-card) 84%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.85);
+}
+
+/* Soft blur fade scrim below header so scrolling messages tuck cleanly under it */
+.shell .msg-detail-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 18px;
+  pointer-events: none;
+  background: linear-gradient(var(--apple-background), transparent);
+  opacity: 0.72;
+}
+
+.shell .msg-back-btn {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  place-items: center;
+  background: var(--apple-fill-tertiary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 50%, transparent);
+  color: var(--apple-blue);
+  flex: none;
+}
+
+.shell .msg-back-btn:hover {
+  background: var(--apple-fill-secondary);
+}
+
+.shell .msg-detail-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.shell .msg-detail-name {
+  margin: 0;
+  font-size: calc(19.5px * var(--text-scale, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .msg-detail-role {
+  font-size: calc(13.5px * var(--text-scale, 1));
+  color: var(--apple-label-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .msg-live-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 42%;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 650;
+  line-height: 1.15;
+  background: var(--apple-fill-tertiary);
+  color: var(--apple-label-secondary);
+  border: 1px solid transparent;
+}
+
+.shell .msg-live-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell .msg-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: currentColor;
+}
+
+.shell .msg-live-pill.tone-info {
+  background: color-mix(in oklab, var(--apple-blue) 16%, transparent);
+  border-color: color-mix(in oklab, var(--apple-blue) 32%, transparent);
+  color: var(--apple-blue);
+}
+
+.shell .msg-live-pill.tone-good {
+  background: color-mix(in oklab, var(--apple-green) 16%, transparent);
+  border-color: color-mix(in oklab, var(--apple-green) 32%, transparent);
+  color: var(--apple-green);
+}
+
+.shell .msg-live-pill.tone-warn {
+  background: color-mix(in oklab, var(--apple-orange) 17%, transparent);
+  border-color: color-mix(in oklab, var(--apple-orange) 36%, transparent);
+  color: var(--apple-orange);
+}
+
+.shell .msg-live-pill.tone-bad {
+  background: color-mix(in oklab, var(--apple-red) 18%, transparent);
+  border-color: color-mix(in oklab, var(--apple-red) 38%, transparent);
+  color: var(--apple-red);
+}
+
+/* --- Message Stream & Grouped Bubbles ------------------------------------- */
+
+.shell .msg-stream {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  scroll-padding-top: calc(var(--msg-head-h) + 24px);
+  padding: calc(var(--msg-head-h) + 18px) max(22px, var(--msg-corner-clear)) 20px 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell .msg-bubbles {
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+}
+
+.shell .msg-time-divider {
+  display: flex;
+  justify-content: center;
+  margin: 14px 0 10px;
+}
+
+.shell .msg-time-divider:first-child {
+  margin-top: 2px;
+}
+
+.shell .msg-time-divider span {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--apple-fill-quaternary);
+  color: var(--apple-label-secondary);
+  font-size: calc(12.5px * var(--text-scale, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .msg-row {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.shell .msg-row.pos-first,
+.shell .msg-row.pos-middle {
+  margin-bottom: 4px;
+}
+
+.shell .msg-row.them {
+  justify-content: flex-start;
+}
+
+.shell .msg-row.me {
+  justify-content: flex-end;
+}
+
+.shell .msg-bubble {
+  max-width: min(78%, 580px);
+  padding: 12px 16px 10px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .msg-bubble.them {
+  background: color-mix(in oklab, var(--apple-card-raised) 86%, var(--apple-card));
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 55%, transparent);
+  color: var(--apple-label);
+}
+
+.shell.appearance-light .msg-bubble.them {
+  background: #ffffff;
+  border-color: rgb(0 0 0 / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 2px 8px rgb(0 0 0 / 0.06);
+}
+
+.shell .msg-bubble.me {
+  background: linear-gradient(160deg, color-mix(in oklab, var(--apple-blue) 88%, white), var(--apple-blue));
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.24),
+    var(--shadow-raised);
+}
+
+/* iMessage bubble corner chaining for grouped clusters */
+.shell .msg-row.them.pos-first .msg-bubble.them {
+  border-bottom-left-radius: 7px;
+}
+
+.shell .msg-row.them.pos-middle .msg-bubble.them {
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 7px;
+}
+
+.shell .msg-row.them.pos-last .msg-bubble.them {
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 6px;
+}
+
+.shell .msg-row.them.pos-single .msg-bubble.them {
+  border-bottom-left-radius: 6px;
+}
+
+.shell .msg-row.me.pos-first .msg-bubble.me {
+  border-bottom-right-radius: 7px;
+}
+
+.shell .msg-row.me.pos-middle .msg-bubble.me {
+  border-top-right-radius: 7px;
+  border-bottom-right-radius: 7px;
+}
+
+.shell .msg-row.me.pos-last .msg-bubble.me {
+  border-top-right-radius: 7px;
+  border-bottom-right-radius: 6px;
+}
+
+.shell .msg-row.me.pos-single .msg-bubble.me {
+  border-bottom-right-radius: 6px;
+}
+
+/* Semantic Priority Alert Tones & Header Tags */
+.shell .msg-bubble.them.alert-critical {
+  border-color: color-mix(in oklab, var(--apple-red) 46%, transparent);
+  background: color-mix(in oklab, var(--apple-red) 10%, var(--apple-card-raised));
+}
+
+.shell.appearance-light .msg-bubble.them.alert-critical {
+  background: color-mix(in oklab, var(--apple-red) 7%, #fff);
+}
+
+.shell .msg-bubble.them.alert-warning {
+  border-color: color-mix(in oklab, var(--apple-orange) 46%, transparent);
+  background: color-mix(in oklab, var(--apple-orange) 9%, var(--apple-card-raised));
+}
+
+.shell.appearance-light .msg-bubble.them.alert-warning {
+  background: color-mix(in oklab, var(--apple-orange) 7%, #fff);
+}
+
+.shell .msg-bubble.them.alert-info {
+  border-color: color-mix(in oklab, var(--apple-blue) 40%, transparent);
+}
+
+.shell .msg-bubble.them.alert-success {
+  border-color: color-mix(in oklab, var(--apple-green) 42%, transparent);
+  background: color-mix(in oklab, var(--apple-green) 9%, var(--apple-card-raised));
+}
+
+.shell.appearance-light .msg-bubble.them.alert-success {
+  background: color-mix(in oklab, var(--apple-green) 7%, #fff);
+}
+
+.shell .msg-alert-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.shell .msg-alert-tag.tone-critical {
+  background: color-mix(in oklab, var(--apple-red) 18%, transparent);
+  color: var(--apple-red);
+}
+
+.shell .msg-alert-tag.tone-warning {
+  background: color-mix(in oklab, var(--apple-orange) 18%, transparent);
+  color: var(--apple-orange);
+}
+
+.shell .msg-alert-tag.tone-info {
+  background: color-mix(in oklab, var(--apple-blue) 16%, transparent);
+  color: var(--apple-blue);
+}
+
+.shell .msg-alert-tag.tone-success {
+  background: color-mix(in oklab, var(--apple-green) 18%, transparent);
+  color: var(--apple-green);
+}
+
+.shell .msg-text {
+  margin: 0;
+  font-size: calc(17.5px * var(--text-scale, 1));
+  line-height: 1.44;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.shell .msg-stamp {
+  font-size: calc(12px * var(--text-scale, 1));
+  font-variant-numeric: tabular-nums;
+  opacity: 0.68;
+  align-self: flex-end;
+}
+
+/* --- Structured CarPlay Route-Stop Action Card ---------------------------- */
+
+.shell .msg-stop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: var(--apple-fill-quaternary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 45%, transparent);
+}
+
+.shell .msg-stop-card.done {
+  border-color: color-mix(in oklab, var(--apple-green) 42%, transparent);
+  background: color-mix(in oklab, var(--apple-green) 9%, var(--apple-fill-quaternary));
+}
+
+.shell .msg-stop-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.shell .msg-stop-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+.shell .msg-stop-tile.category-fuel {
+  background: linear-gradient(155deg, var(--apple-orange), color-mix(in oklab, var(--apple-yellow) 75%, orange));
+}
+
+.shell .msg-stop-tile.category-rest {
+  background: linear-gradient(155deg, var(--apple-indigo), var(--apple-blue));
+}
+
+.shell .msg-stop-tile.category-service {
+  background: linear-gradient(155deg, var(--apple-green), var(--apple-teal));
+}
+
+.shell .msg-stop-status {
+  font-size: calc(13.5px * var(--text-scale, 1));
+  font-weight: 600;
+  line-height: 1.3;
+  padding-left: 46px;
+}
+
+.shell .msg-stop-status.ok {
+  color: var(--apple-green);
+}
+
+.shell .msg-stop-status.error {
+  color: var(--apple-orange);
+}
+
+.shell .msg-stop-status.loading {
+  color: var(--apple-label-secondary);
+}
+
+.shell .msg-stop-actions {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shell .msg-action-btn,
+.shell .msg-map-jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: calc(14.5px * var(--text-scale, 1));
+  font-weight: 650;
+  transition:
+    background-color 160ms var(--motion-ease),
+    color 160ms var(--motion-ease);
+}
+
+.shell .msg-action-btn {
+  background: color-mix(in oklab, var(--apple-blue) 17%, transparent);
+  color: var(--apple-blue);
+}
+
+.shell .msg-action-btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--apple-blue) 26%, transparent);
+}
+
+.shell .msg-action-btn.done {
+  background: color-mix(in oklab, var(--apple-green) 18%, transparent);
+  color: var(--apple-green);
+  cursor: default;
+}
+
+.shell .msg-map-jump-btn {
+  background: var(--apple-blue);
+  color: #fff;
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .msg-map-jump-btn:hover {
+  background: color-mix(in oklab, var(--apple-blue) 88%, black);
+}
+
+.shell .msg-map-jump-btn.inline {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: calc(13.5px * var(--text-scale, 1));
+}
+
+/* --- Smart Jump-to-Latest Floating Pill ----------------------------------- */
+
+.shell .msg-jump-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.shell .msg-jump-btn {
+  pointer-events: auto;
+  transform: translateY(calc(-100% - 10px));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--apple-card-raised) 86%, transparent);
+  border: 1px solid color-mix(in oklab, var(--glass-rim) 70%, transparent);
+  color: var(--apple-blue);
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 700;
+  box-shadow: var(--shadow-raised-large);
+}
+
+.shell.appearance-light .msg-jump-btn {
+  background: color-mix(in oklab, #fff 90%, transparent);
+}
+
+.shell .msg-jump-btn:hover {
+  background: color-mix(in oklab, var(--apple-blue) 14%, var(--apple-card-raised));
+}
+
+/* --- Empty States --------------------------------------------------------- */
+
+.shell .msg-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 24px 32px;
+  color: var(--apple-label-secondary);
+}
+
+.shell .msg-empty-icon {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--apple-fill-tertiary);
+  color: var(--apple-blue);
+}
+
+.shell .msg-empty-title {
+  margin: 4px 0 0;
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 700;
+  color: var(--apple-label);
+  text-wrap: balance;
+}
+
+.shell .msg-empty-desc {
+  margin: 0;
+  max-width: 440px;
+  font-size: calc(16px * var(--text-scale, 1));
+  line-height: 1.48;
+  text-wrap: pretty;
+}
+
+/* --- Bottom Single-Row Swipeable Quick Reply Bar -------------------------- */
+
+.shell .msg-reply-bar {
+  flex: none;
+  padding: 10px max(24px, calc(var(--msg-corner-clear) + 4px)) max(14px, calc(var(--msg-corner-clear) * 0.78)) 18px;
+  border-top: 1px solid color-mix(in oklab, var(--apple-separator) 72%, transparent);
+  background: color-mix(in oklab, var(--apple-card) 80%, transparent);
+  backdrop-filter: blur(22px) saturate(160%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shell .msg-reply-feedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .msg-reply-feedback.ok {
+  color: var(--apple-green);
+}
+
+.shell .msg-reply-feedback.error {
+  color: var(--apple-orange);
+}
+
+.shell .msg-reply-feedback.loading {
+  color: var(--apple-label-secondary);
+}
+
+.shell .msg-reply-pills {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 2px;
+  scrollbar-width: none;
+  padding: 2px;
+}
+
+.shell .msg-reply-pill {
+  flex: none;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--apple-fill-secondary);
+  border: 1px solid color-mix(in oklab, var(--apple-separator) 36%, transparent);
+  color: var(--apple-label);
+  font-size: calc(13.5px * var(--text-scale, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease);
+}
+
+.shell .msg-reply-pill svg {
+  color: var(--apple-blue);
+  flex: none;
+}
+
+.shell .msg-reply-pill:hover {
+  background: color-mix(in oklab, var(--apple-blue) 20%, var(--apple-fill));
+  border-color: color-mix(in oklab, var(--apple-blue) 36%, transparent);
+}
+
+/* --- Focus Ring Compliance (WCAG 2.4.7 / 1.4.11) -------------------------- */
+
+.shell .messages-app button:focus-visible {
+  outline: 3px solid var(--apple-blue);
+  outline-offset: 2px;
+}
+
+.shell .messages-app .msg-map-jump-btn:focus-visible,
+.shell .messages-app .msg-confirm-clear-btn:focus-visible {
+  outline: 3px solid var(--apple-label);
+  outline-offset: 2px;
+}
+
+/* --- Motion (strictly inside prefers-reduced-motion: no-preference) ------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .msg-dnd-btn,
+  .shell .msg-clear-btn,
+  .shell .msg-confirm-clear-btn,
+  .shell .msg-cancel-clear-btn,
+  .shell .msg-thread-row,
+  .shell .msg-back-btn,
+  .shell .msg-action-btn,
+  .shell .msg-map-jump-btn,
+  .shell .msg-jump-btn,
+  .shell .msg-reply-pill {
+    transition:
+      background-color 160ms var(--motion-ease),
+      border-color 160ms var(--motion-ease),
+      color 160ms var(--motion-ease),
+      scale 140ms var(--motion-ease);
+  }
+
+  .shell .msg-dnd-btn:active,
+  .shell .msg-clear-btn:active,
+  .shell .msg-confirm-clear-btn:active,
+  .shell .msg-cancel-clear-btn:active,
+  .shell .msg-back-btn:active,
+  .shell .msg-action-btn:active:not(:disabled),
+  .shell .msg-map-jump-btn:active,
+  .shell .msg-jump-btn:active,
+  .shell .msg-reply-pill:active {
+    scale: 0.96;
+  }
+
+  .shell .msg-thread-row:active {
+    scale: 0.985;
+  }
+
+  .shell .msg-row {
+    animation: msg-bubble-in 220ms var(--motion-ease) both;
+  }
+}
+
+@keyframes msg-bubble-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+/* --- Responsive Container Queries (strictly descendants of .messages-app) - */
+
+@container messages (max-width: 700px) {
+  .shell .msg-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .shell .messages-app.show-detail .msg-sidebar {
+    display: none;
+  }
+
+  .shell .messages-app:not(.show-detail) .msg-detail {
+    display: none;
+  }
+
+  .shell .msg-back-btn {
+    display: grid;
+  }
+
+  .shell .msg-live-pill {
+    max-width: 44%;
+  }
+}
+
+@container messages (max-height: 500px) {
+  .shell .msg-layout {
+    --msg-head-h: 64px;
+  }
+
+  .shell .msg-side-head {
+    padding-top: max(14px, calc(var(--msg-corner-clear) * 0.65));
+    padding-bottom: 8px;
+  }
+
+  .shell .msg-side-title {
+    font-size: calc(24px * var(--text-scale, 1));
+  }
+
+  .shell .msg-thread-row {
+    min-height: 62px;
+    padding: 8px 12px 8px 8px;
+  }
+
+  .shell .msg-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .shell .msg-avatar.small {
+    width: 34px;
+    height: 34px;
+  }
+
+  .shell .msg-detail-head {
+    padding-block: 8px;
+  }
+
+  .shell .msg-stream {
+    padding-top: calc(var(--msg-head-h) + 12px);
+    padding-bottom: 12px;
+  }
+
+  .shell .msg-reply-bar {
+    padding-top: 8px;
+    padding-bottom: max(10px, calc(var(--msg-corner-clear) * 0.65));
+  }
+}

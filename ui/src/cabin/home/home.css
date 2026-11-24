@@ -78,6 +78,39 @@
   filter: var(--shadow-icon-large);
 }
 
+.app-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.app-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--apple-red, rgb(255 56 60));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+.home-pages.compact .app-badge {
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
 .label {
   padding: 5px 16px 6px;
   border-radius: 14px;

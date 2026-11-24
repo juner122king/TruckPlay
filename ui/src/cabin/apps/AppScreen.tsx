@@ -19,6 +19,7 @@ import { HongguoApp } from './hongguo/HongguoApp'
 import { WeatherApp } from './weather/WeatherApp'
 import { YouTubeApp } from './youtube/YouTubeApp'
 import { FreightApp } from './freight/FreightApp'
+import { MessagesApp } from './messages/MessagesApp'
 import './apps.css'
 
 /**
@@ -114,6 +115,8 @@ function AppContent({ app }: { app: AppId }) {
       return <PlayerApp />
     case 'freight':
       return <FreightApp />
+    case 'messages':
+      return <MessagesApp />
     case 'safari':
       return <SafariApp />
     default:
