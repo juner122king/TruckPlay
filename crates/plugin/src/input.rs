@@ -39,7 +39,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, MAPVK_VSC_TO
 use windows::core::{GUID, HRESULT, Interface};
 
 use crate::hooks::{guarded, hook, vtable_entry};
-use crate::{bridge, keybinds, log, typing};
+use crate::{bridge, game_action, keybinds, log, typing};
 
 // IDirectInputDevice8 vtable slots (IUnknown = 0..2).
 const VTBL_GET_DEVICE_STATE: usize = 9;
@@ -330,10 +330,11 @@ unsafe fn get_device_data(
     // the original function, called with the caller's arguments as they came. The events are looked at only
     // once counted (`count` set).
     unsafe {
+        let capacity = if !count.is_null() { *count } else { 0 };
         let original: GetDeviceDataFn = std::mem::transmute(original.load(Ordering::Acquire));
         let (result, outermost) = outermost(|| original(device, object_size, data, count, flags));
         if outermost && result.is_ok() && !count.is_null() {
-            guarded(|| on_device_data(device, object_size, data, count, flags));
+            guarded(|| on_device_data(device, object_size, data, count, capacity, flags));
         }
         result
     }
@@ -355,10 +356,11 @@ unsafe fn on_device_state(device: *mut c_void, size: u32, state: *mut u8) {
                 // While the player types into WestPlay, the keyboard's keys are its (but the game's own); a key
                 // bound to WestPlay is from its press to its release.
                 let typed = typing && !typing::stays_the_games_scancode(code);
-                if typed || dik_taken(code, *key & 0x80 != 0) {
+                if typed || dik_taken(code, *key & 0x80 != 0) || game_action::hides_dik(code) {
                     *key = 0;
                 }
             }
+            game_action::apply_dinput_state(std::slice::from_raw_parts_mut(state, size as usize));
         }
         if !interaction_active() {
             return;
@@ -402,6 +404,7 @@ unsafe fn on_device_data(
     object_size: u32,
     data: *mut DIDEVICEOBJECTDATA,
     count: *mut u32,
+    capacity: u32,
     flags: u32,
 ) {
     // SAFETY: `count` events of `object_size` bytes each are what the original call just wrote into `data`
@@ -426,7 +429,7 @@ unsafe fn on_device_data(
         let events = std::slice::from_raw_parts_mut(data as *mut u8, *count as usize * object_size as usize);
         // A peek leaves the events in the buffer: they're taken when the game reads them for real.
         let peek = flags & DIGDD_PEEK != 0;
-        let kept = match kind {
+        let mut kept = match kind {
             DeviceKind::Mouse(layout) => {
                 let mut held = GAME_HELD.lock().unwrap_or_else(|e| e.into_inner());
                 let held = held.entry(device as usize).or_default();
@@ -461,11 +464,29 @@ unsafe fn on_device_data(
                         } else {
                             dik_taken(offset, value & 0x80 != 0)
                         };
-                    !typed && !taken
+                    !typed && !taken && !game_action::hides_dik(offset)
                 })
             }
             DeviceKind::Other => return,
         };
+        if kind == DeviceKind::Keyboard
+            && !peek
+            && capacity != u32::MAX
+            && (object_size as usize) >= size_of::<DIDEVICEOBJECTDATA>()
+            && kept < capacity as usize
+        {
+            let room = (capacity as usize) - kept;
+            let injected = game_action::drain_dinput_events(room);
+            for (dik, down, seq) in injected {
+                let dst = (data as *mut u8).add(kept * object_size as usize);
+                std::ptr::write_bytes(dst, 0, object_size as usize);
+                let ev = &mut *(dst as *mut DIDEVICEOBJECTDATA);
+                ev.dwOfs = u32::from(dik);
+                ev.dwData = if down { 0x80 } else { 0 };
+                ev.dwSequence = seq;
+                kept += 1;
+            }
+        }
         *count = kept as u32;
     }
 }
@@ -668,6 +689,11 @@ fn toggle_mode() -> bool {
 static TOGGLED: AtomicBool = AtomicBool::new(false);
 /// Whether the interaction key was down at the last frame.
 static KEY_WAS_DOWN: AtomicBool = AtomicBool::new(false);
+
+/// Turns off toggle-mode screen interaction immediately (e.g. before injecting a game UI action).
+pub fn cancel_toggle() {
+    TOGGLED.store(false, Ordering::Release);
+}
 
 /// Once a frame: in toggle mode, each press of the interaction key turns using the screen on or off. It's
 /// off whenever WestPlay isn't on the screen, and as the game pauses.

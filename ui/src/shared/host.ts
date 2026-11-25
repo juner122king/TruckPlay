@@ -143,6 +143,66 @@ export interface GameplayEvent {
   target: string
 }
 
+export interface BankLoan {
+  amount: number
+  originalAmount: number
+  interestRate: number
+  remainingDays: number
+  dailyRepayment: number
+}
+
+export interface BankInfo {
+  moneyAccount: number
+  loans: BankLoan[]
+}
+
+export interface GarageSummary {
+  cityId: string
+  status: number
+  vehicleCount: number
+  driverCount: number
+  isHq: boolean
+}
+
+export interface HiredDriver {
+  id: string
+  garageCity: string
+  currentCity: string
+  state: number
+  onDutyTimer: number
+  skillPoints: number
+  lastProfit?: number | null
+}
+
+export interface UsedTruckOffer {
+  id: string
+  model: string
+  price: number
+  odometerKm: number
+  wear: number
+  expirationTime?: number | null
+}
+
+export interface CompanySnapshot {
+  companyName?: string | null
+  playerName?: string | null
+  bank: BankInfo
+  garages: GarageSummary[]
+  drivers: HiredDriver[]
+  usedTrucks: UsedTruckOffer[]
+}
+
+export type GameActionKind =
+  | 'roadsideTowToService'
+  | 'roadsideTowToRoad'
+  | 'roadsideEmergencyRefuel'
+  | 'openAssistanceMenu'
+  | 'toggleHazardLights'
+  | 'openGarageManager'
+  | 'openGameDesktop'
+
+export type GameActionAnswer = 'done' | 'gamePaused' | 'notInGame' | 'busy' | 'unsupported' | 'noAnswer'
+
 export type HostMessage =
   | { type: 'mediaResource'; app: MediaApp; generation: number; resident: boolean }
   | { type: 'telemetry'; data: Telemetry }
@@ -181,6 +241,10 @@ export type HostMessage =
   | { type: 'cursor'; host: boolean }
   /** The cities whose garages the player owns, and their headquarters', from their latest save. */
   | { type: 'garages'; owned: string[]; headquarters: string | null }
+  /** Company financial, garage, hired driver, and used truck snapshot from the latest save. */
+  | { type: 'company'; data: CompanySnapshot }
+  /** The game plugin's answer to a `gameAction` request `id`. */
+  | { type: 'gameActionAnswer'; id: number; answer: GameActionAnswer }
   /** The game's answer to the page's `route` request `id`. */
   | { type: 'routeAnswer'; id: number; answer: RouteAnswer }
   /** WestPlay's own routes for the page's `routes` request `id` (none: no road graph, or no way there). */
@@ -441,6 +505,8 @@ export type PageMessage =
   | { type: 'player'; command: PlayerCommand }
   /** What the Safari app asks of its pages (`westplay_host::safari::Command`). */
   | { type: 'safari'; command: SafariCommand }
+  /** An in-game action triggered by the Phone app (F7 assistance, hazards, garage/desktop shortcuts). */
+  | { type: 'gameAction'; id: number; action: GameActionKind; autoConfirm?: boolean }
 
 /** A Safari tab's page (`westplay_host::safari::TabState`): its address and title, whether it loads, whether it
  * can go back or forward, its icon's address, its colour at the top (a CSS colour), whether it's full screen,

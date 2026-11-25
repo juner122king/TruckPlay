@@ -776,9 +776,10 @@ unsafe fn on_present(swapchain: *mut c_void) {
     unsafe {
         let frame = FRAME.fetch_add(1, Ordering::Relaxed) + 1;
         screens::on_frame(frame);
-        // The interaction key's toggle, then the keybinds (which may need it).
+        // The interaction key's toggle, then the keybinds (which may need it), then synthetic phone actions.
         crate::input::on_frame();
         crate::keybinds::on_frame();
+        crate::game_action::on_frame();
         if let Some(bridge) = bridge::get() {
             bridge.plugin.heartbeat.store(frame, Ordering::Release);
         }
@@ -832,12 +833,18 @@ unsafe fn log_window_mode(swapchain: *mut c_void) {
     }
 }
 
+/// The game's window handle, once `Present` has observed the swap chain.
+pub fn game_hwnd() -> Option<HWND> {
+    let window = HWND(GAME_WINDOW.load(Ordering::Relaxed) as *mut c_void);
+    (!window.is_invalid()).then_some(window)
+}
+
 /// Whether the game's window shows: shown and not minimised, in front or not (Lossless Scaling's window is in
 /// front of the game it scales: owner 2026-10-28, whenever the game shows, WestPlay works). Not yet known: no.
 pub fn game_shown() -> bool {
-    let window = HWND(GAME_WINDOW.load(Ordering::Relaxed) as *mut c_void);
+    let Some(window) = game_hwnd() else { return false };
     // SAFETY: plain queries about a window handle (one gone answers no).
-    !window.is_invalid() && unsafe { IsWindowVisible(window).as_bool() && !IsIconic(window).as_bool() }
+    unsafe { IsWindowVisible(window).as_bool() && !IsIconic(window).as_bool() }
 }
 
 /// The window's mode as one number (never 0): exclusive 1, borderless 2, a window 3; 4 added in the background.

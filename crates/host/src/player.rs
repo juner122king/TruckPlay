@@ -14,13 +14,14 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant, SystemTime};
 
 use westplay_mapdata::locale;
-use westplay_mapdata::save::{self, Garages};
+use westplay_mapdata::save::{self, CompanySnapshot, Garages};
 use westplay_setup::game::Kind;
 use westplay_setup::profiles::{self, find_mod, is_hvt_map};
 use westplay_setup::{game, places};
-use westplay_shared::{BridgeMapping, TruckInfo};
+use westplay_shared::{BridgeMapping, GAME_ACTION_KEY_COUNT, TruckInfo};
 
 use crate::fitted::{self, SavedTruck};
+use crate::game_action::parse_controls_keybinds;
 use crate::speakers::{self, Speaker};
 
 /// How often to look for a newer save.
@@ -30,6 +31,10 @@ const CHECK_EVERY: Duration = Duration::from_secs(10);
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Player {
     pub garages: Garages,
+    /// Company financial status, owned garage details, hired AI drivers, and used-truck market listings.
+    pub company: CompanySnapshot,
+    /// Keyboard bindings parsed from `controls.sii` for Phone game actions (`0` = game default).
+    pub keybinds: [u32; GAME_ACTION_KEY_COUNT],
     /// The player's profile plays on a map by HVT (Heavy Vehicles Turkey), which WestPlay doesn't allow.
     pub hvt_map: bool,
     /// The game's language (`tr_tr`…), from its config.
@@ -112,10 +117,8 @@ impl PlayerWatch {
                 {
                     match read_units(&path) {
                         Ok(units) => {
-                            let mods = save::profile_of(&path)
-                                .and_then(|profile| read_units(&profile).ok())
-                                .map(|units| save::active_mods(&units))
-                                .unwrap_or_default();
+                            let profile_units = save::profile_of(&path).and_then(|profile| read_units(&profile).ok());
+                            let mods = profile_units.as_deref().map(save::active_mods).unwrap_or_default();
                             let mod_dir = documents.as_deref().map(|dir| dir.join("mod")).unwrap_or_default();
                             let found: Vec<_> =
                                 mods.iter().map(|listed| find_mod(kind, listed, game.as_ref(), &mod_dir)).collect();
@@ -125,8 +128,14 @@ impl PlayerWatch {
                             saved = fitted::saved_trucks(&units);
                             mod_files = found.into_iter().filter_map(|m| m.files).collect();
                             let config = options.as_deref().and_then(|file| std::fs::read_to_string(file).ok());
+                            let keybinds = profile_controls(&path)
+                                .and_then(|file| std::fs::read_to_string(file).ok())
+                                .map(|text| parse_controls_keybinds(&text))
+                                .unwrap_or_default();
                             let player = Player {
                                 garages: save::garages(&units),
+                                company: save::company_snapshot(&units, profile_units.as_deref()),
+                                keybinds,
                                 hvt_map,
                                 language: documents.as_deref().and_then(game_language),
                                 time_zones: config.as_deref().is_some_and(time_zones),
@@ -218,6 +227,11 @@ fn profile_config(save: &Path) -> Option<PathBuf> {
     Some(save::profile_of(save)?.parent()?.join("config.cfg"))
 }
 
+/// The keybindings file of a save's profile (`profiles/<profile>/controls.sii`).
+fn profile_controls(save: &Path) -> Option<PathBuf> {
+    Some(save::profile_of(save)?.parent()?.join("controls.sii"))
+}
+
 /// Whether a profile's options (its `config.cfg`) are in miles: `uset g_mph "1"` (the game's UK and USA regional
 /// profiles: def/regional_settings), `"0"` kilometres (Europe's); `None` when not written.
 fn mph(config: &str) -> Option<bool> {
@@ -246,14 +260,29 @@ mod tests {
 
     #[test]
     fn reads_whether_the_profile_is_in_miles() {
-        assert_eq!(super::mph("uset g_hud_speed_limit \"1\"
+        assert_eq!(
+            super::mph(
+                "uset g_hud_speed_limit \"1\"
 uset g_mph \"1\"
-"), Some(true));
-        assert_eq!(super::mph("uset g_mph \"0\"
-"), Some(false));
-        assert_eq!(super::mph("uset g_mpg \"2\"
+"
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            super::mph(
+                "uset g_mph \"0\"
+"
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            super::mph(
+                "uset g_mpg \"2\"
 uset g_lang_init \"tr_tr\"
-"), None);
+"
+            ),
+            None
+        );
     }
 
     #[test]

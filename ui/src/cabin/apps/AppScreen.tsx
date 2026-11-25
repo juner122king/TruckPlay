@@ -20,6 +20,7 @@ import { WeatherApp } from './weather/WeatherApp'
 import { YouTubeApp } from './youtube/YouTubeApp'
 import { FreightApp } from './freight/FreightApp'
 import { MessagesApp } from './messages/MessagesApp'
+import { PhoneApp } from './phone/PhoneApp'
 import './apps.css'
 
 /**
@@ -117,6 +118,8 @@ function AppContent({ app }: { app: AppId }) {
       return <FreightApp />
     case 'messages':
       return <MessagesApp />
+    case 'phone':
+      return <PhoneApp />
     case 'safari':
       return <SafariApp />
     default:

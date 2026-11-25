@@ -3,6 +3,7 @@ import { releaseMedia } from '../apps/releaseMedia'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import {
+  type CompanySnapshot,
   type Equalizer,
   FLAT,
   type HostMessage,
@@ -90,6 +91,7 @@ import { isScreenLayoutId, type ScreenLayoutId } from './screen'
 import { DEFAULT_TEXT_SIZE, STEPS_ADDED_BELOW, toTextSize } from './textSize'
 import { languageOf, stringsFor } from './strings'
 import { clockStyleFor, resetSimulationTracker, type SuppressOptions, useSimulation } from './simulation'
+import { receiveGameActionAnswer, resetPhoneTracker, usePhone } from './phone'
 
 /** The Dashboard's widgets the player can turn off (turn-by-turn always shows while there's a route). */
 export type DashboardWidget = 'nowPlaying' | 'destination' | 'weather'
@@ -343,6 +345,8 @@ export interface LiveState {
    * save). */
   ownedGarages: string[]
   headquarters: string | null
+  /** Company financial status, garage details, hired AI drivers, and used-truck market listings from the latest save. */
+  company: CompanySnapshot | null
   /** The player plays on a map by HVT, which WestPlay doesn't allow: the game's language to say so in.
    * `null`: not (or not known yet). */
   hvtMap: { language: string | null } | null
@@ -418,6 +422,7 @@ export const useLive = create<LiveState>()(() => ({
   screenLayout: previewLayout(),
   ownedGarages: [],
   headquarters: null,
+  company: null,
   hvtMap: null,
   gameLanguage: null,
   chosenLanguage: null,
@@ -536,9 +541,21 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
             .powerEvent({ type: 'electrics', on: message.data.electricEnabled, at: now(), truckScreen })
         }
         const live = useLive.getState()
+        const strings = simStrings()
         useSimulation
           .getState()
-          .ingestTelemetry(message.data, live.job, live.clockShift, live.mph, simStrings(), simOptions())
+          .ingestTelemetry(message.data, live.job, live.clockShift, live.mph, strings, simOptions())
+        usePhone
+          .getState()
+          .evaluateIncomingCalls(
+            message.data,
+            live.job,
+            live.truck,
+            live.clockShift,
+            live.mph,
+            useSimulation.getState().dnd,
+            strings,
+          )
         break
       }
       case 'truck':
@@ -571,6 +588,12 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
       }
       case 'garages':
         useLive.setState({ ownedGarages: message.owned, headquarters: message.headquarters })
+        break
+      case 'company':
+        useLive.setState({ company: message.data })
+        break
+      case 'gameActionAnswer':
+        receiveGameActionAnswer(message.id, message.answer)
         break
       case 'routeAnswer':
         receiveRouteAnswer(message.id, message.answer)
@@ -755,6 +778,7 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
           useLive.setState({ telemetry: null, semaphores: [] })
           useCabin.getState().powerEvent({ type: 'electrics', on: false, at: now() })
           resetSimulationTracker()
+          resetPhoneTracker()
         }
         break
       case 'youtubeAccount':

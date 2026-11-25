@@ -30,7 +30,7 @@ pub fn bridge_name() -> String {
     format!("Local\\WestPlay.Bridge.v{BRIDGE_VERSION}")
 }
 pub const BRIDGE_MAGIC: u32 = u32::from_le_bytes(*b"WPB7");
-pub const BRIDGE_VERSION: u32 = 30;
+pub const BRIDGE_VERSION: u32 = 31;
 
 /// Size of the app's frames, and the base size of the screen textures in the mod (`westplay_setup::game_mod`
 /// builds them from these).
@@ -177,10 +177,7 @@ const OB_GPS_GLASS: &[(&str, Glass)] = &[
         "setradt531",
         Glass { left: 0.0123, right: 0.9877, top: 0.0123, bottom: 0.9877, width_cm: 17.55, height_cm: 10.80 },
     ),
-    (
-        "manlions",
-        Glass { left: 0.0047, right: 0.9965, top: 0.0047, bottom: 0.9964, width_cm: 13.14, height_cm: 7.32 },
-    ),
+    ("manlions", Glass { left: 0.0047, right: 0.9965, top: 0.0047, bottom: 0.9964, width_cm: 13.14, height_cm: 7.32 }),
 ];
 
 /// The glass of the screen at layout `index` in the truck `truck_id`, where WestPlay's image covers its part's
@@ -374,6 +371,7 @@ pub struct Bridge {
     pub host: HostBlock,
     pub route: RouteBlock,
     pub typing: TypingBlock,
+    pub game_action: GameActionBlock,
 }
 
 /// Written by the game plugin.
@@ -497,11 +495,7 @@ pub struct SemaphoresBlock {
 
 impl Default for SemaphoresBlock {
     fn default() -> Self {
-        Self {
-            frame: 0,
-            count: 0,
-            semaphores: [Semaphore::default(); SEMAPHORES_MAX],
-        }
+        Self { frame: 0, count: 0, semaphores: [Semaphore::default(); SEMAPHORES_MAX] }
     }
 }
 
@@ -754,6 +748,92 @@ pub enum RouteAnswer {
 impl RouteAnswer {
     pub fn from_code(code: i32) -> Option<Self> {
         [Self::Done, Self::AlreadyThere, Self::OnJob, Self::Full, Self::NoSuchNode, Self::Unsupported, Self::Unexpected]
+            .into_iter()
+            .find(|answer| *answer as i32 == code)
+    }
+}
+
+/// Number of profile key bindings forwarded to the plugin for [`GameActionBlock`]:
+/// `[0] = F7 (advpage3 / assistance)`, `[1] = Enter (activate)`, `[2] = F (flasher4way)`,
+/// `[3] = G (gar_man)`, `[4] = Esc (menu)`.
+pub const GAME_ACTION_KEY_COUNT: usize = 5;
+
+/// [`GameActionBlock::flags`]: also press the final `Enter` after selecting a roadside assistance option.
+pub const GAME_ACTION_FLAG_AUTO_CONFIRM: u32 = 1 << 0;
+
+/// An in-game action triggered from the cabin UI (e.g. Phone roadside assistance, hazard lights, garage manager,
+/// or main desktop menu): the app writes the request, the plugin injects the synthetic key sequence and writes
+/// the answer back.
+#[repr(C)]
+pub struct GameActionBlock {
+    /// Action to perform (a [`GameAction`] code), written before `request` changes.
+    pub action: AtomicU32,
+    /// Optional bit flags (e.g. [`GAME_ACTION_FLAG_AUTO_CONFIRM`]), written before `request` changes.
+    pub flags: AtomicU32,
+    /// Player keybindings parsed from `controls.sii` (Windows virtual-key codes; 0 = game default).
+    pub key_vks: [AtomicU32; GAME_ACTION_KEY_COUNT],
+    /// Incremented by the host for each new request.
+    pub request: AtomicU32,
+    /// The `request` the plugin last answered, with `answer` written before it.
+    pub answered: AtomicU32,
+    pub answer: AtomicI32,
+}
+
+/// High-level in-game actions requested by the Phone app.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u32)]
+pub enum GameAction {
+    /// Roadside assistance option 1: tow truck & trailer to nearest service center.
+    RoadsideTowToService = 1,
+    /// Roadside assistance option 2: recover/tow truck back to the nearest road.
+    RoadsideTowToRoad = 2,
+    /// Roadside assistance option 3: emergency refueling.
+    RoadsideEmergencyRefuel = 3,
+    /// Open the F7 assistance menu without choosing an option.
+    OpenAssistanceMenu = 4,
+    /// Toggle 4-way hazard flashers.
+    ToggleHazardLights = 5,
+    /// Open the game's Garage Manager (`G`).
+    OpenGarageManager = 6,
+    /// Open the game's main desktop menu (`Esc`) for Bank / Used Truck Dealer access.
+    OpenGameDesktop = 7,
+}
+
+impl GameAction {
+    pub fn from_code(code: u32) -> Option<Self> {
+        [
+            Self::RoadsideTowToService,
+            Self::RoadsideTowToRoad,
+            Self::RoadsideEmergencyRefuel,
+            Self::OpenAssistanceMenu,
+            Self::ToggleHazardLights,
+            Self::OpenGarageManager,
+            Self::OpenGameDesktop,
+        ]
+        .into_iter()
+        .find(|action| *action as u32 == code)
+    }
+}
+
+/// How the plugin answered a [`GameActionBlock`] request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i32)]
+pub enum GameActionAnswer {
+    /// Sequence queued / executed.
+    Done = 1,
+    /// Game is paused so driving-only actions (roadside / hazards) cannot run.
+    GamePaused = -1,
+    /// Game window is not visible / active.
+    NotInGame = -2,
+    /// Another synthetic key sequence is currently running.
+    Busy = -3,
+    /// Action code is unrecognized or unsupported.
+    Unsupported = -4,
+}
+
+impl GameActionAnswer {
+    pub fn from_code(code: i32) -> Option<Self> {
+        [Self::Done, Self::GamePaused, Self::NotInGame, Self::Busy, Self::Unsupported]
             .into_iter()
             .find(|answer| *answer as i32 == code)
     }
@@ -1560,5 +1640,34 @@ mod tests {
         }
         let popped: Vec<u32> = std::iter::from_fn(|| queue.pop()).map(|e| e.kind).collect();
         assert_eq!(popped, [1, 2, 3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn game_action_codes_round_trip() {
+        for action in [
+            GameAction::RoadsideTowToService,
+            GameAction::RoadsideTowToRoad,
+            GameAction::RoadsideEmergencyRefuel,
+            GameAction::OpenAssistanceMenu,
+            GameAction::ToggleHazardLights,
+            GameAction::OpenGarageManager,
+            GameAction::OpenGameDesktop,
+        ] {
+            assert_eq!(GameAction::from_code(action as u32), Some(action));
+        }
+        assert_eq!(GameAction::from_code(0), None);
+        assert_eq!(GameAction::from_code(99), None);
+
+        for answer in [
+            GameActionAnswer::Done,
+            GameActionAnswer::GamePaused,
+            GameActionAnswer::NotInGame,
+            GameActionAnswer::Busy,
+            GameActionAnswer::Unsupported,
+        ] {
+            assert_eq!(GameActionAnswer::from_code(answer as i32), Some(answer));
+        }
+        assert_eq!(GameActionAnswer::from_code(0), None);
+        assert_eq!(GameActionAnswer::from_code(-99), None);
     }
 }

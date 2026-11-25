@@ -8,6 +8,7 @@ mod bridge;
 mod camera;
 mod d3d;
 mod frame;
+mod game_action;
 mod hooks;
 mod input;
 mod keybinds;

@@ -1,0 +1,134 @@
+/* Compact floating CarPlay incoming-call banner (IncomingCallBanner.tsx) */
+
+.call-banner-slot {
+  position: absolute;
+  left: var(--content-left, 170px);
+  right: var(--edge, 16px);
+  top: 16px;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition:
+    opacity 200ms var(--motion-ease),
+    transform 220ms var(--motion-ease),
+    visibility 0s linear 220ms;
+}
+
+.call-banner-slot.shown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+
+.call-banner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(600px, 94%);
+  padding: 10px 12px 10px 14px;
+  border-radius: 28px;
+  background: color-mix(in oklab, var(--apple-card, #1c1c1e) 90%, transparent);
+  border: 1px solid color-mix(in oklab, var(--apple-green) 42%, var(--glass-rim));
+  backdrop-filter: blur(32px) saturate(175%);
+  box-shadow: var(--shadow-raised-large);
+  color: var(--apple-label, var(--text));
+}
+
+.shell.appearance-light .call-banner {
+  background: color-mix(in oklab, #fff 92%, transparent);
+}
+
+.call-banner-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  background: linear-gradient(145deg, #ff6b4a, #e53935);
+}
+
+.call-banner-avatar.tone-receiver,
+.call-banner-avatar.tone-shipper {
+  background: linear-gradient(145deg, #06b6d4, #0e7490);
+}
+
+.call-banner-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.call-banner-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.call-banner-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--apple-green) 22%, transparent);
+  color: var(--apple-green);
+  flex-shrink: 0;
+}
+
+.call-banner-name {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.call-banner-reason {
+  font-size: calc(13px * var(--text-scale, 1));
+  color: var(--apple-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.call-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.call-banner-btn {
+  border: 0;
+  border-radius: 999px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.call-banner-btn.decline {
+  width: 40px;
+  background: var(--apple-red);
+}
+
+.call-banner-btn.answer {
+  padding: 0 16px;
+  background: var(--apple-green);
+}

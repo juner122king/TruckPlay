@@ -20,7 +20,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{BOOL, PCSTR, s, w};
 
 use crate::hooks::{guarded, hook};
-use crate::{keybinds, typing};
+use crate::{game_action, keybinds, typing};
 
 type PeekMessageWFn = unsafe extern "system" fn(*mut MSG, HWND, u32, u32, u32) -> BOOL;
 type GetMessageWFn = unsafe extern "system" fn(*mut MSG, HWND, u32, u32) -> BOOL;
@@ -91,7 +91,9 @@ unsafe extern "system" fn get_async_key_state(key: i32) -> i16 {
         let mut state = original(key);
         // Our own calls (inside `guarded`) get the real state.
         guarded(|| {
-            if hidden(key as u32) {
+            if game_action::synthetic_vk_down(key as u32) {
+                state = -32767i16;
+            } else if hidden(key as u32) {
                 state = 0;
             }
         });
@@ -107,7 +109,9 @@ unsafe extern "system" fn get_key_state(key: i32) -> i16 {
         let original: GetKeyStateFn = std::mem::transmute(ORIG_GET_KEY_STATE.load(Ordering::Acquire));
         let mut state = original(key);
         guarded(|| {
-            if hidden(key as u32) {
+            if game_action::synthetic_vk_down(key as u32) {
+                state = -32768i16;
+            } else if hidden(key as u32) {
                 state = 0;
             }
         });
@@ -115,10 +119,10 @@ unsafe extern "system" fn get_key_state(key: i32) -> i16 {
     }
 }
 
-/// Whether the game's polling sees `key` up whatever it is: any key but its own while the player types, and a
-/// key bound to WestPlay while its binding counts (`keybinds`).
+/// Whether the game's polling sees `key` up whatever it is: any key but its own while the player types, a
+/// key bound to WestPlay while its binding counts (`keybinds`), or the interaction key while a synthetic action runs.
 fn hidden(key: u32) -> bool {
-    (typing::typing() && !typing::stays_the_games(key)) || keybinds::taken(key)
+    (typing::typing() && !typing::stays_the_games(key)) || keybinds::taken(key) || game_action::hides_vk(key)
 }
 
 /// While the player types, takes every key's messages (but the game's own) away from the game, turning them

@@ -17,13 +17,14 @@
 //! The binary layout follows SII_Decrypt's decoder (TheLazyTomcat, <https://github.com/TheLazyTomcat/SII_Decrypt>),
 //! learned from, not copied.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use aes::cipher::block_padding::Pkcs7;
 use aes::cipher::{BlockDecryptMut, KeyIvInit};
+use serde::Serialize;
 
 use crate::reader::{OutOfBounds, Reader};
 use crate::sii::{self, Unit};
@@ -294,6 +295,299 @@ pub fn garages(units: &[Unit]) -> Garages {
         .filter(|city| !city.is_empty() && *city != "null")
         .map(str::to_owned);
     Garages { owned, headquarters }
+}
+
+/// Active bank loan parsed from a `bank_loan` unit in `game.sii`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BankLoan {
+    pub amount: i64,
+    pub original_amount: i64,
+    pub interest_rate: f32,
+    pub remaining_days: u32,
+    pub daily_repayment: i64,
+}
+
+/// Player bank status parsed from `bank` and `bank_loan` units in `game.sii`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BankInfo {
+    pub money_account: i64,
+    pub loans: Vec<BankLoan>,
+}
+
+/// Summary of an owned garage from `game.sii`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GarageSummary {
+    pub city_id: String,
+    pub status: u32,
+    pub vehicle_count: u32,
+    pub driver_count: u32,
+    pub is_hq: bool,
+}
+
+/// Summary of a hired AI driver from `driver_ai` units referenced by owned garages/player.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HiredDriver {
+    pub id: String,
+    pub garage_city: String,
+    pub current_city: String,
+    pub state: u32,
+    pub on_duty_timer: i32,
+    pub skill_points: u32,
+    pub last_profit: Option<i64>,
+}
+
+/// Used truck market offer defensively parsed from `game.sii` (ETS2/ATS 1.49+).
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsedTruckOffer {
+    pub id: String,
+    pub model: String,
+    pub price: i64,
+    pub odometer_km: u32,
+    pub wear: f32,
+    pub expiration_time: Option<u32>,
+}
+
+/// Company, fleet, financial, and used-truck data extracted from the player's latest save.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanySnapshot {
+    pub company_name: Option<String>,
+    pub player_name: Option<String>,
+    pub bank: BankInfo,
+    pub garages: Vec<GarageSummary>,
+    pub drivers: Vec<HiredDriver>,
+    pub used_trucks: Vec<UsedTruckOffer>,
+}
+
+fn parse_i64(value: &str) -> Option<i64> {
+    let trimmed = value.trim();
+    trimmed.parse::<i64>().ok().or_else(|| trimmed.parse::<f64>().ok().map(|v| v.round() as i64))
+}
+
+fn parse_u32(value: &str) -> Option<u32> {
+    let trimmed = value.trim();
+    trimmed.parse::<u32>().ok().or_else(|| trimmed.parse::<f64>().ok().filter(|v| *v >= 0.0).map(|v| v.round() as u32))
+}
+
+fn parse_f32(value: &str) -> Option<f32> {
+    value.trim().parse::<f32>().ok().filter(|v| v.is_finite())
+}
+
+fn is_ref(value: &str) -> bool {
+    let v = value.trim();
+    !v.is_empty() && v != "null" && !v.chars().all(|c| c.is_ascii_digit())
+}
+
+fn truck_model_from_data_path(path: &str) -> Option<String> {
+    let rest = path.split("/def/vehicle/truck/").nth(1)?;
+    let model = rest.split('/').next()?;
+    (!model.is_empty()).then(|| model.to_owned())
+}
+
+fn parse_bank_loan(u: &Unit) -> Option<BankLoan> {
+    let amount = u.get("amount").and_then(parse_i64).unwrap_or(0);
+    if amount <= 0 {
+        return None;
+    }
+    let original_amount = u.get("original_amount").and_then(parse_i64).unwrap_or(amount);
+    let interest_rate = u.get("interest_rate").and_then(parse_f32).unwrap_or(0.0);
+    let remaining_days = u.get("remaining_days").or_else(|| u.get("duration")).and_then(parse_u32).unwrap_or(0);
+    let daily_repayment = u.get("daily_repayment").and_then(parse_i64).filter(|&v| v > 0).unwrap_or_else(|| {
+        if remaining_days > 0 { (amount + i64::from(remaining_days) - 1) / i64::from(remaining_days) } else { 0 }
+    });
+    Some(BankLoan { amount, original_amount, interest_rate, remaining_days, daily_repayment })
+}
+
+fn parse_bank_info(units: &[Unit], by_name: &HashMap<&str, &Unit>) -> BankInfo {
+    let bank_unit = units.iter().find(|u| u.class == "bank");
+    let money_account = bank_unit.and_then(|u| u.get("money_account")).and_then(parse_i64).unwrap_or(0);
+    let loan_refs: Vec<&str> = bank_unit.map(|u| u.all("loans").filter(|v| is_ref(v)).collect()).unwrap_or_default();
+
+    let mut loans: Vec<BankLoan> = if !loan_refs.is_empty() {
+        loan_refs.iter().filter_map(|id| by_name.get(id).and_then(|u| parse_bank_loan(u))).collect()
+    } else {
+        units.iter().filter(|u| u.class == "bank_loan").filter_map(parse_bank_loan).collect()
+    };
+    loans.sort_by_key(|a| std::cmp::Reverse(a.amount));
+    BankInfo { money_account, loans }
+}
+
+fn parse_garages_and_hired(
+    units: &[Unit],
+    player_unit: Option<&Unit>,
+    hq_city: Option<&str>,
+) -> (Vec<GarageSummary>, HashMap<String, String>, HashSet<String>) {
+    let mut garages = Vec::new();
+    let mut driver_garage = HashMap::new();
+    let mut hired_ids = HashSet::new();
+
+    if let Some(p) = player_unit {
+        for d in p.all("drivers").filter(|v| is_ref(v) && *v != "driver.player") {
+            hired_ids.insert(d.to_owned());
+        }
+    }
+
+    for u in units.iter().filter(|u| u.class == "garage") {
+        let status = u.get("status").and_then(parse_u32).unwrap_or(0);
+        if status == 0 {
+            continue;
+        }
+        let Some(city_id) = u.name.strip_prefix("garage.").map(str::to_owned) else { continue };
+        let vehicle_count = u.all("vehicles").filter(|v| is_ref(v)).count() as u32;
+        let mut driver_count = 0u32;
+        for d in u.all("drivers").filter(|v| is_ref(v)) {
+            driver_count += 1;
+            if d != "driver.player" {
+                hired_ids.insert(d.to_owned());
+                driver_garage.insert(d.to_owned(), city_id.clone());
+            }
+        }
+        garages.push(GarageSummary {
+            city_id: city_id.clone(),
+            status,
+            vehicle_count,
+            driver_count,
+            is_hq: hq_city == Some(city_id.as_str()),
+        });
+    }
+    garages.sort_by(|a, b| b.is_hq.cmp(&a.is_hq).then_with(|| a.city_id.cmp(&b.city_id)));
+    (garages, driver_garage, hired_ids)
+}
+
+fn parse_hired_drivers(
+    units: &[Unit],
+    by_name: &HashMap<&str, &Unit>,
+    driver_garage: &HashMap<String, String>,
+    hired_ids: &HashSet<String>,
+) -> Vec<HiredDriver> {
+    let mut drivers = Vec::new();
+    for u in units.iter().filter(|u| u.class == "driver_ai" && hired_ids.contains(&u.name)) {
+        let hometown = u.get("hometown").filter(|s| is_ref(s)).unwrap_or_default().to_owned();
+        let garage_city = driver_garage.get(&u.name).cloned().unwrap_or(hometown);
+        let current_city =
+            u.get("current_city").filter(|s| is_ref(s)).map(str::to_owned).unwrap_or_else(|| garage_city.clone());
+        let state = u.get("state").and_then(parse_u32).unwrap_or(1);
+        let on_duty_timer = u.get("on_duty_timer").and_then(parse_i64).unwrap_or(0) as i32;
+        let skill_points = u.get("adr").and_then(parse_u32).map(u32::count_ones).unwrap_or(0)
+            + ["long_dist", "heavy", "fragile", "urgent", "mechanical"]
+                .iter()
+                .filter_map(|k| u.get(k).and_then(parse_u32))
+                .sum::<u32>();
+
+        let last_profit = u
+            .get("profit_log")
+            .and_then(|log_id| by_name.get(log_id))
+            .and_then(|log_unit| log_unit.all("stats_data").filter(|v| is_ref(v)).last())
+            .and_then(|entry_id| by_name.get(entry_id))
+            .and_then(|entry| {
+                let revenue = entry.get("revenue").and_then(parse_i64)?;
+                let costs: i64 =
+                    ["wage", "maintenance", "fuel"].iter().filter_map(|k| entry.get(k).and_then(parse_i64)).sum();
+                Some(revenue - costs)
+            });
+
+        drivers.push(HiredDriver {
+            id: u.name.clone(),
+            garage_city,
+            current_city,
+            state,
+            on_duty_timer,
+            skill_points,
+            last_profit,
+        });
+    }
+    drivers.sort_by(|a, b| a.garage_city.cmp(&b.garage_city).then_with(|| a.id.cmp(&b.id)));
+    drivers
+}
+
+fn parse_used_trucks(units: &[Unit], by_name: &HashMap<&str, &Unit>) -> Vec<UsedTruckOffer> {
+    let mut offer_units: Vec<&Unit> = units
+        .iter()
+        .filter(|u| matches!(u.class.as_str(), "used_vehicle_offer" | "used_truck_offer" | "used_vehicle"))
+        .collect();
+    if offer_units.is_empty() {
+        for container in units.iter().filter(|u| u.class.contains("used_vehicle") || u.class == "economy") {
+            for r in container.all("used_vehicles").chain(container.all("offers")).filter(|v| is_ref(v)) {
+                if let Some(u) = by_name.get(r) {
+                    offer_units.push(u);
+                }
+            }
+        }
+    }
+
+    let mut used_trucks = Vec::new();
+    for u in offer_units {
+        let vehicle_unit = u.get("vehicle").or_else(|| u.get("truck")).and_then(|vid| by_name.get(vid).copied());
+        let target = vehicle_unit.unwrap_or(u);
+        let model = u
+            .get("model")
+            .or_else(|| u.get("vehicle_model"))
+            .filter(|s| is_ref(s))
+            .map(str::to_owned)
+            .or_else(|| {
+                target
+                    .all("accessories")
+                    .filter_map(|acc| by_name.get(acc))
+                    .filter_map(|acc| acc.get("data_path"))
+                    .find_map(truck_model_from_data_path)
+            })
+            .unwrap_or_default();
+        let price = u.get("price").or_else(|| u.get("offer_price")).and_then(parse_i64).unwrap_or(0);
+        if model.is_empty() && price <= 0 {
+            continue;
+        }
+        let odometer_km = u.get("odometer").or_else(|| target.get("odometer")).and_then(parse_u32).unwrap_or(0);
+        let wear =
+            ["wear", "permanent_wear", "engine_wear", "transmission_wear", "cabin_wear", "chassis_wear", "wheels_wear"]
+                .iter()
+                .filter_map(|k| u.get(k).or_else(|| target.get(k)).and_then(parse_f32))
+                .fold(0.0f32, f32::max)
+                .clamp(0.0, 1.0);
+        let expiration_time = u.get("expiration_game_time").or_else(|| u.get("expiration_time")).and_then(parse_u32);
+        used_trucks.push(UsedTruckOffer {
+            id: u.name.clone(),
+            model: if model.is_empty() { u.name.clone() } else { model },
+            price,
+            odometer_km,
+            wear,
+            expiration_time,
+        });
+    }
+    used_trucks.sort_by_key(|a| a.price);
+    used_trucks
+}
+
+/// Extracts bank balance/loans, owned garages, hired drivers, and used-truck market listings from `game.sii`
+/// units (plus optional `profile.sii` units for company/player names).
+pub fn company_snapshot(units: &[Unit], profile_units: Option<&[Unit]>) -> CompanySnapshot {
+    let by_name: HashMap<&str, &Unit> = units.iter().map(|u| (u.name.as_str(), u)).collect();
+    let (company_name, player_name) = profile_units
+        .and_then(|pu| pu.iter().find(|u| u.class == "user_profile"))
+        .map(|u| {
+            (
+                u.get("company_name").filter(|s| !s.is_empty()).map(str::to_owned),
+                u.get("profile_name").filter(|s| !s.is_empty()).map(str::to_owned),
+            )
+        })
+        .unwrap_or((None, None));
+
+    let player_unit = units.iter().find(|u| u.class == "player");
+    let hq_city = player_unit
+        .and_then(|u| u.get("hq_city"))
+        .filter(|city| !city.is_empty() && *city != "null")
+        .map(str::to_owned);
+
+    let bank = parse_bank_info(units, &by_name);
+    let (garages, driver_garage, hired_ids) = parse_garages_and_hired(units, player_unit, hq_city.as_deref());
+    let drivers = parse_hired_drivers(units, &by_name, &driver_garage, &hired_ids);
+    let used_trucks = parse_used_trucks(units, &by_name);
+
+    CompanySnapshot { company_name, player_name, bank, garages, drivers, used_trucks }
 }
 
 /// The mods a profile has enabled (its `profile.sii`, read with [`read`]), as the game lists them:
@@ -750,5 +1044,125 @@ user_profile : _nameless.1 {
         let mut truncated = binary_save();
         truncated.truncate(40);
         assert!(matches!(read(&truncated), Err(SaveError::Truncated)));
+    }
+
+    #[test]
+    fn extracts_company_bank_drivers_garages_and_used_trucks_from_save() {
+        let save_text = r#"SiiNunit
+{
+bank : _nameless.bank {
+ money_account: 248500
+ loans: 1
+ loans[0]: _nameless.loan1
+}
+bank_loan : _nameless.loan1 {
+ amount: 85000
+ original_amount: 100000
+ interest_rate: 0.18
+ remaining_days: 25
+}
+player : _nameless.player {
+ hq_city: berlin
+ drivers: 2
+ drivers[0]: driver.player
+ drivers[1]: driver.177
+}
+garage : garage.berlin {
+ status: 3
+ vehicles: 2
+ vehicles[0]: _nameless.v1
+ vehicles[1]: _nameless.v2
+ drivers: 2
+ drivers[0]: driver.player
+ drivers[1]: driver.177
+}
+garage : garage.paris {
+ status: 0
+}
+driver_ai : driver.177 {
+ adr: 63
+ long_dist: 6
+ heavy: 4
+ fragile: 3
+ urgent: 2
+ mechanical: 1
+ hometown: berlin
+ current_city: hamburg
+ state: 2
+ on_duty_timer: 420
+ profit_log: _nameless.plog1
+}
+driver_ai : driver.999 {
+ hometown: paris
+ current_city: paris
+ state: 1
+}
+profit_log : _nameless.plog1 {
+ stats_data: 1
+ stats_data[0]: _nameless.pentry1
+}
+profit_log_entry : _nameless.pentry1 {
+ revenue: 6400
+ wage: 800
+ maintenance: 350
+ fuel: 450
+}
+used_vehicle_offer : _nameless.offer1 {
+ vehicle: _nameless.used1
+ price: 78500
+ expiration_game_time: 12000
+}
+vehicle : _nameless.used1 {
+ odometer: 142300
+ engine_wear: 0.24
+ accessories: 1
+ accessories[0]: _nameless.acc1
+}
+vehicle_accessory : _nameless.acc1 {
+ data_path: "/def/vehicle/truck/scania.s_2016/data.sii"
+}
+}
+"#;
+        let profile_text = r#"SiiNunit
+{
+user_profile : _nameless.prof {
+ profile_name: "Alex"
+ company_name: "EuroExpress Logistics"
+}
+}
+"#;
+        let units = read(save_text.as_bytes()).unwrap();
+        let prof = read(profile_text.as_bytes()).unwrap();
+        let snap = company_snapshot(&units, Some(&prof));
+
+        assert_eq!(snap.company_name.as_deref(), Some("EuroExpress Logistics"));
+        assert_eq!(snap.player_name.as_deref(), Some("Alex"));
+        assert_eq!(snap.bank.money_account, 248_500);
+        assert_eq!(snap.bank.loans.len(), 1);
+        assert_eq!(snap.bank.loans[0].amount, 85_000);
+        assert_eq!(snap.bank.loans[0].remaining_days, 25);
+        assert_eq!(snap.bank.loans[0].daily_repayment, 3400);
+
+        assert_eq!(snap.garages.len(), 1);
+        assert_eq!(snap.garages[0].city_id, "berlin");
+        assert!(snap.garages[0].is_hq);
+        assert_eq!(snap.garages[0].vehicle_count, 2);
+        assert_eq!(snap.garages[0].driver_count, 2);
+
+        // Only hired driver.177 is included; unhired driver.999 is excluded.
+        assert_eq!(snap.drivers.len(), 1);
+        assert_eq!(snap.drivers[0].id, "driver.177");
+        assert_eq!(snap.drivers[0].garage_city, "berlin");
+        assert_eq!(snap.drivers[0].current_city, "hamburg");
+        assert_eq!(snap.drivers[0].state, 2);
+        assert_eq!(snap.drivers[0].skill_points, 6 + 6 + 4 + 3 + 2 + 1);
+        assert_eq!(snap.drivers[0].last_profit, Some(4800));
+
+        assert_eq!(snap.used_trucks.len(), 1);
+        assert_eq!(snap.used_trucks[0].model, "scania.s_2016");
+        assert_eq!(snap.used_trucks[0].price, 78_500);
+        assert_eq!(snap.used_trucks[0].odometer_km, 142_300);
+        assert!((snap.used_trucks[0].wear - 0.24).abs() < 1e-4);
+        assert_eq!(snap.used_trucks[0].expiration_time, Some(12000));
     }
 }

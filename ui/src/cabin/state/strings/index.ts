@@ -888,6 +888,170 @@ export interface Strings {
     historyAndData: string
     clearData: string
   }
+  /** The Phone app: default service hotlines, company/save directory, recents, keypad, in-call workspaces,
+   * and compact incoming-call banners. */
+  phone: {
+    title: string
+    tabs: {
+      hotlines: string
+      contacts: string
+      recents: string
+      keypad: string
+    }
+    sections: {
+      defaultServices: string
+      activeTrip: string
+      garages: string
+      drivers: string
+    }
+    defaults: {
+      roadsideName: string
+      roadsideRole: string
+      roadsideBrandRole: (brand: string) => string
+      bankName: string
+      bankRole: string
+      usedTrucksName: string
+      usedTrucksRole: string
+      shipperRole: (city: string) => string
+      receiverRole: (city: string) => string
+    }
+    call: {
+      dialing: string
+      connectingNote: string
+      connected: string
+      ended: string
+      hangUp: string
+      callNow: string
+      callBack: string
+      incomingTitle: string
+      answer: string
+      decline: string
+      autoConfirm: string
+      autoConfirmHint: string
+      muteNote: string
+    }
+    roadside: {
+      greeting: (brand: string) => string
+      diagOk: string
+      diagFuelLow: (range: string) => string
+      diagWearHigh: (part: string, percent: string) => string
+      diagAirLow: string
+      askService: string
+      towToService: string
+      towToServiceDesc: string
+      towToRoad: string
+      towToRoadDesc: string
+      emergencyRefuel: string
+      emergencyRefuelDesc: string
+      refuelFuelPlentyNote: string
+      navService: string
+      toggleHazards: string
+      openF7Menu: string
+      triggered: (service: string) => string
+      triggeredConfirmHint: (service: string) => string
+    }
+    bank: {
+      greeting: (company: string) => string
+      balanceLabel: string
+      loansHeading: string
+      noLoans: string
+      loanRemaining: string
+      loanOriginal: string
+      loanDaily: string
+      loanDaysLeft: (days: number) => string
+      loanRate: (rate: string) => string
+      cashflowHeading: string
+      cashflowIncome: string
+      cashflowExpense: string
+      cashflowNet: string
+      openGameMenu: string
+      noSaveData: string
+    }
+    usedTrucks: {
+      greeting: (count: number) => string
+      emptyGreeting: string
+      emptyTitle: string
+      emptyDesc: string
+      odometer: (distance: string) => string
+      wear: (percent: string) => string
+      conditionGood: string
+      conditionFair: string
+      conditionRough: string
+      expiresIn: (duration: string) => string
+      navDealer: string
+      openGameMenu: string
+    }
+    company: {
+      hqBadge: string
+      garageStats: (vehicles: number, drivers: number) => string
+      garageGreeting: (city: string, vehicles: number, drivers: number) => string
+      navGarage: string
+      openGarageManager: string
+      driverLabel: (id: string) => string
+      driverStateIdle: string
+      driverStateWorking: string
+      driverStateReturning: string
+      driverSubtitle: (city: string, state: string) => string
+      driverGreetingWorking: (id: string, city: string, garage: string) => string
+      driverGreetingIdle: (id: string, city: string) => string
+      driverLastProfit: (amount: string) => string
+      driverSkillLevel: (points: number) => string
+      shipperGreeting: (company: string, cargo: string, loaded: boolean) => string
+      receiverGreeting: (company: string, cargo: string, buffer: string, damage: number) => string
+      openFreight: string
+      planRest: string
+      noGarages: string
+      noDrivers: string
+    }
+    recents: {
+      emptyTitle: string
+      emptyDesc: string
+      clearAll: string
+      confirmClear: string
+      cancel: string
+      outgoing: string
+      incoming: string
+      missed: string
+      declined: string
+      missedBadge: (count: number) => string
+    }
+    keypad: {
+      placeholder: string
+      call: string
+      clear: string
+      unknownCode: (digits: string) => string
+      shortcutsTitle: string
+      shortcutRoadside: string
+      shortcutBank: string
+      shortcutUsedTrucks: string
+      shortcutFuel: string
+      shortcutRest: string
+      shortcutService: string
+      shortcutHq: string
+    }
+    incoming: {
+      lowFuelReason: (range: string) => string
+      highWearReason: (part: string, percent: string) => string
+      airPressureReason: string
+      lateJobReason: string
+      cargoDamageReason: (percent: number) => string
+    }
+    feedback: {
+      sending: string
+      done: string
+      gamePaused: string
+      notInGame: string
+      busy: string
+      unsupported: string
+      noAnswer: string
+      previewSimulated: string
+      navAdded: (place: string, distance?: string) => string
+      navFailed: string
+      navNoPlaces: string
+      viewOnMap: string
+      previewBadge: string
+    }
+  }
 }
 
 const STRINGS: Record<string, Strings> = Object.fromEntries(

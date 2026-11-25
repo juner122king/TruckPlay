@@ -17,6 +17,7 @@ pub mod customize;
 mod dev_window;
 mod douyin;
 pub mod fitted;
+mod game_action;
 mod game_settings;
 mod gpu;
 #[cfg(test)]
@@ -444,6 +445,9 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut truckersmp_game: Option<westplay_setup::game::Kind> = None;
     // The page's changes to the game's route, waiting for the plugin's answer.
     let mut route_changes = route_change::RouteChanges::default();
+    // In-game actions requested by the cabin Phone app (F7 assistance, hazards, garage/desktop shortcuts).
+    let mut game_actions = game_action::GameActions::default();
+    let mut player_keybinds = [0u32; westplay_shared::GAME_ACTION_KEY_COUNT];
     // WestPlay's own routes to a place, planned for the page before Go (planner.rs), and the one picked
     // being handed to the game's GPS (handover.rs).
     let mut planner = planner::Planner::start();
@@ -1031,6 +1035,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
         }
 
         while let Ok(player) = player_watch.updates.try_recv() {
+            player_keybinds = player.keybinds;
             player_messages = player_messages_for(&player);
             for message in &player_messages {
                 let _ = webview.post_json(message);
@@ -1355,9 +1360,25 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         }
                     }
                 }
+                Some(PageMessage::GameAction { id, action, auto_confirm }) => {
+                    let block = &bridge.bridge().game_action;
+                    if let Some(overtaken) = game_actions.ask(
+                        block,
+                        id,
+                        action.into(),
+                        auto_confirm.unwrap_or(false),
+                        &player_keybinds,
+                        Instant::now(),
+                    ) {
+                        let _ = webview.post_json(&overtaken);
+                    }
+                }
                 None => {}
             }
             sync_media_resources!();
+        }
+        if let Some(answer) = game_actions.answer(&bridge.bridge().game_action, Instant::now()) {
+            let _ = webview.post_json(&answer);
         }
         if let Some(routes) = planner.answer() {
             let _ = webview.post_json(&routes);
@@ -3107,6 +3128,39 @@ enum PageMessage {
         id: u32,
         nodes: Vec<String>,
     },
+    /// An in-game action triggered by the Phone app (roadside assistance, hazards, garage manager, desktop menu).
+    GameAction {
+        id: u32,
+        action: PageGameAction,
+        #[serde(default, rename = "autoConfirm")]
+        auto_confirm: Option<bool>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum PageGameAction {
+    RoadsideTowToService,
+    RoadsideTowToRoad,
+    RoadsideEmergencyRefuel,
+    OpenAssistanceMenu,
+    ToggleHazardLights,
+    OpenGarageManager,
+    OpenGameDesktop,
+}
+
+impl From<PageGameAction> for westplay_shared::GameAction {
+    fn from(action: PageGameAction) -> Self {
+        match action {
+            PageGameAction::RoadsideTowToService => Self::RoadsideTowToService,
+            PageGameAction::RoadsideTowToRoad => Self::RoadsideTowToRoad,
+            PageGameAction::RoadsideEmergencyRefuel => Self::RoadsideEmergencyRefuel,
+            PageGameAction::OpenAssistanceMenu => Self::OpenAssistanceMenu,
+            PageGameAction::ToggleHazardLights => Self::ToggleHazardLights,
+            PageGameAction::OpenGarageManager => Self::OpenGarageManager,
+            PageGameAction::OpenGameDesktop => Self::OpenGameDesktop,
+        }
+    }
 }
 
 /// A route being handed to the game's GPS: the page's request, the hand-over (the route picked and the
@@ -3167,6 +3221,7 @@ fn player_messages_for(player: &Player) -> Vec<String> {
     vec![
         serde_json::json!({ "type": "garages", "owned": garages.owned, "headquarters": garages.headquarters })
             .to_string(),
+        serde_json::json!({ "type": "company", "data": player.company }).to_string(),
         serde_json::json!({ "type": "mapBlock", "hvt": player.hvt_map, "language": player.language }).to_string(),
         serde_json::json!({ "type": "timeZones", "on": player.time_zones }).to_string(),
         serde_json::json!({ "type": "units", "mph": player.mph }).to_string(),
@@ -3711,20 +3766,22 @@ mod tests {
                 owned: ["calais".to_owned(), "dover".to_owned()].into(),
                 headquarters: Some("calais".into()),
             },
+            company: Default::default(),
+            keybinds: Default::default(),
             hvt_map: true,
             language: Some("tr_tr".into()),
             time_zones: true,
             mph: Some(true),
         };
-        assert_eq!(
-            super::player_messages_for(&player),
-            [
-                r#"{"headquarters":"calais","owned":["calais","dover"],"type":"garages"}"#,
-                r#"{"hvt":true,"language":"tr_tr","type":"mapBlock"}"#,
-                r#"{"on":true,"type":"timeZones"}"#,
-                r#"{"mph":true,"type":"units"}"#
-            ]
-        );
+        let messages = super::player_messages_for(&player);
+        assert_eq!(messages.len(), 5);
+        assert_eq!(messages[0], r#"{"headquarters":"calais","owned":["calais","dover"],"type":"garages"}"#);
+        let company: serde_json::Value = serde_json::from_str(&messages[1]).unwrap();
+        assert_eq!(company["type"], "company");
+        assert_eq!(company["data"]["bank"]["moneyAccount"], 0);
+        assert_eq!(messages[2], r#"{"hvt":true,"language":"tr_tr","type":"mapBlock"}"#);
+        assert_eq!(messages[3], r#"{"on":true,"type":"timeZones"}"#);
+        assert_eq!(messages[4], r#"{"mph":true,"type":"units"}"#);
     }
 
     #[test]

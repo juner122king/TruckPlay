@@ -1,5 +1,6 @@
 import { type FocusEvent, useEffect, useState } from 'react'
 import { ThreadAvatarGlyph } from '../apps/messages/glyphs'
+import { usePhone } from '../state/phone'
 import { useSimulation } from '../state/simulation'
 import { go } from '../state/store'
 import { useText } from '../state/text'
@@ -17,11 +18,12 @@ export function NotificationBanner() {
   const dnd = useSimulation((state) => state.dnd)
   const dismissBanner = useSimulation((state) => state.dismissBanner)
   const setActiveThread = useSimulation((state) => state.setActiveThread)
+  const incomingCall = usePhone((state) => state.incomingCall)
   const text = useText()
 
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
-  const shown = Boolean(banner && !dnd)
+  const shown = Boolean(banner && !dnd && !incomingCall)
   const paused = hovered || focused
 
   useEffect(() => {
