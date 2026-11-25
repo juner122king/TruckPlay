@@ -335,7 +335,7 @@ export const useSimulation = create<SimulationState>()(
         plannedRest: null,
         banner: null,
         activeThread: 'dispatch',
-        dnd: false,
+        dnd: true,
 
         setDnd: (dnd) => set((state) => ({ dnd, banner: dnd ? null : state.banner })),
 
@@ -940,7 +940,13 @@ export const useSimulation = create<SimulationState>()(
     },
     {
       name: IS_DEMO ? 'westplay.simulation.demo' : 'westplay.simulation',
-      version: 1,
+      // 2: Do Not Disturb defaults to enabled so new and upgraded installs start silent until toggled off.
+      version: 2,
+      migrate: (stored, version) => {
+        const kept = (stored ?? {}) as Partial<PersistedSimulation>
+        if (version < 2) return { ...kept, dnd: true }
+        return kept
+      },
       storage: createJSONStorage(() => localStorage),
       partialize: (state): PersistedSimulation => ({
         messages: state.messages,

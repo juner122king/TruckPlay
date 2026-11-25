@@ -83,6 +83,7 @@ describe('useSimulation', () => {
     vi.stubGlobal('location', { search: '' })
     const { useSimulation, resetSimulationTracker, countUnread } = await import('./simulation')
     resetSimulationTracker()
+    useSimulation.getState().setDnd(false)
     useSimulation.getState().clearMessages()
     useSimulation.getState().clearLogbook()
 
@@ -155,6 +156,7 @@ describe('useSimulation', () => {
     vi.stubGlobal('location', { search: '' })
     const { useSimulation, resetSimulationTracker } = await import('./simulation')
     resetSimulationTracker()
+    useSimulation.getState().setDnd(false)
     useSimulation.getState().clearMessages()
     useSimulation.getState().clearLogbook()
 
@@ -283,7 +285,7 @@ describe('useSimulation', () => {
     useSimulation.getState().clearMessages()
     useSimulation.getState().clearLogbook()
 
-    useSimulation.getState().setDnd(true)
+    expect(useSimulation.getState().dnd).toBe(true)
     useSimulation.getState().ingestGameplayEvent(
       {
         kind: GAMEPLAY_EVENT_FINED,
@@ -341,6 +343,7 @@ describe('useSimulation', () => {
     vi.stubGlobal('location', { search: '' })
     const { useSimulation, resetSimulationTracker } = await import('./simulation')
     resetSimulationTracker()
+    useSimulation.getState().setDnd(false)
     useSimulation.getState().clearMessages()
 
     // Spawning already in rain does not falsely trigger an alert
@@ -423,5 +426,27 @@ describe('useSimulation', () => {
     expect(useSimulation.getState().messages[1].priority).toBe('high')
     expect(useSimulation.getState().messages[1].body).toBe(zhStrings.messages.events.rainStarted)
     expect(useSimulation.getState().banner?.thread).toBe('fleet')
+  })
+
+  it('defaults DND to enabled, migrates v1 storage to enabled, and preserves v2 user preference', async () => {
+    const savedStorage = (state: unknown, version: number) => {
+      vi.stubGlobal('window', {})
+      vi.stubGlobal('location', { search: '' })
+      const items = new Map([['westplay.simulation', JSON.stringify({ state, version })]])
+      return {
+        getItem: (key: string) => items.get(key) ?? null,
+        setItem: (key: string, value: string) => void items.set(key, value),
+        removeItem: (key: string) => void items.delete(key),
+      }
+    }
+
+    vi.stubGlobal('localStorage', savedStorage({ dnd: false }, 1))
+    const { useSimulation: migrated } = await import('./simulation')
+    expect(migrated.getState().dnd).toBe(true)
+
+    vi.resetModules()
+    vi.stubGlobal('localStorage', savedStorage({ dnd: false }, 2))
+    const { useSimulation: persisted } = await import('./simulation')
+    expect(persisted.getState().dnd).toBe(false)
   })
 })
