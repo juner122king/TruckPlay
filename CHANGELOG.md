@@ -3,6 +3,13 @@
 What changed in each release of TruckPlay (independent GPL-3.0-or-later fork of WestPlay 2.4.x). The newest release's
 notes are what the app shows when it offers the update.
 
+## 1.0.1 (2026-11-25)
+- 新增全局 **上一首 / 下一首** 快捷键（默认 `InteractionKey + 6` / `InteractionKey + 7`）：可在 Companion「控制」页自定义为单键或组合键，按键自动拦截不穿透游戏并支持多媒体键友好名称；同步升级共享内存桥接至 v32（更新重启后将自动同步新版 `westplay.dll`）。
+- 取消音量增减键长按 1 秒切歌机制，音量调节改为按下即刻响应。
+- 统一接入并修复全部 10 个内置多媒体应用的全局切歌路由（Apple Music、网易云音乐、QQ 音乐、喜马拉雅、广播电台、Bilibili、抖音、红果短剧、YouTube、本地播放器），排除 Safari 避免误接管：修复 Bilibili 后台切歌强制全屏与直播误 Seek 并补齐上一视频观看历史、修复喜马拉雅/电台列表缺失时的索引越界，以及优化抖音切歌标题即时显示与加载态识别。
+- 新增 CarPlay 风格顶部切歌玻璃 HUD 提示（显示切歌方向及新曲目/视频/电台标题，全屏视频播放下同样清晰显示），并完善 `README.md` 项目说明与上游开源归属文档。
+- Added global **Previous / Next Track** shortcuts (`InteractionKey + 6` / `InteractionKey + 7` by default, configurable in Companion Controls; bumps shared bridge to v32) with a CarPlay-style top track-change HUD pill visible even over fullscreen video, removed 1s volume-hold skipping so volume keys respond immediately, unified track skipping across all 10 built-in media apps (fixing Bilibili background skip/live seek/watched history, Ximalaya/Radio queue wrap-around, and Douyin instant HUD title while keeping Safari excluded), and expanded `README.md`.
+
 ## 1.0.0 (2026-11-25)
 - **TruckPlay 1.0.0 首个正式版本发布**：支持应用内自动检查更新与签名安装升级（`juner122king/TruckPlay` GitHub Releases），保留 `1.0.0-rc.1` 及此前版本用户数据、地图缓存与插件兼容平滑升级。
 - 新增 CarPlay **Phone（电话）** 应用与紧凑型顶部来电横幅：升级共享内存桥接至 v31（支持 Win32 + DirectInput 合成按键序列与 `GameActionBlock`），扩展 `game.sii` / `controls.sii` 解析以同步银行余额/贷款、车库、雇佣司机、二手卡车报价与快捷键配置；提供道路救援（拖车至维修厂 / 拖车至路面 / 紧急加油）、银行、二手卡车、车队通讯录、最近通话与拨号键盘。
