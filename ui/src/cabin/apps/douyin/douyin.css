@@ -579,7 +579,7 @@
 .dy-over-stage.hud-quiet .dy-stage-top,
 .dy-over-stage.hud-quiet .dy-stage-rail,
 .dy-over-stage.hud-quiet .dy-stage-scrim-top {
-  opacity: 0.14;
+  opacity: 0.42;
 }
 
 .dy-over-stage.hud-quiet .dy-stage-top:hover,

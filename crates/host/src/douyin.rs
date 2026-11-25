@@ -8,7 +8,79 @@ use crate::signin::{self, Progress, SignInWindow};
 use crate::speakers::{self, CabCache, Equalizer, Head, Speaker};
 use crate::webview::{self, OffscreenWebView, PageSize, Stage};
 
-pub const HOME: &str = "https://www.douyin.com/";
+pub const HOME: &str = "https://www.douyin.com/?recommend=1";
+pub const COOKIE_URL: &str = "https://www.douyin.com/";
+
+fn de_f64_lenient<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct Visitor;
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = f64;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a number or null")
+        }
+        fn visit_none<E>(self) -> Result<f64, E> {
+            Ok(0.0)
+        }
+        fn visit_unit<E>(self) -> Result<f64, E> {
+            Ok(0.0)
+        }
+        fn visit_i64<E>(self, v: i64) -> Result<f64, E> {
+            Ok(if v > 0 { v as f64 } else { 0.0 })
+        }
+        fn visit_u64<E>(self, v: u64) -> Result<f64, E> {
+            Ok(v as f64)
+        }
+        fn visit_f64<E>(self, v: f64) -> Result<f64, E> {
+            Ok(if v.is_finite() && v >= 0.0 { v } else { 0.0 })
+        }
+    }
+    deserializer.deserialize_any(Visitor)
+}
+
+fn de_opt_u64_lenient<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct Visitor;
+    impl<'de> serde::de::Visitor<'de> for Visitor {
+        type Value = Option<u64>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("an optional non-negative number")
+        }
+        fn visit_none<E>(self) -> Result<Option<u64>, E> {
+            Ok(None)
+        }
+        fn visit_unit<E>(self) -> Result<Option<u64>, E> {
+            Ok(None)
+        }
+        fn visit_some<D2>(self, deserializer: D2) -> Result<Option<u64>, D2::Error>
+        where
+            D2: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(self)
+        }
+        fn visit_i64<E>(self, v: i64) -> Result<Option<u64>, E> {
+            Ok(if v >= 0 { Some(v as u64) } else { None })
+        }
+        fn visit_u64<E>(self, v: u64) -> Result<Option<u64>, E> {
+            Ok(Some(v))
+        }
+        fn visit_f64<E>(self, v: f64) -> Result<Option<u64>, E> {
+            Ok(if v.is_finite() && v >= 0.0 { Some(v.round() as u64) } else { None })
+        }
+    }
+    deserializer.deserialize_any(Visitor)
+}
+
+fn de_opt_u32_lenient<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(de_opt_u64_lenient(deserializer)?.and_then(|v| u32::try_from(v).ok()))
+}
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "action", rename_all = "camelCase")]
@@ -87,14 +159,17 @@ pub enum Question {
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Video {
+    #[serde(default)]
     pub id: String,
+    #[serde(default)]
     pub title: String,
+    #[serde(default)]
     pub author: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artwork: Option<String>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_f64_lenient")]
     pub duration: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
@@ -102,19 +177,19 @@ pub struct Video {
     pub liked: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collected: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u64_lenient", skip_serializing_if = "Option::is_none")]
     pub likes: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u64_lenient", skip_serializing_if = "Option::is_none")]
     pub comments: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u64_lenient", skip_serializing_if = "Option::is_none")]
     pub collects: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u64_lenient", skip_serializing_if = "Option::is_none")]
     pub shares: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub music: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u32_lenient", skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u32_lenient", skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel: Option<String>,
@@ -127,7 +202,9 @@ pub struct Video {
 pub struct Playback {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(default)]
     pub title: String,
+    #[serde(default)]
     pub artist: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
@@ -135,16 +212,19 @@ pub struct Playback {
     pub avatar: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artwork: Option<String>,
+    #[serde(default, deserialize_with = "de_f64_lenient")]
     pub duration: f64,
+    #[serde(default, deserialize_with = "de_f64_lenient")]
     pub position: f64,
+    #[serde(default)]
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub liked: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collected: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u64_lenient", skip_serializing_if = "Option::is_none")]
     pub likes: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, deserialize_with = "de_opt_u64_lenient", skip_serializing_if = "Option::is_none")]
     pub comments: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub music: Option<String>,
@@ -246,6 +326,7 @@ impl Douyin {
                 let _ = self.pass(&Command::Crop { on: *crop });
                 let page = self.frame.get();
                 let (x, y, width, height) = crate::youtube::within(page, *x, *y, *width, *height);
+                crate::log!("[douyin] show: {x}, {y}, {width}x{height}, crop={crop}");
                 if width * 2 < page.0 {
                     self.view.fit(page, x, y, width, height)?;
                 } else {
@@ -253,7 +334,10 @@ impl Douyin {
                 }
                 self.view.show(true)
             }
-            Command::Hide => self.view.show(false),
+            Command::Hide => {
+                crate::log!("[douyin] hide");
+                self.view.show(false)
+            }
             Command::SignIn => {
                 self.sign_in();
                 Ok(())
@@ -304,7 +388,7 @@ impl Douyin {
 
         if !self.checked_initial_cookie.get() {
             self.checked_initial_cookie.set(true);
-            let signed_in = self.view.has_cookie(HOME, &["sessionid", "sessionid_ss", "sid_tt"]);
+            let signed_in = self.view.has_cookie(COOKIE_URL, &["sessionid", "sessionid_ss", "sid_tt"]);
             if signed_in {
                 reports.push(Report::State(State { signed_in: true, playing: false, nickname: None, avatar: None }));
             }
@@ -317,7 +401,7 @@ impl Douyin {
             self.told.borrow_mut().reset();
             let _ = self.view.navigate(HOME);
             let signed_in =
-                p == Progress::SignedIn || self.view.has_cookie(HOME, &["sessionid", "sessionid_ss", "sid_tt"]);
+                p == Progress::SignedIn || self.view.has_cookie(COOKIE_URL, &["sessionid", "sessionid_ss", "sid_tt"]);
             reports.push(Report::State(State { signed_in, playing: false, nickname: None, avatar: None }));
         }
 
@@ -329,25 +413,43 @@ impl Douyin {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&message) {
                 let msg_type = value.get("type").and_then(|t| t.as_str()).unwrap_or("");
                 match msg_type {
+                    "diag" => {
+                        if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
+                            crate::log!("[douyin] diag: {text}");
+                        }
+                    }
                     "state" => {
                         if let Some(state_val) = value.get("state") {
-                            if let Ok(mut s) = serde_json::from_value::<State>(state_val.clone()) {
-                                if !s.signed_in && self.view.has_cookie(HOME, &["sessionid", "sessionid_ss", "sid_tt"])
-                                {
-                                    s.signed_in = true;
+                            match serde_json::from_value::<State>(state_val.clone()) {
+                                Ok(mut s) => {
+                                    if !s.signed_in
+                                        && self.view.has_cookie(COOKIE_URL, &["sessionid", "sessionid_ss", "sid_tt"])
+                                    {
+                                        s.signed_in = true;
+                                    }
+                                    reports.push(Report::State(s));
                                 }
-                                reports.push(Report::State(s));
+                                Err(e) => crate::log!("[douyin] state decode error: {e}"),
                             }
                         }
                     }
                     "playback" => {
-                        let pb = value.get("playback").and_then(|p| serde_json::from_value::<Playback>(p.clone()).ok());
-                        reports.push(Report::Playback(pb));
+                        if let Some(pb_val) = value.get("playback") {
+                            if pb_val.is_null() {
+                                reports.push(Report::Playback(None));
+                            } else {
+                                match serde_json::from_value::<Playback>(pb_val.clone()) {
+                                    Ok(pb) => reports.push(Report::Playback(Some(pb))),
+                                    Err(e) => crate::log!("[douyin] playback decode error: {e}"),
+                                }
+                            }
+                        }
                     }
                     "answer" => {
                         if let Some(ans_val) = value.get("answer") {
-                            if let Ok(a) = serde_json::from_value::<Answer>(ans_val.clone()) {
-                                reports.push(Report::Answer(a));
+                            match serde_json::from_value::<Answer>(ans_val.clone()) {
+                                Ok(a) => reports.push(Report::Answer(a)),
+                                Err(e) => crate::log!("[douyin] answer decode error: {e}"),
                             }
                         }
                     }
@@ -433,6 +535,30 @@ mod tests {
             let back: Command = serde_json::from_str(&json).unwrap();
             assert_eq!(back, cmd);
         }
+    }
+
+    #[test]
+    fn deserializes_lenient_video_and_playback_numbers() {
+        let ans_json = serde_json::json!({
+            "id": 0,
+            "channel": "recommend",
+            "videos": [{
+                "id": "7400001",
+                "title": "Test",
+                "author": "Driver",
+                "duration": 94.5,
+                "likes": -1,
+                "comments": 12.0,
+                "width": 720.0,
+                "height": 1280
+            }]
+        });
+        let ans: Answer = serde_json::from_value(ans_json).unwrap();
+        let v = &ans.videos.unwrap()[0];
+        assert_eq!(v.likes, None);
+        assert_eq!(v.comments, Some(12));
+        assert_eq!(v.width, Some(720));
+        assert_eq!(v.height, Some(1280));
     }
 
     #[test]
