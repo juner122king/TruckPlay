@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { type SignedIn, useAskOnce, useSignedIn } from './accounts'
+import { type SignedIn, useSignedIn } from './accounts'
 import { isReleasedApp } from '../cabin/state/apps'
 import {
   appVersion,
@@ -255,9 +255,8 @@ function Room({
   // What a check of each game set up found, for the pages that show it (Setup, Map): checked once, as they open.
   const [checks, setChecks] = useState<Record<string, GameCheck>>({})
   const checked = useCallback((dir: string, check: GameCheck) => setChecks((known) => ({ ...known, [dir]: check })), [])
-  // Who's signed in, known at once (what was last known), and asked as the companion opens if never known.
+  // Who's signed in, known at once (what was last known or reported by the host).
   const signedIn = useSignedIn(status)
-  useAskOnce()
   // The uninstall sheet over the room, and the room fading as WestPlay leaves.
   const [uninstalling, setUninstalling] = useState(false)
   // The language sheet (Setup).
@@ -531,21 +530,15 @@ function SectionList({
     controls: keyName,
     customize: '',
     accounts:
-      signedIn.youtube === null &&
-      signedIn.appleMusic === null &&
-      signedIn.bilibili === null &&
-      (!isReleasedApp('ximalaya') || signedIn.ximalaya === null) &&
-      signedIn.netease === null
-        ? ''
-        : [
-            signedIn.youtube && 'YouTube',
-            signedIn.appleMusic && 'Apple Music',
-            signedIn.bilibili && '哔哩哔哩',
-            isReleasedApp('ximalaya') && signedIn.ximalaya && '喜马拉雅',
-            signedIn.netease && '网易云音乐',
-          ]
-            .filter(Boolean)
-            .join(', ') || cw.values.none,
+      [
+        signedIn.youtube && 'YouTube',
+        signedIn.appleMusic && 'Apple Music',
+        signedIn.bilibili && '哔哩哔哩',
+        isReleasedApp('ximalaya') && signedIn.ximalaya && '喜马拉雅',
+        signedIn.netease && '网易云音乐',
+      ]
+        .filter(Boolean)
+        .join(', ') || cw.values.none,
     map: mapValue(status, mapProgress, cw, words),
     options: '',
     // The games set up, by their short names (their versions too long for the list).

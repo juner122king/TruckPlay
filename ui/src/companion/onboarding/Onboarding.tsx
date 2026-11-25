@@ -12,15 +12,7 @@ import {
   GAME_NAMES,
   type SetupState,
 } from '../setup'
-import {
-  type HostStatus,
-  appleMusicCheck,
-  appleMusicSignIn,
-  appleMusicSignOut,
-  youtubeCheck,
-  youtubeSignIn,
-  youtubeSignOut,
-} from '../useHostStatus'
+import { type HostStatus } from '../useHostStatus'
 import { DEFAULT_KEY, type SettingsState } from '../useSettings'
 import { memoryNote } from '../pages/page'
 import { companionWords } from '../pages/words'
@@ -30,7 +22,6 @@ import { type Banner, GlassCursor, type Pose, TruckScreen } from '../room/TruckS
 import {
   Button,
   CheckBox,
-  Checking,
   Cross,
   Group,
   KeyChooser,
@@ -49,10 +40,8 @@ import {
   gameSummary,
   n,
   RoomText,
-  useChecking,
   useGameRunning,
   useGlidingProgress,
-  useSignOut,
   useWords,
   WordsContext,
 } from '../room/room'
@@ -69,18 +58,7 @@ import {
 import { useDemo } from '../room/useDemo'
 import { chosenLanguage, count, list, percent, wordsFor } from './words'
 
-const STEPS = [
-  'welcome',
-  'game',
-  'check',
-  'speed',
-  'install',
-  'map',
-  'controls',
-  'accounts',
-  'appleMusic',
-  'tutorial',
-] as const
+const STEPS = ['welcome', 'game', 'check', 'speed', 'install', 'map', 'controls', 'tutorial'] as const
 type StepId = (typeof STEPS)[number]
 
 const POSES: Record<StepId, Pose> = {
@@ -91,8 +69,6 @@ const POSES: Record<StepId, Pose> = {
   install: 'side',
   map: 'side',
   controls: 'side',
-  accounts: 'side',
-  appleMusic: 'side',
   tutorial: 'final',
 }
 
@@ -300,8 +276,6 @@ export function Onboarding({
             )}
             {step === 'map' && <MapStep status={status} settings={settings} next={next} back={back} />}
             {step === 'controls' && <Controls settings={settings} next={next} back={back} />}
-            {step === 'accounts' && <Accounts status={status} next={next} back={back} />}
-            {step === 'appleMusic' && <ServiceSignIn service="appleMusic" status={status} next={next} back={back} />}
             {step === 'tutorial' && <TutorialIntro code={code} finish={finish} back={back} />}
             {over}
           </ScreenContext.Provider>
@@ -943,122 +917,6 @@ function Controls({ settings, next, back }: { settings: SettingsState; next(): v
         choose={(key) => current && settings.update({ ...current, interaction: { ...current.interaction, key } })}
       />
       {settings.error && <Note tone="bad">{settings.error}</Note>}
-    </Panel>
-  )
-}
-
-function Accounts({ status, next, back }: { status: HostStatus | null; next(): void; back?: () => void }) {
-  const signedIn = status?.youtubeSignedIn ?? false
-  const signingIn = status?.youtubeSigningIn ?? false
-  // Signed in already? Found out first (YouTube run, hidden, to say so).
-  const checking = useChecking(status?.youtubeSignedIn != null, youtubeCheck)
-  const signOut = useSignOut(signedIn, youtubeSignOut)
-  const words = useWords()
-  const w = words.accounts
-  useScreenAt('youtube', GLOW.youtube, signingIn ? banner(w.signingIn, true) : null)
-  return (
-    <Panel
-      place="side"
-      title={w.title}
-      sub={w.sub}
-      back={back}
-      action={
-        <Button onClick={next} disabled={checking}>
-          {signedIn ? words.continue : w.notNow}
-        </Button>
-      }
-    >
-      <Group place={4}>
-        <Row
-          title="YouTube"
-          detail={checking ? undefined : signingIn ? w.finishInWindow : signedIn ? w.signedIn : w.notSignedIn}
-          accessory={
-            checking ? (
-              <Checking />
-            ) : signedIn ? (
-              <Button glass small busy={signOut.signingOut} onClick={signOut.start}>
-                {w.signOut}
-              </Button>
-            ) : (
-              <Button glass small busy={signingIn} onClick={() => youtubeSignIn()}>
-                {w.signIn}
-              </Button>
-            )
-          }
-        />
-      </Group>
-    </Panel>
-  )
-}
-
-/** Apple Music's sign-in, as YouTube's: the service's own page in a window on the desktop, its
- * app on the screen meanwhile. Their buttons and states are YouTube's step's words; their own say what each
- * is for. */
-const SERVICE_STEPS = {
-  appleMusic: {
-    name: 'Apple Music',
-    app: 'music',
-    glow: GLOW.music,
-    signedIn: (status: HostStatus | null) => status?.appleMusicSignedIn,
-    signingIn: (status: HostStatus | null) => status?.appleMusicSigningIn ?? false,
-    check: appleMusicCheck,
-    signIn: appleMusicSignIn,
-    signOut: appleMusicSignOut,
-  },
-} as const
-
-function ServiceSignIn({
-  service,
-  status,
-  next,
-  back,
-}: {
-  service: keyof typeof SERVICE_STEPS
-  status: HostStatus | null
-  next(): void
-  back?: () => void
-}) {
-  const it = SERVICE_STEPS[service]
-  const signedIn = it.signedIn(status) ?? false
-  const signingIn = it.signingIn(status)
-  // Signed in already? Found out first (the service's web player run, hidden, to say so).
-  const checking = useChecking(it.signedIn(status) != null, it.check)
-  const signOut = useSignOut(signedIn, it.signOut)
-  const words = useWords()
-  const w = words.accounts
-  const s = words[service]
-  useScreenAt(it.app, it.glow, signingIn ? banner(s.signingIn, true) : null)
-  return (
-    <Panel
-      place="side"
-      title={s.title}
-      sub={s.sub}
-      back={back}
-      action={
-        <Button onClick={next} disabled={checking}>
-          {signedIn ? words.continue : w.notNow}
-        </Button>
-      }
-    >
-      <Group place={4}>
-        <Row
-          title={it.name}
-          detail={checking ? undefined : signingIn ? s.finishInWindow : signedIn ? w.signedIn : w.notSignedIn}
-          accessory={
-            checking ? (
-              <Checking />
-            ) : signedIn ? (
-              <Button glass small busy={signOut.signingOut} onClick={signOut.start}>
-                {w.signOut}
-              </Button>
-            ) : (
-              <Button glass small busy={signingIn} onClick={() => it.signIn()}>
-                {w.signIn}
-              </Button>
-            )
-          }
-        />
-      </Group>
     </Panel>
   )
 }

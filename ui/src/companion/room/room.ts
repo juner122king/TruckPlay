@@ -81,26 +81,6 @@ export function useSignOut(signedIn: boolean, signOut: () => Promise<void>): { s
   }
 }
 
-/** How long a step waits to know whether its service is signed in before taking it as signed out (offline,
- * say), so it never holds the player up. */
-export const CHECK_WAIT = 15000
-
-/**
- * Whether a sign-in step is still finding out if its service is signed in (`known`: the status says, one way
- * or the other): it asks once (`check`: the service run, hidden), and gives up waiting after `CHECK_WAIT`.
- */
-export function useChecking(known: boolean, check: () => Promise<void>): boolean {
-  const [waited, setWaited] = useState(false)
-  useEffect(() => {
-    check().catch(() => setWaited(true))
-    const timer = window.setTimeout(() => setWaited(true), CHECK_WAIT)
-    return () => window.clearTimeout(timer)
-    // Asked once, as the step shows.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  return !known && !waited
-}
-
 /** The onboarding's words, and their language's game code (`tr_tr`). */
 export const WordsContext = createContext<{ words: Words; code: string }>({ words: wordsFor('en_us'), code: 'en_us' })
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Service, SignedIn } from '../accounts'
 import type { Note, Words } from '../onboarding/words'
-import { Button, Checking, Group, Panel, Row } from '../room/parts'
+import { Button, Group, Panel, Row } from '../room/parts'
 import { banner, useSignOut, useWords } from '../room/room'
 import { GLOW, useScreenAt } from '../room/screen'
 import { type AppId, isReleasedApp } from '../../cabin/state/apps'
@@ -127,8 +127,7 @@ export function Accounts({ status, cw, signedIn }: PageProps) {
   )
 }
 
-/** A service: signed in or not (as last known; found out as the companion opened if never known), and its
- * button. */
+/** A service: signed in or not (as last known), and its button. */
 function Account({
   service,
   status,
@@ -146,17 +145,14 @@ function Account({
   const known = all[service]
   const signedIn = known ?? false
   const signingIn = s.signingIn(status)
-  const checking = known === null
   const signOut = useSignOut(signedIn, s.signOut)
   return (
     <Row
       title={s.name}
-      detail={checking ? undefined : signingIn ? s.words(words).finishInWindow : signedIn ? w.signedIn : w.notSignedIn}
+      detail={signingIn ? s.words(words).finishInWindow : signedIn ? w.signedIn : w.notSignedIn}
       hover={hover}
       accessory={
-        checking ? (
-          <Checking />
-        ) : signedIn ? (
+        signedIn ? (
           <Button glass small busy={signOut.signingOut} onClick={signOut.start}>
             {w.signOut}
           </Button>

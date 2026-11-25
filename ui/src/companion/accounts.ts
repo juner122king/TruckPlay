@@ -1,15 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isReleasedApp } from '../cabin/state/apps'
-import {
-  type HostStatus,
-  appleMusicCheck,
-  bilibiliCheck,
-  douyinCheck,
-  hongguoCheck,
-  neteaseCheck,
-  ximalayaCheck,
-  youtubeCheck,
-} from './useHostStatus'
+import { type HostStatus } from './useHostStatus'
 
 export interface SignedIn {
   youtube: boolean | null
@@ -89,18 +79,4 @@ export function useSignedIn(status: HostStatus | null): SignedIn {
     netease: now.netease ?? known.netease,
     appleMusic: now.appleMusic ?? known.appleMusic,
   }
-}
-
-/** As the companion opens: each service never known yet is run, hidden, to say. */
-export function useAskOnce(): void {
-  useEffect(() => {
-    const known = kept()
-    if (known.youtube === null && isReleasedApp('youtube')) youtubeCheck().catch(() => {})
-    if (known.bilibili === null && isReleasedApp('bilibili')) bilibiliCheck().catch(() => {})
-    if (known.ximalaya === null && isReleasedApp('ximalaya')) ximalayaCheck().catch(() => {})
-    if (known.douyin === null && isReleasedApp('douyin')) douyinCheck().catch(() => {})
-    if (known.hongguo === null && isReleasedApp('hongguo')) hongguoCheck().catch(() => {})
-    if (known.netease === null && isReleasedApp('netease')) neteaseCheck().catch(() => {})
-    if (known.appleMusic === null && isReleasedApp('music')) appleMusicCheck().catch(() => {})
-  }, [])
 }
