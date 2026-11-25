@@ -283,13 +283,6 @@ export interface CompanionWords {
     banners: { updating: { title: string; text: string }; updated: { title: string; text: string } }
     finish: { title: string; text: string; button: string }
   }
-  /** Support me: WestPlay's development, supported on its maker's Kreosus page (opened in the browser). */
-  support: {
-    title: string
-    sub: string
-    button: string
-    note: string
-  }
   /** Options: companion window startup and system tray behavior. */
   options: {
     title: string
@@ -348,8 +341,7 @@ export interface TutorialWords {
   finish: string
 }
 
-export type SectionId =
-  'screen' | 'controls' | 'customize' | 'accounts' | 'map' | 'options' | 'setup' | 'about' | 'support'
+export type SectionId = 'screen' | 'controls' | 'customize' | 'accounts' | 'map' | 'options' | 'setup' | 'about'
 
 const WORDS: Record<string, CompanionWords> = Object.fromEntries(
   Object.entries(import.meta.glob<CompanionWords>('./[a-z][a-z]_[a-z][a-z].ts', { eager: true, import: 'words' })).map(

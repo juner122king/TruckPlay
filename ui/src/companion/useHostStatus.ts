@@ -235,19 +235,6 @@ export function appleMusicSignOut(): Promise<void> {
   return call('apple_music_sign_out')
 }
 
-/** Opens the support page (Kreosus) in the player's browser. */
-export function openSupportPage(): Promise<void> {
-  return call('open_support_page')
-}
-
-/** WestPlay's pages elsewhere, at the foot of the list. */
-export type Social = 'youtube' | 'discord' | 'patreon'
-
-/** Opens one of WestPlay's pages elsewhere in the player's browser (the app holds their addresses). */
-export function openSocial(site: Social): Promise<void> {
-  return call('open_social', { site })
-}
-
 /** Where this run's app.log is: Documents\WestPlay\logs, or WestPlay's own folder where Documents refused it. */
 export function appLogPlace(): Promise<string | null> {
   return call('app_log_place')

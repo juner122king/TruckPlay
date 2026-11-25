@@ -10,7 +10,6 @@ export const words: CompanionWords = {
     setup: 'Setup',
     about: 'About',
     customize: 'Customize',
-    support: 'Support me',
   },
   state: {
     starting: 'Starting…',
@@ -263,7 +262,6 @@ export const words: CompanionWords = {
       options: 'Start TruckPlay minimized, or keep it running in the system tray when minimized or closed.',
       setup: 'Where TruckPlay is installed, with Reinstall and Uninstall if you ever need them.',
       about: 'Your version, and a report to copy if something isn’t right.',
-      support: 'If you enjoy TruckPlay, you can support its development here.',
     },
     finish: 'Done',
   },
@@ -369,12 +367,6 @@ export const words: CompanionWords = {
       text: 'The new TruckPlay’s plugin goes into your game. Windows asks for permission, as when you installed it.',
       button: 'Continue',
     },
-  },
-  support: {
-    title: 'Support me',
-    sub: 'TruckPlay is free. If it makes your drives better, you can support its development on Kreosus, once or every month.',
-    button: 'Support on Kreosus',
-    note: 'Opens Kreosus in your browser.',
   },
   options: {
     title: 'Options',

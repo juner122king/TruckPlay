@@ -10,7 +10,6 @@ export const words: CompanionWords = {
     options: '选项',
     setup: '设置',
     about: '关于',
-    support: '支持我',
   },
   state: {
     starting: '正在启动…',
@@ -258,7 +257,6 @@ export const words: CompanionWords = {
       options: '设置开机或启动时最小化，以及在最小化或关闭窗口时保留在系统托盘中运行。',
       setup: 'TruckPlay 的安装位置。需要时可在这里重新安装或卸载。',
       about: '当前版本，以及出问题时可复制发送的报告。',
-      support: '如果你喜欢 TruckPlay，可以在这里支持它的开发。',
     },
     finish: '完成',
   },
@@ -367,12 +365,6 @@ export const words: CompanionWords = {
       text: '新版 TruckPlay 的插件将装入游戏。和安装时一样，Windows 会请求权限。',
       button: '继续',
     },
-  },
-  support: {
-    title: '支持我',
-    sub: 'TruckPlay 是免费的。如果它让你开车更愉快，可以在 Kreosus 上支持它的开发，单次或每月均可。',
-    button: '在 Kreosus 上支持',
-    note: '将在浏览器中打开 Kreosus。',
   },
   options: {
     title: '选项',

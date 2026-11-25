@@ -447,20 +447,6 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
     case 'netease_sign_in':
       signIn('netease')
       return later(undefined)
-    case 'open_support_page':
-      window.open('https://github.com/juner122king/TruckPlay', '_blank', 'noopener')
-      return later(undefined)
-    case 'open_social':
-      window.open(
-        args?.site === 'youtube'
-          ? 'https://www.youtube.com/@tyraness'
-          : args?.site === 'patreon'
-            ? 'https://www.patreon.com/c/westmods'
-            : 'https://discord.com/invite/Jt34SmwU6',
-        '_blank',
-        'noopener',
-      )
-      return later(undefined)
     case 'app_log_place':
       return later('C:\\Users\\Player\\Documents\\WestPlay\\logs\\app.log')
     case 'youtube_sign_out':

@@ -274,36 +274,6 @@ fn apple_music_check(accounts: State<Accounts>) {
     accounts.0.apple_music.request(AccountAction::Check);
 }
 
-/// The TruckPlay project repository page.
-const SUPPORT_PAGE: &str = "https://github.com/juner122king/TruckPlay";
-
-/// Opens the support page (Support me) in the player's browser. The address is fixed here, so the companion
-/// can't open any other.
-#[tauri::command]
-fn open_support_page() {
-    westplay_host::browser::open(SUPPORT_PAGE);
-}
-
-/// WestPlay's pages elsewhere, at the foot of the companion's list.
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Social {
-    YouTube,
-    Discord,
-    Patreon,
-}
-
-/// Opens one of WestPlay's pages elsewhere (its YouTube channel, its Discord, its Patreon) in the player's browser.
-/// The addresses are fixed here, as the support page's.
-#[tauri::command]
-fn open_social(site: Social) {
-    westplay_host::browser::open(match site {
-        Social::YouTube => "https://www.youtube.com/@tyraness",
-        Social::Discord => "https://discord.com/invite/Jt34SmwU6",
-        Social::Patreon => "https://www.patreon.com/c/westmods",
-    });
-}
-
 /// Where this run's `app.log` is (the About page): Documents\WestPlay\logs, or WestPlay's own data folder where
 /// Documents refused it; `None` if it couldn't be made.
 #[tauri::command]
@@ -416,8 +386,6 @@ fn main() {
             apple_music_sign_in,
             apple_music_sign_out,
             apple_music_check,
-            open_support_page,
-            open_social,
             app_log_place,
             customize::customize_list,
             customize::add_wallpapers,
