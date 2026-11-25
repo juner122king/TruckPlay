@@ -35,7 +35,8 @@ describe('screenProfile', () => {
     // Its 7" screen: tuned larger (a small screen), while another truck on the stock screen isn't tuned.
     expect(screenProfile('generic', scaniaS).scale).toBe(1.7)
     expect(screenProfile('generic', truck('mercedes', 'vehicle.mercedes.actros'))).toBe(FALLBACK_PROFILE)
-    expect(screenProfile('daf-2021', dafXg).oemStrip).toBe('daf-2021')
+    expect(screenProfile('daf-2021', dafXg)).toEqual({ name: 'DAF 2021', oemStrip: 'daf-2021', scale: 1 })
+    expect(screenProfile('tablet', null)).toEqual({ name: 'WestPlay tablet', oemStrip: null, scale: 1 })
   })
 
   it('uses the F-150 screen profile and its physical aspect ratio', () => {

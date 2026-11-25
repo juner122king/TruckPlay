@@ -82,18 +82,9 @@ export interface ScreenProfile {
    * real-world size and more fits on screen, like CarPlay on a bigger display (the Home grid gains columns).
    */
   scale: number
-  /** How much larger the sidebar's app icons are than every other screen's (1 when not set). */
-  sidebarIcons?: number
-  /** How large the sidebar's buttons (Home and Dashboard, the truck) are, their symbols with them, against their first
-   * size ([`SIDEBAR_BUTTONS`] when not set): each stays as far from the sidebar's bottom at any size. */
-  sidebarButtons?: number
   /** How many recent apps the sidebar shows (three when not set; `sidebarApps`): a tall screen's has room for
    * more, a short one's for fewer. */
   recents?: number
-  /** A short sidebar's spacing (page units), tighter than every other screen's so its apps stay in its middle clear of
-   * the clock and the buttons: between the apps (shell.css: 18), the Home symbol from the bottom (58.67), and between
-   * the truck and Home buttons' symbols (36). */
-  sidebarGaps?: { apps?: number; homeBottom?: number; buttons?: number }
   /**
    * Where WestPlay's button sits while the screen is handed to the truck (its centre, in frame pixels), if
    * the default spot (the CarPlay area's top-left corner) covers part of the truck's own screen.
@@ -157,16 +148,12 @@ const SMART_DASH: ScreenProfile = {
  * over the entry for its layout alone (one layout can sit in several trucks with different screen sizes).
  */
 const PROFILES: readonly ProfileEntry[] = [
-  // Its sidebar ends above the DAF's strip, short for three apps in its middle (owner 2026-11-13) and both buttons: the
-  // apps, the buttons and the Home button from the bottom closer, chosen by eye from several, so the apps stay in the
-  // middle, the truck nearer the Home button than them, and the Home button clear of the round end.
   {
     layout: 'daf-2021',
     profile: {
       name: 'DAF 2021',
       oemStrip: 'daf-2021',
       scale: 1,
-      sidebarGaps: { apps: 10, homeBottom: 40, buttons: 18 },
     },
   },
   {
@@ -202,12 +189,11 @@ const PROFILES: readonly ProfileEntry[] = [
   // Volvo FH 2021 and 2024: the whole screen, at the DAF's sizing until tuned in the cab (owner 2026-10-21).
   { layout: 'volvo-fh', profile: { name: 'Volvo FH', oemStrip: null, scale: 1 } },
   // WestPlay's tablet, in any truck: an iPad Air's glass, 23.2 x 16.3 cm, the page laid out at its 1.425:1
-  // (crates/shared page_height), at the DAF's sizing. Its glass shows the frame whole. Its sidebar's icons a quarter
-  // larger and its Home button twice the size, chosen by the owner from drawings of it (2026-11-11: smaller than a
-  // finger could touch).
+  // (crates/shared page_height), at the DAF's sizing. Its glass shows the frame whole, with the unified
+  // CarPlay sidebar proportions shared by every screen.
   {
     layout: 'tablet',
-    profile: { name: 'WestPlay tablet', oemStrip: null, scale: 1, sidebarIcons: 1.25, sidebarButtons: 2 },
+    profile: { name: 'WestPlay tablet', oemStrip: null, scale: 1 },
   },
   // Oyuncuyusbis' coaches (mods), each on its Gps part (owner 2026-11-16: "all four busses get them in their GPS tablet
   // part just like Setra"): the Setra S 516 HD/2's and the Travego's tablet (20.1 x 12.2 cm), the Setra S 531 DT's
@@ -235,12 +221,6 @@ const PROFILES: readonly ProfileEntry[] = [
   // 2026-11-13, after seeing three).
   { layout: 'man-lions-24', profile: { name: "MAN Lion's Coach (2024)", oemStrip: null, scale: 1.2, recents: 2 } },
 ]
-
-/** The sidebar's buttons on every screen: the tablet's twice their first size (owner 2026-11-11: smaller than a finger
- * could touch), then every screen's (owner 2026-11-12: "too small globally"). At twice, beside a sidebar app of the
- * first size their symbols were as large as it ("fucking huge", owner 2026-11-13): 1.6, as the tablet's to its icons a
- * quarter larger, and about CarPlay's (reference/carplay-photos: its Home symbol half its icons). */
-export const SIDEBAR_BUTTONS = 1.6
 
 /** Screens not tuned yet: CarPlay on the whole screen, its layout adapting to the space (responsive). */
 export const FALLBACK_PROFILE: ScreenProfile = { name: 'Default', oemStrip: null, scale: 1 }

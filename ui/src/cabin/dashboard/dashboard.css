@@ -1,6 +1,6 @@
 /* Dashboard: map tile (most of the space) + a column of three one-job widgets. */
 .screen.dashboard {
-  left: var(--content-left, 170px);
+  left: var(--content-left, 136px);
   right: var(--edge);
   top: var(--edge);
   bottom: var(--edge);

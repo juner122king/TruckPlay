@@ -2,7 +2,7 @@
 
 .notify-banner-slot {
   position: absolute;
-  left: var(--content-left, 170px);
+  left: var(--content-left, 136px);
   right: var(--edge, 16px);
   top: 18px;
   z-index: 4;

@@ -98,7 +98,7 @@ function RecentApp({ app, current }: { app: AppId; current: boolean }) {
 /** Home: the app grid. */
 function GridGlyph({ shown }: { shown: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" width="34" height="34" className={shown ? 'shown' : undefined} aria-hidden>
+    <svg viewBox="0 0 24 24" width="42" height="42" className={shown ? 'shown' : undefined} aria-hidden>
       {[4, 10.25, 16.5].flatMap((x) =>
         [4, 10.25, 16.5].map((y) => (
           <rect key={`${x}-${y}`} x={x} y={y} width="3.5" height="3.5" rx="1" fill="currentColor" />
@@ -122,8 +122,8 @@ function DashboardGlyph({ shown }: { shown: boolean }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="34"
-      height="34"
+      width="42"
+      height="42"
       className={shown ? 'shown' : undefined}
       fill="none"
       stroke="currentColor"
@@ -140,8 +140,8 @@ function TruckGlyph() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="36"
-      height="36"
+      width="44"
+      height="44"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -159,7 +159,7 @@ function TruckGlyph() {
 
 function SignalBars() {
   return (
-    <svg viewBox="0 0 20 14" width="26" height="18" aria-hidden>
+    <svg viewBox="0 0 20 14" width="19" height="13" aria-hidden>
       {[0, 1, 2, 3].map((bar) => (
         <rect
           key={bar}

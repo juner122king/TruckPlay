@@ -31,7 +31,7 @@
   --keyboard-padding: max(12px, calc(var(--keyboard-radius) - var(--key-radius)));
   position: absolute;
   /* Right of the sidebar, inside the app area's margins. */
-  left: calc(var(--content-left, 170px) + var(--keyboard-margin));
+  left: calc(var(--content-left, 136px) + var(--keyboard-margin));
   right: calc(var(--edge) + var(--keyboard-margin));
   /* Shared with what makes room for it (shell.css). */
   bottom: var(--keyboard-bottom);

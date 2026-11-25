@@ -1579,7 +1579,7 @@
 
 .shell .am-prompt-veil {
   position: absolute;
-  inset: calc(-1 * var(--edge)) calc(-1 * var(--edge)) calc(-1 * var(--edge)) calc(-1 * var(--content-left, 170px));
+  inset: calc(-1 * var(--edge)) calc(-1 * var(--edge)) calc(-1 * var(--edge)) calc(-1 * var(--content-left, 136px));
   z-index: 6;
   display: grid;
   place-items: center;

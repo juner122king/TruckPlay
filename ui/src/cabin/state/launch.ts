@@ -87,7 +87,7 @@ export function useLaunchStyle(app: AppId, role: LaunchRole): CSSProperties | un
 export const LAUNCH_STYLE: CSSProperties = { viewTransitionName: APP_WINDOW }
 
 /** Corner radius of the icon an app grows out of or shrinks into (Home icons are bigger). */
-const ICON_RADIUS: Record<LaunchOrigin, string> = { home: '31px', sidebar: '17px' }
+const ICON_RADIUS: Record<LaunchOrigin, string> = { home: '31px', sidebar: '14px' }
 
 let running: ViewTransition | null = null
 

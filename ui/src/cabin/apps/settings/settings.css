@@ -302,23 +302,23 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 15%;
+  width: 11%;
   background: var(--picture-glass);
 }
 
 .screen-picture-widget {
   position: absolute;
-  left: 67%;
+  left: 66%;
   top: 9%;
-  width: 27%;
+  width: 28%;
   height: 39%;
   border-radius: 9px;
   background: var(--picture-widget);
 }
 
 .screen-picture-widget.large {
-  left: 21%;
-  width: 41%;
+  left: 17%;
+  width: 44%;
   height: 82%;
 }
 

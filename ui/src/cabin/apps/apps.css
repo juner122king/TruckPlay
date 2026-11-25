@@ -6,7 +6,7 @@
 /* The app's content fills the space right of the sidebar. */
 .app-panel {
   position: absolute;
-  left: var(--content-left, 170px);
+  left: var(--content-left, 136px);
   right: var(--edge);
   top: var(--edge);
   bottom: var(--edge);
