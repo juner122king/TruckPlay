@@ -816,10 +816,10 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         receiveXimalayaPlayback(message.playback)
         break
       case 'douyin':
-        receiveDouyinState(message.signedIn, message.playing, message.signingIn)
+        receiveDouyinState(message.signedIn, message.playing, message.signingIn, message.nickname, message.avatar)
         break
       case 'douyinAnswer':
-        receiveDouyinAnswer(message.id, message.failed, message.error, message.videos)
+        receiveDouyinAnswer(message.id, message.failed, message.error, message.videos, message.channel)
         break
       case 'douyinPlayback':
         receiveDouyinPlayback(message.playback)

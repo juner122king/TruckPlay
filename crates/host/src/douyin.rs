@@ -19,8 +19,11 @@ pub enum Command {
     Play {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         video: Option<Video>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        index: Option<usize>,
     },
     Pause,
+    Toggle,
     Next,
     Previous,
     Seek {
@@ -29,7 +32,24 @@ pub enum Command {
     Volume {
         percent: f64,
     },
+    Mute {
+        muted: bool,
+    },
+    Rate {
+        rate: f64,
+    },
+    AutoScroll {
+        on: bool,
+    },
+    Channel {
+        channel: String,
+    },
+    Refresh,
     Like {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
+    Collect {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
     },
@@ -54,8 +74,14 @@ pub enum Command {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "ask", rename_all = "camelCase")]
 pub enum Question {
-    Feed,
-    Search { query: String },
+    Feed {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        channel: Option<String>,
+    },
+    Search {
+        query: String,
+    },
+    Profile,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -74,15 +100,39 @@ pub struct Video {
     pub url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub liked: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collected: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub likes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comments: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collects: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shares: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub music: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_live: Option<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Playback {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub title: String,
     pub artist: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artwork: Option<String>,
     pub duration: f64,
@@ -90,6 +140,28 @@ pub struct Playback {
     pub status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub liked: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collected: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub likes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comments: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub music: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub muted: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_scroll: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buffering: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_ready: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_vertical: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -97,6 +169,10 @@ pub struct Playback {
 pub struct State {
     pub signed_in: bool,
     pub playing: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -109,6 +185,8 @@ pub struct Answer {
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub videos: Option<Vec<Video>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -184,7 +262,12 @@ impl Douyin {
                 let _ = self.view.delete_cookies();
                 self.told.borrow_mut().reset();
                 let _ = self.view.navigate(HOME);
-                self.pending.borrow_mut().push(Report::State(State { signed_in: false, playing: false }));
+                self.pending.borrow_mut().push(Report::State(State {
+                    signed_in: false,
+                    playing: false,
+                    nickname: None,
+                    avatar: None,
+                }));
                 Ok(())
             }
             other => self.pass(other),
@@ -223,7 +306,7 @@ impl Douyin {
             self.checked_initial_cookie.set(true);
             let signed_in = self.view.has_cookie(HOME, &["sessionid", "sessionid_ss", "sid_tt"]);
             if signed_in {
-                reports.push(Report::State(State { signed_in: true, playing: false }));
+                reports.push(Report::State(State { signed_in: true, playing: false, nickname: None, avatar: None }));
             }
         }
 
@@ -235,7 +318,7 @@ impl Douyin {
             let _ = self.view.navigate(HOME);
             let signed_in =
                 p == Progress::SignedIn || self.view.has_cookie(HOME, &["sessionid", "sessionid_ss", "sid_tt"]);
-            reports.push(Report::State(State { signed_in, playing: false }));
+            reports.push(Report::State(State { signed_in, playing: false, nickname: None, avatar: None }));
         }
 
         for message in self.view.take_page_messages() {
@@ -248,7 +331,11 @@ impl Douyin {
                 match msg_type {
                     "state" => {
                         if let Some(state_val) = value.get("state") {
-                            if let Ok(s) = serde_json::from_value::<State>(state_val.clone()) {
+                            if let Ok(mut s) = serde_json::from_value::<State>(state_val.clone()) {
+                                if !s.signed_in && self.view.has_cookie(HOME, &["sessionid", "sessionid_ss", "sid_tt"])
+                                {
+                                    s.signed_in = true;
+                                }
                                 reports.push(Report::State(s));
                             }
                         }
@@ -293,11 +380,15 @@ impl Douyin {
 pub fn state_message(state: Option<&State>, signing_in: bool) -> String {
     let signed_in = state.map(|s| s.signed_in);
     let playing = state.map(|s| s.playing);
+    let nickname = state.and_then(|s| s.nickname.as_deref());
+    let avatar = state.and_then(|s| s.avatar.as_deref());
     serde_json::json!({
         "type": "douyin",
         "signedIn": signed_in,
         "playing": playing,
         "signingIn": signing_in,
+        "nickname": nickname,
+        "avatar": avatar,
     })
     .to_string()
 }
@@ -317,6 +408,46 @@ pub fn answer_message(answer: &Answer) -> String {
         "failed": answer.failed,
         "error": answer.error,
         "videos": answer.videos,
+        "channel": answer.channel,
     })
     .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trips_extended_commands() {
+        let cmds = [
+            Command::Channel { channel: "jingxuan".into() },
+            Command::Rate { rate: 1.5 },
+            Command::Mute { muted: true },
+            Command::AutoScroll { on: false },
+            Command::Collect { id: Some("7400001".into()) },
+            Command::Refresh,
+            Command::Ask { id: 7, question: Question::Feed { channel: Some("car".into()) } },
+        ];
+        for cmd in cmds {
+            let json = serde_json::to_string(&cmd).unwrap();
+            let back: Command = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, cmd);
+        }
+    }
+
+    #[test]
+    fn serializes_state_with_profile() {
+        let state = State {
+            signed_in: true,
+            playing: true,
+            nickname: Some("老张重卡".into()),
+            avatar: Some("https://example.com/a.jpg".into()),
+        };
+        let msg: serde_json::Value = serde_json::from_str(&state_message(Some(&state), false)).unwrap();
+        assert_eq!(msg["type"], "douyin");
+        assert_eq!(msg["signedIn"], true);
+        assert_eq!(msg["playing"], true);
+        assert_eq!(msg["nickname"], "老张重卡");
+        assert_eq!(msg["avatar"], "https://example.com/a.jpg");
+    }
 }

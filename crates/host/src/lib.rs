@@ -1250,8 +1250,13 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     }
                 }
                 Some(PageMessage::Douyin { command }) => {
-                    if douyin.is_none() && matches!(command, douyin::Command::Pause | douyin::Command::Hide) {
-                        // Nothing to pause or hide.
+                    if douyin.is_none()
+                        && matches!(
+                            command,
+                            douyin::Command::Pause | douyin::Command::Hide | douyin::Command::Crop { .. }
+                        )
+                    {
+                        // Nothing to pause, hide or crop.
                     } else if let Some(player) = start_douyin(&mut douyin, &stage, &config) {
                         let _ = player.command(&command);
                     }

@@ -126,7 +126,9 @@ export function VideoHole({
       settling = []
       if (app === 'douyin') {
         useDouyin.setState({ hole: null })
-        postToHost({ type: 'douyin', command: { action: 'hide' } })
+        if (!useDouyin.getState().open) {
+          postToHost({ type: 'douyin', command: { action: 'hide' } })
+        }
       } else if (app === 'hongguo') {
         useHongguo.setState({ hole: null })
         postToHost({ type: 'hongguo', command: { action: 'hide' } })
@@ -179,7 +181,9 @@ export function VideoHole({
       }
       if (app === 'douyin') {
         useDouyin.setState({ hole: null })
-        postToHost({ type: 'douyin', command: { action: 'hide' } })
+        if (!useDouyin.getState().open) {
+          postToHost({ type: 'douyin', command: { action: 'hide' } })
+        }
       } else if (app === 'hongguo') {
         useHongguo.setState({ hole: null })
         if (!useHongguo.getState().open) {

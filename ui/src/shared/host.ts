@@ -363,7 +363,14 @@ export type HostMessage =
   | ({ type: 'neteaseAnswer'; id: number; failed?: boolean; error?: string } & Partial<NeteaseAnswers>)
   | { type: 'neteasePlayback'; playback: NeteasePlayback | null }
   /** Douyin: whether it's signed in and playing, and whether its sign-in QR window is open. */
-  | { type: 'douyin'; signedIn: boolean | null; playing: boolean | null; signingIn: boolean }
+  | {
+      type: 'douyin'
+      signedIn: boolean | null
+      playing: boolean | null
+      signingIn: boolean
+      nickname?: string | null
+      avatar?: string | null
+    }
   | ({ type: 'douyinAnswer'; id: number; failed?: boolean; error?: string } & Partial<DouyinAnswers>)
   | { type: 'douyinPlayback'; playback: DouyinPlayback | null }
   /** Hongguo: whether it's signed in and playing, and whether its sign-in QR window is open. */
@@ -984,20 +991,29 @@ export type DouyinCommand =
   | { action: 'start' }
   | { action: 'signIn' }
   | { action: 'signOut' }
-  | { action: 'play'; video?: DouyinVideo }
+  | { action: 'play'; video?: DouyinVideo; index?: number }
   | { action: 'pause' }
   | { action: 'toggle' }
   | { action: 'next' }
   | { action: 'previous' }
   | { action: 'seek'; seconds: number }
   | { action: 'volume'; percent: number }
+  | { action: 'mute'; muted: boolean }
+  | { action: 'rate'; rate: number }
+  | { action: 'autoScroll'; on: boolean }
+  | { action: 'channel'; channel: string }
+  | { action: 'refresh' }
   | { action: 'like'; id?: string }
+  | { action: 'collect'; id?: string }
   | { action: 'show'; x: number; y: number; width: number; height: number; crop?: boolean }
   | { action: 'crop'; on: boolean }
   | { action: 'hide' }
   | { action: 'ask'; id: number; question: DouyinQuestion }
 
-export type DouyinQuestion = { ask: 'feed' } | { ask: 'search'; query: string }
+export type DouyinQuestion =
+  | { ask: 'feed'; channel?: string }
+  | { ask: 'search'; query: string }
+  | { ask: 'profile' }
 
 export interface DouyinVideo {
   id: string
@@ -1008,9 +1024,16 @@ export interface DouyinVideo {
   duration?: number
   url?: string
   liked?: boolean
+  collected?: boolean
   likes?: number
   comments?: number
+  collects?: number
+  shares?: number
   music?: string
+  width?: number
+  height?: number
+  channel?: string
+  isLive?: boolean
 }
 
 export interface DouyinPlayback {
@@ -1018,15 +1041,28 @@ export interface DouyinPlayback {
   title: string
   artist: string
   author?: string
+  avatar?: string
   artwork?: string
   duration: number
   position: number
   status: string
   liked?: boolean
+  collected?: boolean
+  likes?: number
+  comments?: number
+  music?: string
+  rate?: number
+  muted?: boolean
+  autoScroll?: boolean
+  buffering?: boolean
+  hostReady?: boolean
+  isVertical?: boolean
+  channel?: string
 }
 
 export interface DouyinAnswers {
   videos?: DouyinVideo[]
+  channel?: string
 }
 
 /** What the Hongguo app asks of Hongguo's web player (`westplay_host::hongguo::Command`). */

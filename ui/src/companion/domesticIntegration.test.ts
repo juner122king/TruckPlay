@@ -23,6 +23,7 @@ describe('domestic edition integration', () => {
         'bilibili',
         'ximalaya',
         'radio',
+        'douyin',
         'freight',
         'safari',
         'music',
@@ -31,7 +32,7 @@ describe('domestic edition integration', () => {
       ]),
     )
     expect(RELEASED_APP_IDS).toContain('ximalaya')
-    expect(RELEASED_APP_IDS).not.toContain('douyin')
+    expect(RELEASED_APP_IDS).toContain('douyin')
     expect(RELEASED_APP_IDS).not.toContain('hongguo')
     expect(isAppId('ximalaya')).toBe(true)
     expect(isAppId('douyin')).toBe(true)

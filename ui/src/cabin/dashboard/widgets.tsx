@@ -2,6 +2,7 @@ import { type Backdrop, type Look, useWordsOver, wordsClass } from '../apps/musi
 import { Crossfade } from '../apps/music/Crossfade'
 import { VideoWidget } from '../apps/youtube/VideoWidget'
 import { BilibiliVideoWidget } from '../apps/bilibili/VideoWidget'
+import { DouyinVideoWidget } from '../apps/douyin/VideoWidget'
 import { HongguoVideoWidget } from '../apps/hongguo/VideoWidget'
 import { NextGlyph, NoteGlyph, PauseGlyph, PlayGlyph, PreviousGlyph } from '../apps/music/glyphs'
 import { TrackSlide } from '../apps/music/TrackSlide'
@@ -19,7 +20,6 @@ import {
   useXimalayaSource,
 } from '../apps/ximalaya/ximalaya'
 import { setRadioNowPlaying } from '../apps/radio/radio'
-import { playOrPause as playOrPauseDouyin, skip as skipDouyin, useDouyin, useDouyinSource } from '../apps/douyin/douyin'
 import {
   playOrPause as playOrPauseNetease,
   skip as skipNetease,
@@ -54,7 +54,7 @@ export function NowPlayingWidget() {
       {shown && showing === 'video' && <VideoWidget />}
       {shown && showing === 'bilibili' && bilibili && <BilibiliVideoWidget />}
       {shown && showing === 'ximalaya' && ximalaya && <XimalayaWidget ximalaya={ximalaya} />}
-      {shown && showing === 'douyin' && douyin && <DouyinWidget douyin={douyin} />}
+      {shown && showing === 'douyin' && douyin && <DouyinVideoWidget />}
       {shown && showing === 'hongguo' && hongguo && <HongguoVideoWidget />}
       {shown && showing === 'netease' && netease && <NeteaseWidget netease={netease} />}
       {shown && showing === 'appleMusic' && appleMusic && <AppleMusicWidget appleMusic={appleMusic} />}
@@ -102,25 +102,6 @@ function XimalayaWidget({ ximalaya }: { ximalaya: NonNullable<ReturnType<typeof 
         if (action === 'playPause') playOrPauseXimalaya()
         else if (action === 'next') skipXimalaya(1)
         else if (action === 'previous') skipXimalaya(-1)
-      }}
-    />
-  )
-}
-
-/** Douyin short video audio: what plays, its controls, opening Douyin on Now Playing. */
-function DouyinWidget({ douyin }: { douyin: NonNullable<ReturnType<typeof useDouyinSource>> }) {
-  return (
-    <MusicWidget
-      source={douyin.source}
-      artwork={douyin.artwork}
-      onOpen={() => {
-        useDouyin.setState({ nowPlaying: true })
-        go({ type: 'openApp', app: 'douyin' })
-      }}
-      onControl={(action) => {
-        if (action === 'playPause') playOrPauseDouyin()
-        else if (action === 'next') skipDouyin(1)
-        else if (action === 'previous') skipDouyin(-1)
       }}
     />
   )

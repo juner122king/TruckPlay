@@ -24,7 +24,7 @@ describe('navigate', () => {
   })
 
   it('ignores unreleased apps when opening', () => {
-    const state = navigate(INITIAL_NAVIGATION, { type: 'openApp', app: 'douyin' })
+    const state = navigate(INITIAL_NAVIGATION, { type: 'openApp', app: 'hongguo' })
     expect(state).toBe(INITIAL_NAVIGATION)
   })
 
@@ -94,7 +94,7 @@ describe('sidebarApps', () => {
 
   it('deduplicates and skips unreleased apps and extra maps entries while keeping order', () => {
     expect(
-      sidebarApps(['douyin', 'youtube', 'maps', 'hongguo', 'youtube', 'podcasts', 'freight', 'ximalaya'], 3),
+      sidebarApps(['podcasts', 'youtube', 'maps', 'hongguo', 'youtube', 'podcasts', 'freight', 'douyin'], 3),
     ).toEqual(['maps', 'youtube', 'freight'])
   })
 

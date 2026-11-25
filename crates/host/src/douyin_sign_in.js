@@ -1,39 +1,82 @@
 ;(() => {
+  if (window.top !== window) return
   const post = (message) => window.chrome?.webview?.postMessage(message)
   let autoClicked = false
+  let checking = false
 
-  const check = () => {
-    // 1. Check DOM for logged-in user avatar or profile elements
-    const avatar = document.querySelector(
-      '[data-e2e="user-avatar"], [data-e2e="user-info"], a[href^="/user/"], [data-e2e="user-detail"], img[class*="avatar"], div[class*="avatar"]'
-    )
-    const hasUserCookies =
-      document.cookie.includes('sessionid') ||
-      document.cookie.includes('sid_tt') ||
-      document.cookie.includes('uid_tt')
+  const hasAuthCookie = () =>
+    document.cookie.includes('sessionid=') ||
+    document.cookie.includes('sessionid_ss=') ||
+    document.cookie.includes('sid_tt=') ||
+    document.cookie.includes('uid_tt=')
 
-    const loginBtn = Array.from(document.querySelectorAll('button, a, div[role="button"]')).find((el) => {
-      const text = el.textContent?.trim()
-      return (text === '登录' || text === '立即登录' || el.getAttribute('data-e2e') === 'login-button') && el.offsetParent !== null
-    })
+  const verifyApiAuth = async () => {
+    try {
+      const res = await fetch('/aweme/v1/web/user/profile/self/?device_platform=webapp&aid=6383', {
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const user = data?.user
+        if (user && (user.uid || user.sec_uid || user.unique_id)) {
+          return true
+        }
+      }
+    } catch {}
+    try {
+      const res = await fetch('/passport/web/account/info/', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.message === 'success' && (data?.data?.user_id_str || data?.data?.user_id)) {
+          return true
+        }
+      }
+    } catch {}
+    return false
+  }
 
-    if (avatar || hasUserCookies || (!loginBtn && document.querySelector('video'))) {
-      post({ signedIn: true })
-      return
-    }
-
-    // 2. Auto click login button if QR modal is not open yet
-    if (!autoClicked && loginBtn) {
-      const qrModal = document.querySelector(
-        '[class*="login-guide"], [class*="login-panel"], [class*="login-mask"], [id*="login"], [class*="qrcode"]'
-      )
-      if (!qrModal) {
-        autoClicked = true
-        loginBtn.click()
+  const check = async () => {
+    const onDouyin = location.hostname.endsWith('douyin.com')
+    if (onDouyin && !checking) {
+      checking = true
+      try {
+        const selfLink = document.querySelector('a[href*="/user/self"], [data-e2e="user-info-self"]')
+        if (hasAuthCookie() && selfLink) {
+          post({ signedIn: true })
+          return
+        }
+        if (await verifyApiAuth()) {
+          post({ signedIn: true })
+          return
+        }
+      } finally {
+        checking = false
       }
     }
 
-    setTimeout(check, 600)
+    // Auto-open the login / QR dialog once if not visible yet
+    if (!autoClicked) {
+      const qrModal = document.querySelector(
+        '[class*="login-guide"], [class*="login-panel"], [class*="login-mask"], [id*="login"], [class*="qrcode"]',
+      )
+      if (!qrModal) {
+        const loginBtn = Array.from(document.querySelectorAll('button, a, div[role="button"]')).find((el) => {
+          const text = el.textContent?.trim()
+          return (
+            (text === '登录' || text === '立即登录' || el.getAttribute('data-e2e') === 'login-button') &&
+            el.offsetParent !== null
+          )
+        })
+        if (loginBtn && typeof loginBtn.click === 'function') {
+          autoClicked = true
+          try {
+            loginBtn.click()
+          } catch {}
+        }
+      }
+    }
+
+    setTimeout(check, 1000)
   }
 
   check()

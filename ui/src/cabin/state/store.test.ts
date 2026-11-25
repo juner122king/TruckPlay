@@ -116,7 +116,7 @@ describe('the saved navigation recents', () => {
         {
           navigation: {
             route: { kind: 'dashboard' },
-            recents: ['freight', 'hongguo', 'youtube', 'freight', 'settings', 'douyin', 'maps'],
+            recents: ['freight', 'hongguo', 'youtube', 'freight', 'settings', 'podcasts', 'maps'],
             base: 'dashboard',
           },
         },
@@ -134,7 +134,7 @@ describe('the saved navigation recents', () => {
         {
           navigation: {
             route: { kind: 'dashboard' },
-            recents: ['hongguo', 'douyin'],
+            recents: ['hongguo', 'podcasts'],
             base: 'dashboard',
           },
         },

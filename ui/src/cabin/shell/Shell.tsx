@@ -8,6 +8,7 @@ import { RETURN_BUTTON_SIZE, returnButtonCentre } from '../state/screen'
 import { textScale } from '../state/textSize'
 import { Player } from '../apps/youtube/Player'
 import { BilibiliPlayer } from '../apps/bilibili/Player'
+import { DouyinPlayer } from '../apps/douyin/Player'
 import { HongguoPlayer } from '../apps/hongguo/Player'
 import { useYouTube } from '../apps/youtube/youtube'
 import { useDouyin } from '../apps/douyin/douyin'
@@ -81,8 +82,9 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
   // in small (YouTube's Now playing): the CarPlay area is cut open where it shows.
   const ytWatching = useYouTube((state) => state.open)
   const biliWatching = useBilibili((state) => state.open)
+  const dyWatching = useDouyin((state) => state.open)
   const hgWatching = useHongguo((state) => state.open)
-  const watching = ytWatching || biliWatching || hgWatching
+  const watching = ytWatching || biliWatching || dyWatching || hgWatching
   const holdSidebar = useYouTube((state) => state.holdSidebar)
   const ytHole = useYouTube((state) => state.hole)
   const dyHole = useDouyin((state) => state.hole)
@@ -148,6 +150,7 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
           {children}
           <Player />
           <BilibiliPlayer />
+          <DouyinPlayer />
           <HongguoPlayer />
           <Keyboard />
           <NotificationBanner />

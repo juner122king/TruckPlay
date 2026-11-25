@@ -10,6 +10,7 @@ describe('the apps this release has', () => {
       'bilibili',
       'ximalaya',
       'radio',
+      'douyin',
       'youtube',
       'player',
       'freight',
@@ -25,7 +26,7 @@ describe('the apps this release has', () => {
   it('opens none of the later ones from a saved screen or recent', () => {
     expect(isReleasedApp('podcasts')).toBe(false)
     expect(isReleasedApp('ximalaya')).toBe(true)
-    expect(isReleasedApp('douyin')).toBe(false)
+    expect(isReleasedApp('douyin')).toBe(true)
     expect(isReleasedApp('hongguo')).toBe(false)
     expect(isReleasedApp('radio')).toBe(true)
     expect(isReleasedApp('phone')).toBe(true)
