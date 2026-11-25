@@ -3475,7 +3475,7 @@ pub(crate) fn is_language_tag(tag: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{PageMessage, PageRouteAction, parse_page_message, screen_message, settings_message};
+    use super::{Keybind, PageMessage, PageRouteAction, keybind_message, parse_page_message, screen_message, settings_message};
 
     #[test]
     fn a_language_tag_is_a_language_and_up_to_two_parts() {
