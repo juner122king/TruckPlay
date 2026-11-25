@@ -19,6 +19,8 @@ import {
   ximalayaSignOut,
   neteaseSignIn,
   neteaseSignOut,
+  qqmusicSignIn,
+  qqmusicSignOut,
   youtubeSignIn,
   youtubeSignOut,
 } from '../useHostStatus'
@@ -92,6 +94,15 @@ const SERVICES: Record<
     signingIn: (status) => status?.neteaseSigningIn ?? false,
     words: (words) => words.accounts,
   },
+  qqmusic: {
+    name: 'QQ音乐',
+    app: 'qqmusic',
+    glow: GLOW.qqmusic,
+    signIn: qqmusicSignIn,
+    signOut: qqmusicSignOut,
+    signingIn: (status) => status?.qqmusicSigningIn ?? false,
+    words: (words) => words.accounts,
+  },
   appleMusic: {
     name: 'Apple Music',
     app: 'music',
@@ -103,7 +114,16 @@ const SERVICES: Record<
   },
 }
 
-const ALL_SERVICES: Service[] = ['youtube', 'netease', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'appleMusic']
+const ALL_SERVICES: Service[] = [
+  'youtube',
+  'netease',
+  'qqmusic',
+  'bilibili',
+  'ximalaya',
+  'douyin',
+  'hongguo',
+  'appleMusic',
+]
 const ORDER: Service[] = ALL_SERVICES.filter((service) => isReleasedApp(SERVICES[service].app))
 
 /**

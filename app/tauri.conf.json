@@ -43,7 +43,7 @@
     "copyright": "Copyright © 2026 TruckPlay (based on WestPlay, GPL-3.0-or-later).",
     "category": "Game",
     "shortDescription": "TruckPlay — CarPlay-style in-cabin screen for ETS2 and ATS",
-    "longDescription": "TruckPlay brings in-cabin maps, speed cameras, traffic lights, freight HUD, Apple Music, YouTube, Bilibili, NetEase Cloud Music, Radio and local playback to ETS2 and ATS.",
+    "longDescription": "TruckPlay brings in-cabin maps, speed cameras, traffic lights, freight HUD, Apple Music, YouTube, Bilibili, NetEase Cloud Music, QQ Music, Radio and local playback to ETS2 and ATS.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

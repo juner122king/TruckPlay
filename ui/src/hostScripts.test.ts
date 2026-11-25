@@ -10,6 +10,8 @@ import hongguoSignIn from '../../crates/host/src/hongguo_sign_in.js?raw'
 import cabSound from '../../crates/host/src/cab_sound.js?raw'
 import netease from '../../crates/host/src/netease.js?raw'
 import neteaseSignIn from '../../crates/host/src/netease_sign_in.js?raw'
+import qqmusic from '../../crates/host/src/qqmusic.js?raw'
+import qqmusicSignIn from '../../crates/host/src/qqmusic_sign_in.js?raw'
 import ximalaya from '../../crates/host/src/ximalaya.js?raw'
 import ximalayaHls from '../../crates/host/src/ximalaya_hls.js?raw'
 import ximalayaSignIn from '../../crates/host/src/ximalaya_sign_in.js?raw'
@@ -34,6 +36,8 @@ const AS_RUN: Record<string, string[]> = {
   "Hongguo's sign-in": [hongguoSignIn],
   NetEase: [cabSound, netease],
   "NetEase's sign-in": [neteaseSignIn],
+  'QQ Music': [cabSound, qqmusic],
+  "QQ Music's sign-in": [qqmusicSignIn],
 }
 
 describe("the players' page scripts", () => {

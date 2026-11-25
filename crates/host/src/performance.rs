@@ -71,6 +71,7 @@ pub enum Profile {
     Douyin,
     Hongguo,
     NetEase,
+    QQMusic,
 }
 
 /// What the host knows each second while the game runs.
@@ -373,6 +374,7 @@ fn parts_of(
                 Profile::Douyin => "Douyin",
                 Profile::Hongguo => "Hongguo",
                 Profile::NetEase => "NetEase",
+                Profile::QQMusic => "QQ Music",
                 Profile::AppleMusic => "Apple Music",
                 Profile::Cab => match kind {
                     COREWEBVIEW2_PROCESS_KIND_BROWSER => "browser",

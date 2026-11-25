@@ -26,6 +26,12 @@ import {
   useNetease,
   useNeteaseSource,
 } from '../apps/netease/netease'
+import {
+  playOrPause as playOrPauseQqmusic,
+  skip as skipQqmusic,
+  useQqmusic,
+  useQqmusicSource,
+} from '../apps/qqmusic/qqmusic'
 import { playOrPause as playOrPausePlayer, skip as skipPlayer, usePlayer, usePlayerSource } from '../apps/player/player'
 import type { MediaAction, MediaSource } from '../../shared/media'
 import { useLook } from '../state/hooks'
@@ -48,7 +54,7 @@ import { cabClock } from '../../shared/host'
  */
 export function NowPlayingWidget() {
   const shown = useCabin((state) => state.dashboardWidgets.nowPlaying)
-  const { showing, bilibili, ximalaya, douyin, hongguo, netease, appleMusic, player } = useNowPlaying()
+  const { showing, bilibili, ximalaya, douyin, hongguo, netease, qqmusic, appleMusic, player } = useNowPlaying()
   return (
     <div className={`widget-slot${shown ? ' open' : ''}`}>
       {shown && showing === 'video' && <VideoWidget />}
@@ -57,6 +63,7 @@ export function NowPlayingWidget() {
       {shown && showing === 'douyin' && douyin && <DouyinVideoWidget />}
       {shown && showing === 'hongguo' && hongguo && <HongguoVideoWidget />}
       {shown && showing === 'netease' && netease && <NeteaseWidget netease={netease} />}
+      {shown && showing === 'qqmusic' && qqmusic && <QqmusicWidget qqmusic={qqmusic} />}
       {shown && showing === 'appleMusic' && appleMusic && <AppleMusicWidget appleMusic={appleMusic} />}
       {shown && showing === 'player' && player && <PlayerWidget player={player} />}
       {shown && showing === null && <MusicWidget source={null} artwork={null} onControl={() => {}} />}
@@ -121,6 +128,25 @@ function NeteaseWidget({ netease }: { netease: NonNullable<ReturnType<typeof use
         if (action === 'playPause') playOrPauseNetease()
         else if (action === 'next') skipNetease(1)
         else if (action === 'previous') skipNetease(-1)
+      }}
+    />
+  )
+}
+
+/** QQ Music: what plays, its controls, opening QQ Music on Now Playing. */
+function QqmusicWidget({ qqmusic }: { qqmusic: NonNullable<ReturnType<typeof useQqmusicSource>> }) {
+  return (
+    <MusicWidget
+      source={qqmusic.source}
+      artwork={qqmusic.artwork}
+      onOpen={() => {
+        useQqmusic.setState({ nowPlaying: true })
+        go({ type: 'openApp', app: 'qqmusic' })
+      }}
+      onControl={(action) => {
+        if (action === 'playPause') playOrPauseQqmusic()
+        else if (action === 'next') skipQqmusic(1)
+        else if (action === 'previous') skipQqmusic(-1)
       }}
     />
   )

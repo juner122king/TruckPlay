@@ -38,6 +38,7 @@ const ROLES: AppIconRole[] = [
   'douyin',
   'hongguo',
   'netease',
+  'qqmusic',
   'podcasts',
   'messages',
   'phone',

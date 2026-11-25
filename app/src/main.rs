@@ -256,6 +256,21 @@ fn netease_check(accounts: State<Accounts>) {
     accounts.0.netease.request(AccountAction::Check);
 }
 
+#[tauri::command]
+fn qqmusic_sign_in(accounts: State<Accounts>) {
+    accounts.0.qqmusic.request(AccountAction::SignIn);
+}
+
+#[tauri::command]
+fn qqmusic_sign_out(accounts: State<Accounts>) {
+    accounts.0.qqmusic.request(AccountAction::SignOut);
+}
+
+#[tauri::command]
+fn qqmusic_check(accounts: State<Accounts>) {
+    accounts.0.qqmusic.request(AccountAction::Check);
+}
+
 /// Opens Apple's sign-in for Apple Music in a window on the desktop (the status then says when it's done).
 #[tauri::command]
 fn apple_music_sign_in(accounts: State<Accounts>) {
@@ -383,6 +398,9 @@ fn main() {
             netease_sign_in,
             netease_sign_out,
             netease_check,
+            qqmusic_sign_in,
+            qqmusic_sign_out,
+            qqmusic_check,
             apple_music_sign_in,
             apple_music_sign_out,
             apple_music_check,

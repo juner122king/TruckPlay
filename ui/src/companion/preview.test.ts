@@ -38,7 +38,7 @@ describe('domestic companion preview', () => {
     const settings = (await pending) as Settings
     expect(settings.map.fast).toBe(false)
     const status = take.mock.calls[0][0] as HostStatus
-    for (const service of ['bilibili', 'netease', 'ximalaya', 'douyin', 'hongguo']) {
+    for (const service of ['bilibili', 'netease', 'qqmusic', 'ximalaya', 'douyin', 'hongguo']) {
       expect(status).toHaveProperty(service + 'SignedIn')
       expect(status).toHaveProperty(service + 'SigningIn')
     }

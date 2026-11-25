@@ -7,9 +7,10 @@ import { releaseResource as ximalaya } from './ximalaya/ximalaya'
 import { releaseResource as douyin } from './douyin/douyin'
 import { releaseResource as hongguo } from './hongguo/hongguo'
 import { releaseResource as netease } from './netease/netease'
+import { releaseResource as qqmusic } from './qqmusic/qqmusic'
 import { releaseResource as player } from './player/player'
 
-const release = { youtube, appleMusic, bilibili, ximalaya, douyin, hongguo, netease, player }
+const release = { youtube, appleMusic, bilibili, ximalaya, douyin, hongguo, netease, qqmusic, player }
 
 export function releaseMedia(app: MediaApp): void {
   stopFade(app === 'appleMusic' ? 'apple music' : app)

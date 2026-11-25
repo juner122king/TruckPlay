@@ -532,6 +532,7 @@ function SectionList({
         signedIn.bilibili && '哔哩哔哩',
         isReleasedApp('ximalaya') && signedIn.ximalaya && '喜马拉雅',
         signedIn.netease && '网易云音乐',
+        signedIn.qqmusic && 'QQ音乐',
       ]
         .filter(Boolean)
         .join(', ') || cw.values.none,

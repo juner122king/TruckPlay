@@ -20,6 +20,7 @@ describe('domestic edition integration', () => {
     expect(RELEASED_APP_IDS).toEqual(
       expect.arrayContaining([
         'netease',
+        'qqmusic',
         'bilibili',
         'ximalaya',
         'radio',
@@ -35,6 +36,7 @@ describe('domestic edition integration', () => {
     expect(RELEASED_APP_IDS).toContain('douyin')
     expect(RELEASED_APP_IDS).not.toContain('hongguo')
     expect(isAppId('ximalaya')).toBe(true)
+    expect(isAppId('qqmusic')).toBe(true)
     expect(isAppId('douyin')).toBe(true)
     expect(isAppId('hongguo')).toBe(true)
     expect(isAppId('spotify')).toBe(false)

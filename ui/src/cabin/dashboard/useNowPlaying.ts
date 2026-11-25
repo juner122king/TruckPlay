@@ -5,6 +5,7 @@ import { playOrPause as playOrPauseXimalaya, useXimalayaSource } from '../apps/x
 import { playOrPause as playOrPauseDouyin, useDouyinSource } from '../apps/douyin/douyin'
 import { playOrPause as playOrPauseHongguo, useHongguoSource } from '../apps/hongguo/hongguo'
 import { playOrPause as playOrPauseNetease, useNeteaseSource } from '../apps/netease/netease'
+import { playOrPause as playOrPauseQqmusic, useQqmusicSource } from '../apps/qqmusic/qqmusic'
 import { playOrPause as playOrPauseAppleMusic, useAppleMusicSource } from '../apps/music/appleMusic'
 import { playOrPause as playOrPausePlayer, usePlayerSource } from '../apps/player/player'
 import { type NowPlayingSource, shownSource } from './nowPlaying'
@@ -20,6 +21,7 @@ export function useNowPlaying() {
   const douyin = useDouyinSource()
   const hongguo = useHongguoSource()
   const netease = useNeteaseSource()
+  const qqmusic = useQqmusicSource()
   const appleMusic = useAppleMusicSource()
   const player = usePlayerSource()
   const video = useYouTube((store) => store.current)
@@ -31,6 +33,7 @@ export function useNowPlaying() {
     douyin: douyin?.source.status === 'playing',
     hongguo: hongguo?.source.status === 'playing',
     netease: netease?.source.status === 'playing',
+    qqmusic: qqmusic?.source.status === 'playing',
     appleMusic: appleMusic?.source.status === 'playing',
     player: player?.source.status === 'playing',
   }
@@ -41,6 +44,7 @@ export function useNowPlaying() {
     douyin: Boolean(douyin),
     hongguo: Boolean(hongguo),
     netease: Boolean(netease),
+    qqmusic: Boolean(qqmusic),
     appleMusic: Boolean(appleMusic),
     player: Boolean(player),
   }
@@ -49,7 +53,7 @@ export function useNowPlaying() {
   useEffect(() => {
     if (showing !== null && showingPlays) lastPlayed = showing
   }, [showing, showingPlays])
-  return { showing, playing, bilibili, ximalaya, douyin, hongguo, netease, appleMusic, player, video }
+  return { showing, playing, bilibili, ximalaya, douyin, hongguo, netease, qqmusic, appleMusic, player, video }
 }
 
 /** The track Now Playing shows, as one line of a list draws it (the Equalizer's): its title, who it's by, its
@@ -61,7 +65,8 @@ export function useNowPlayingTrack(): {
   playing: boolean
   playPause: (() => void) | null
 } | null {
-  const { showing, playing, bilibili, ximalaya, douyin, hongguo, netease, appleMusic, player, video } = useNowPlaying()
+  const { showing, playing, bilibili, ximalaya, douyin, hongguo, netease, qqmusic, appleMusic, player, video } =
+    useNowPlaying()
   const music = (
     player: { source: { title: string; artist: string; controls: { playPause: boolean } }; artwork: string | null },
     playPause: () => void,
@@ -94,6 +99,8 @@ export function useNowPlayingTrack(): {
       return hongguo ? music(hongguo, playOrPauseHongguo, playing.hongguo) : null
     case 'netease':
       return netease ? music(netease, playOrPauseNetease, playing.netease) : null
+    case 'qqmusic':
+      return qqmusic ? music(qqmusic, playOrPauseQqmusic, playing.qqmusic) : null
     case 'appleMusic':
       return appleMusic ? music(appleMusic, playOrPauseAppleMusic, playing.appleMusic) : null
     case 'player':

@@ -362,6 +362,18 @@ export type HostMessage =
     }
   | ({ type: 'neteaseAnswer'; id: number; failed?: boolean; error?: string } & Partial<NeteaseAnswers>)
   | { type: 'neteasePlayback'; playback: NeteasePlayback | null }
+  /** QQ Music: whether it's signed in and playing, and whether its sign-in QR window is open. */
+  | {
+      type: 'qqmusic'
+      signedIn: boolean | null
+      playing: boolean | null
+      signingIn: boolean
+      nickname?: string | null
+      avatarUrl?: string | null
+      vipType?: number | null
+    }
+  | ({ type: 'qqmusicAnswer'; id: number; failed?: boolean; error?: string } & Partial<QqmusicAnswers>)
+  | { type: 'qqmusicPlayback'; playback: QqmusicPlayback | null }
   /** Douyin: whether it's signed in and playing, and whether its sign-in QR window is open. */
   | {
       type: 'douyin'
@@ -502,6 +514,8 @@ export type PageMessage =
   | { type: 'ximalaya'; command: XimalayaCommand }
   /** A command for NetEase Cloud Music's web player (`westplay_host::netease::Command`). */
   | { type: 'netease'; command: NeteaseCommand }
+  /** A command for QQ Music's web player (`westplay_host::qqmusic::Command`). */
+  | { type: 'qqmusic'; command: QqmusicCommand }
   /** A command for Douyin's web player (`westplay_host::douyin::Command`). */
   | { type: 'douyin'; command: DouyinCommand }
   /** A command for Hongguo's web player (`westplay_host::hongguo::Command`). */
@@ -983,6 +997,90 @@ export interface NeteaseAnswers {
   playlists?: NeteasePlaylist[]
   radios?: NeteaseRadio[]
   artists?: NeteaseArtist[]
+  lyric?: string
+}
+
+/** What the QQ Music app asks of QQ Music's web player (`westplay_host::qqmusic::Command`). */
+export type QqmusicCommand =
+  | { action: 'start' }
+  | { action: 'signIn' }
+  | { action: 'signOut' }
+  | { action: 'play'; track?: QqmusicTrack }
+  | { action: 'pause' }
+  | { action: 'next' }
+  | { action: 'previous' }
+  | { action: 'seek'; seconds: number }
+  | { action: 'volume'; percent: number }
+  | { action: 'ask'; id: number; question: QqmusicQuestion }
+
+export type QqmusicQuestion =
+  | { ask: 'search'; query: string }
+  | { ask: 'recommend' }
+  | { ask: 'chart'; id: string }
+  | { ask: 'userPlaylists' }
+  | { ask: 'playlistTracks'; playlistId: string }
+  | { ask: 'radios' }
+  | { ask: 'radioSongs'; radioId: string }
+  | { ask: 'userArtists' }
+  | { ask: 'artistSongs'; artistId: string }
+  | { ask: 'lyrics'; id: string; songId?: string }
+
+export interface QqmusicPlaylist {
+  id: string
+  name: string
+  coverImgUrl?: string
+  trackCount: number
+  playCount?: number
+  subscribed?: boolean
+}
+
+export interface QqmusicRadio {
+  id: string
+  name: string
+  picUrl?: string
+  djName?: string
+  programCount: number
+  subCount?: number
+}
+
+export interface QqmusicArtist {
+  id: string
+  name: string
+  picUrl?: string
+  albumSize?: number
+  musicSize?: number
+}
+
+export interface QqmusicTrack {
+  id: string
+  songId?: string
+  mediaMid?: string
+  title: string
+  artist: string
+  album?: string
+  artwork?: string
+  duration?: number
+  url?: string
+  payPlay?: number
+  playable?: boolean
+}
+
+export interface QqmusicPlayback {
+  title: string
+  artist: string
+  artwork?: string
+  duration: number
+  position: number
+  status: string
+  trackId?: string
+  error?: string
+}
+
+export interface QqmusicAnswers {
+  songs?: QqmusicTrack[]
+  playlists?: QqmusicPlaylist[]
+  radios?: QqmusicRadio[]
+  artists?: QqmusicArtist[]
   lyric?: string
 }
 

@@ -48,6 +48,9 @@ export interface HostStatus {
   /** Whether NetEase Cloud Music is signed in (`null`: not known yet), and whether its sign-in window is open. */
   neteaseSignedIn: boolean | null
   neteaseSigningIn: boolean
+  /** Whether QQ Music is signed in (`null`: not known yet), and whether its sign-in window is open. */
+  qqmusicSignedIn: boolean | null
+  qqmusicSigningIn: boolean
   /** The same of Apple Music: signed in or not (`null`: not known yet), and Apple's sign-in window open. */
   appleMusicSignedIn: boolean | null
   appleMusicSigningIn: boolean
@@ -223,6 +226,21 @@ export function neteaseSignOut(): Promise<void> {
 /** Runs NetEase's web player (hidden), so the status says whether it's signed in. */
 export function neteaseCheck(): Promise<void> {
   return call('netease_check')
+}
+
+/** Opens QQ Music's sign-in in a window on the desktop. */
+export function qqmusicSignIn(): Promise<void> {
+  return call('qqmusic_sign_in')
+}
+
+/** Signs QQ Music out. */
+export function qqmusicSignOut(): Promise<void> {
+  return call('qqmusic_sign_out')
+}
+
+/** Runs QQ Music's web player (hidden), so the status says whether it's signed in. */
+export function qqmusicCheck(): Promise<void> {
+  return call('qqmusic_check')
 }
 
 /** Opens Apple's sign-in for Apple Music in a window on the desktop. */

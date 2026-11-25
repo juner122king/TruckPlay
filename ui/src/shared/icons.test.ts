@@ -17,6 +17,7 @@ const ROLES: AppIconRole[] = [
   'ximalaya',
   'radio',
   'netease',
+  'qqmusic',
   'podcasts',
   'messages',
   'phone',
@@ -39,6 +40,7 @@ describe('appIcon', () => {
     expect(appIcon('bilibili', 'dark')).toBe('/icons/westplay/bilibili.dark.svg')
     expect(appIcon('ximalaya', 'dark')).toBe('/icons/westplay/ximalaya.dark.svg')
     expect(appIcon('netease', 'dark')).toBe('/icons/westplay/netease.dark.svg')
+    expect(appIcon('qqmusic', 'dark')).toBe('/icons/westplay/qqmusic.dark.svg')
   })
 
   it('ensures each role icon is well-formed XML without unclosed tags', () => {

@@ -1,8 +1,9 @@
-/** What the Dashboard's Now Playing can show: YouTube's video, NetEase, Bilibili, Ximalaya, Douyin, Hongguo, Apple Music,
+/** What the Dashboard's Now Playing can show: YouTube's video, NetEase, QQ Music, Bilibili, Ximalaya, Douyin, Hongguo, Apple Music,
  * or Player. In this order when two play at once. */
 export const NOW_PLAYING_ORDER = [
   'video',
   'netease',
+  'qqmusic',
   'bilibili',
   'ximalaya',
   'douyin',

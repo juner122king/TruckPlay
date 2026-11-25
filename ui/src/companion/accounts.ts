@@ -8,12 +8,13 @@ export interface SignedIn {
   douyin: boolean | null
   hongguo: boolean | null
   netease: boolean | null
+  qqmusic: boolean | null
   appleMusic: boolean | null
 }
 
 export type Service = keyof SignedIn
 
-const SERVICES: Service[] = ['youtube', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'netease', 'appleMusic']
+const SERVICES: Service[] = ['youtube', 'bilibili', 'ximalaya', 'douyin', 'hongguo', 'netease', 'qqmusic', 'appleMusic']
 
 const KEY = 'westplay.companion.signedIn'
 
@@ -32,6 +33,7 @@ function kept(): SignedIn {
     douyin: known('douyin'),
     hongguo: known('hongguo'),
     netease: known('netease'),
+    qqmusic: known('qqmusic'),
     appleMusic: known('appleMusic'),
   }
 }
@@ -54,6 +56,7 @@ export function useSignedIn(status: HostStatus | null): SignedIn {
     douyin: status?.douyinSignedIn ?? null,
     hongguo: status?.hongguoSignedIn ?? null,
     netease: status?.neteaseSignedIn ?? null,
+    qqmusic: status?.qqmusicSignedIn ?? null,
     appleMusic: status?.appleMusicSignedIn ?? null,
   }
   useEffect(() => {
@@ -66,10 +69,11 @@ export function useSignedIn(status: HostStatus | null): SignedIn {
       douyin: now.douyin ?? before.douyin,
       hongguo: now.hongguo ?? before.hongguo,
       netease: now.netease ?? before.netease,
+      qqmusic: now.qqmusic ?? before.qqmusic,
       appleMusic: now.appleMusic ?? before.appleMusic,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [now.youtube, now.bilibili, now.ximalaya, now.douyin, now.hongguo, now.netease, now.appleMusic])
+  }, [now.youtube, now.bilibili, now.ximalaya, now.douyin, now.hongguo, now.netease, now.qqmusic, now.appleMusic])
   return {
     youtube: now.youtube ?? known.youtube,
     bilibili: now.bilibili ?? known.bilibili,
@@ -77,6 +81,7 @@ export function useSignedIn(status: HostStatus | null): SignedIn {
     douyin: now.douyin ?? known.douyin,
     hongguo: now.hongguo ?? known.hongguo,
     netease: now.netease ?? known.netease,
+    qqmusic: now.qqmusic ?? known.qqmusic,
     appleMusic: now.appleMusic ?? known.appleMusic,
   }
 }

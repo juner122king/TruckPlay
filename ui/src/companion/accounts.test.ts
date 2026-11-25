@@ -23,6 +23,7 @@ function emptySignedIn(): accountsModule.SignedIn {
     douyin: null,
     hongguo: null,
     netease: null,
+    qqmusic: null,
     appleMusic: null,
   }
 }
@@ -115,6 +116,7 @@ describe('account detection removal', () => {
     expect(html).not.toContain('ob-row-spinner')
     expect(html).toContain('YouTube')
     expect(html).toContain('网易云音乐')
+    expect(html).toContain('QQ音乐')
     expect(html).toContain('哔哩哔哩')
     expect(html).toContain('喜马拉雅')
     expect(html).toContain('Apple Music')

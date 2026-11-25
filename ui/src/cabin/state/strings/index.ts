@@ -1075,6 +1075,7 @@ const DEFAULT_APPS: Record<string, string> = {
   ximalaya: '喜马拉雅',
   radio: '电台',
   netease: '网易云音乐',
+  qqmusic: 'QQ音乐',
   douyin: '抖音',
   hongguo: '红果短剧',
 }

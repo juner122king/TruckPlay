@@ -34,6 +34,7 @@ const ICON_FILES: [AppIconRole, string][] = [
   ['radio', 'radio'],
   ['douyin', 'douyin'],
   ['netease', 'netease'],
+  ['qqmusic', 'qqmusic'],
   ['podcasts', 'podcasts'],
   ['messages', 'messages'],
   ['phone', 'phone'],
