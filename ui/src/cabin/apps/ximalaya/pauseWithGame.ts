@@ -5,6 +5,12 @@ export const ximalayaPlayer: MusicPlayer = {
   name: 'ximalaya',
   playingHere: () => Boolean(useXimalaya.getState().playing),
   pendingHere: () => useXimalaya.getState().playback?.status === 'loading',
+  hasMedia: () => Boolean(useXimalaya.getState().playback),
+  trackTitle: () => {
+    const p = useXimalaya.getState().playback
+    if (!p) return null
+    return p.owner === 'radio' ? p.artist || p.title || null : p.title || null
+  },
   pauseHere: pausePlayback,
   resumeHere: () => {
     if (!useXimalaya.getState().playing) playOrPause()

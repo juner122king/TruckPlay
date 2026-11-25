@@ -156,6 +156,28 @@ describe('Ximalaya App State, API Helpers & Controls', () => {
     expect(useXimalaya.getState().playback?.title).toBe(first.title)
   })
 
+  it('safely handles radio liveQueue skip even when current radioId is missing from queue', () => {
+    useXimalaya.setState({
+      playing: true,
+      liveQueue: [{ id: 'radio-10', radioId: 10, radio: true, title: '节目A', artist: '电台A', duration: 0 }],
+      playback: {
+        radioId: 999,
+        owner: 'radio',
+        isLive: true,
+        title: '未知节目',
+        artist: '未知电台',
+        duration: 0,
+        position: 0,
+        status: 'playing',
+        at: 0,
+      },
+    })
+    expect(skip(-1)).toBe(true)
+    expect(useXimalaya.getState().playback?.radioId).toBe(10)
+    useXimalaya.setState({ liveQueue: [] })
+    expect(skip(1)).toBe(false)
+  })
+
   it('seeks to absolute position and skips -15s / +30s accurately', () => {
     play(SAMPLE_TRACKS[0], SAMPLE_TRACKS)
     seek(300)

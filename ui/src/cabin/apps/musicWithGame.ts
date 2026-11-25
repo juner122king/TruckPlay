@@ -16,6 +16,12 @@ export interface MusicPlayer {
   name: string
   /** Whether a local playback request is still connecting. */
   pendingHere?(): boolean
+  /** Whether this app has an active or paused media session that keybinds can control. */
+  hasMedia?(): boolean
+  /** Whether this app supports previous/next track keybinds (default true; false for Safari). */
+  canSkip?: boolean
+  /** Current track/video/station title for the HUD. */
+  trackTitle?(): string | null
   /** Whether music plays here now. */
   playingHere(): boolean
   pauseHere(): void
@@ -26,8 +32,8 @@ export interface MusicPlayer {
   sendVolume(share: number): void
   /** Sets the volume it plays at (0 to 1) as the player's choice, as its own slider does: a keybind. */
   setVolume(share: number): void
-  /** Its own Next (1) or Back (-1), as its buttons do: Back past a song's first seconds is the song's start. */
-  skip(direction: 1 | -1): void
+  /** Its own Next (1) or Back (-1), as its buttons do. Returns `false` when no skip could be performed. */
+  skip(direction: 1 | -1): boolean | void
   /** Called whenever the app's music changes: `started` when it just began playing here. */
   subscribe(changed: (started: boolean) => void): () => void
 }

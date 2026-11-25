@@ -239,6 +239,9 @@ impl KeyCode {
     /// the companion's keybinds. `None` for a mouse button, or a key Windows has no name for.
     pub fn name(code: u32) -> Option<String> {
         use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyNameTextW, MAPVK_VK_TO_VSC_EX, MapVirtualKeyW};
+        if let Some(media) = Self::media_key_name(code) {
+            return Some(media.to_owned());
+        }
         // SAFETY: plain queries; the buffer is a local the call writes within its length.
         unsafe {
             // The scan code, 0xE0xx for an extended key (right Ctrl and Alt, the arrows, Insert...).
@@ -252,6 +255,20 @@ impl KeyCode {
             let length = usize::try_from(GetKeyNameTextW(lparam, &mut name)).ok().filter(|&n| n > 0)?;
             Some(String::from_utf16_lossy(&name[..length]))
         }
+    }
+
+    /// Friendly names for multimedia virtual keys that `MapVirtualKeyW` has no scan-code name for.
+    fn media_key_name(code: u32) -> Option<&'static str> {
+        Some(match code {
+            0xad => "Volume Mute",
+            0xae => "Volume Down",
+            0xaf => "Volume Up",
+            0xb0 => "Media Next",
+            0xb1 => "Media Previous",
+            0xb2 => "Media Stop",
+            0xb3 => "Media Play/Pause",
+            _ => return None,
+        })
     }
 
     /// The four keys the first versions offered, by the names they saved.
@@ -291,7 +308,8 @@ impl<'de> Deserialize<'de> for KeyCode {
 }
 
 /// The keys for what WestPlay does from the game (owner 2026-10-21: every keybind customizable in the
-/// companion): the playing app's volume up and down a step, and play or pause it.
+/// companion): the playing app's volume up and down a step, play or pause it, screen brightness down and up,
+/// and previous or next track.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Keybinds {
@@ -300,6 +318,8 @@ pub struct Keybinds {
     pub play_pause: Binding,
     pub brightness_down: Binding,
     pub brightness_up: Binding,
+    pub previous_track: Binding,
+    pub next_track: Binding,
 }
 
 impl<'de> Deserialize<'de> for Keybinds {
@@ -317,6 +337,8 @@ impl<'de> Deserialize<'de> for Keybinds {
             play_pause: binding("playPause", defaults.play_pause),
             brightness_down: binding("brightnessDown", defaults.brightness_down),
             brightness_up: binding("brightnessUp", defaults.brightness_up),
+            previous_track: binding("previousTrack", defaults.previous_track),
+            next_track: binding("nextTrack", defaults.next_track),
         })
     }
 }
@@ -324,7 +346,7 @@ impl<'de> Deserialize<'de> for Keybinds {
 impl Default for Keybinds {
     /// The interaction key with 1, 2 and 3 (as promised to the players who asked: Alt+1, Alt+2, Alt+3), in a
     /// row as on a stereo (owner 2026-10-21): volume down, play/pause between, volume up; then the screen's
-    /// brightness down and up with 4 and 5 (owner 2026-11-13).
+    /// brightness down and up with 4 and 5 (owner 2026-11-13); then previous and next track with 6 and 7.
     fn default() -> Self {
         let with_key = |code| Binding { key: KeyCode(code), with_interaction_key: true };
         Self {
@@ -333,14 +355,17 @@ impl Default for Keybinds {
             volume_up: with_key(0x33),
             brightness_down: with_key(0x34),
             brightness_up: with_key(0x35),
+            previous_track: with_key(0x36),
+            next_track: with_key(0x37),
         }
     }
 }
 
 impl Keybinds {
     /// Each keybind as the bridge carries it ([`westplay_shared::keybind_value`]), in [`Keybind::ALL`]'s order. One
-    /// pressed as one before it is (a player's own Alt+4 for a volume key, from before the brightness keys took 4
-    /// and 5 by default) is left unbound (0): the player's own keeps the key, and one press never does two things.
+    /// pressed as one before it is (a player's own Alt+4 or Alt+6 for an earlier keybind, from before newer
+    /// defaults took those keys) is left unbound (0): the player's own keeps the key, and one press never does
+    /// two things.
     pub fn bridge_values(&self) -> [u32; KEYBIND_COUNT] {
         let values = Keybind::ALL.map(|keybind| {
             let binding = match keybind {
@@ -349,6 +374,8 @@ impl Keybinds {
                 Keybind::PlayPause => self.play_pause,
                 Keybind::BrightnessDown => self.brightness_down,
                 Keybind::BrightnessUp => self.brightness_up,
+                Keybind::PreviousTrack => self.previous_track,
+                Keybind::NextTrack => self.next_track,
             };
             keybind_value(binding.key.virtual_key(), binding.with_interaction_key)
         });
@@ -537,6 +564,8 @@ mod tests {
         // The names are the keyboard layout's, so only that there's one.
         assert!(KeyCode::name(0x31).is_some_and(|name| !name.is_empty()));
         assert!(KeyCode::name(0xa3).is_some());
+        assert_eq!(KeyCode::name(0xb0).as_deref(), Some("Media Next"));
+        assert_eq!(KeyCode::name(0xb1).as_deref(), Some("Media Previous"));
         assert_eq!(KeyCode::name(0x05), None);
     }
 
@@ -550,6 +579,8 @@ mod tests {
             },
             keybinds: Keybinds {
                 volume_up: Binding { key: KeyCode::new(0x6b).unwrap(), with_interaction_key: false },
+                previous_track: Binding { key: KeyCode::new(0xb1).unwrap(), with_interaction_key: false },
+                next_track: Binding { key: KeyCode::new(0xb0).unwrap(), with_interaction_key: false },
                 ..Keybinds::default()
             },
             screen: ScreenSettings { truck_strip: TruckStrip::Off },
@@ -599,6 +630,11 @@ mod tests {
         assert_eq!(
             [partial.keybinds.brightness_down, partial.keybinds.brightness_up],
             [with_key(0x34), with_key(0x35)]
+        );
+        // And from before the previous/next track keys: the interaction key with 6 (previous) and 7 (next).
+        assert_eq!(
+            [partial.keybinds.previous_track, partial.keybinds.next_track],
+            [with_key(0x36), with_key(0x37)]
         );
         // Files from before the truck strip was a setting keep it on Auto.
         assert_eq!(partial.screen.truck_strip, TruckStrip::Auto);
@@ -673,15 +709,33 @@ mod tests {
     fn a_keybind_pressed_as_one_before_it_is_left_unbound() {
         let with_key = |code| keybind_value(code, true);
         let defaults = Keybinds::default();
-        // Volume up, Volume down, Play/Pause, Brightness down, Brightness up, as the bridge orders them.
+        // Volume up, Volume down, Play/Pause, Brightness down, Brightness up, Previous track, Next track.
         assert_eq!(
             defaults.bridge_values(),
-            [with_key(0x33), with_key(0x31), with_key(0x32), with_key(0x34), with_key(0x35)]
+            [
+                with_key(0x33),
+                with_key(0x31),
+                with_key(0x32),
+                with_key(0x34),
+                with_key(0x35),
+                with_key(0x36),
+                with_key(0x37),
+            ]
         );
         // A player's own Alt+4 for Volume up (from before the brightness keys): theirs keeps it.
         let own = Binding { key: KeyCode::new(0x34).unwrap(), with_interaction_key: true };
         let keybinds = Keybinds { volume_up: own, ..defaults };
-        assert_eq!(keybinds.bridge_values(), [with_key(0x34), with_key(0x31), with_key(0x32), 0, with_key(0x35)]);
+        assert_eq!(
+            keybinds.bridge_values(),
+            [with_key(0x34), with_key(0x31), with_key(0x32), 0, with_key(0x35), with_key(0x36), with_key(0x37)]
+        );
+        // A player's own Alt+6 for Play/Pause (from before the track keys): theirs keeps it, PreviousTrack is 0.
+        let own_track = Binding { key: KeyCode::new(0x36).unwrap(), with_interaction_key: true };
+        let keybinds = Keybinds { play_pause: own_track, ..defaults };
+        assert_eq!(
+            keybinds.bridge_values(),
+            [with_key(0x33), with_key(0x31), with_key(0x36), with_key(0x34), with_key(0x35), 0, with_key(0x37)]
+        );
         // 4 alone is another keybind than Alt+4.
         let alone = Binding { key: KeyCode::new(0x34).unwrap(), with_interaction_key: false };
         let keybinds = Keybinds { volume_up: alone, ..defaults };

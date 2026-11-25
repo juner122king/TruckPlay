@@ -1215,7 +1215,7 @@ export function resumeAutomatically(): void {
   if (!useDouyin.getState().playing) togglePlayback(true)
 }
 
-export function skip(direction: 1 | -1): void {
+export function skip(direction: 1 | -1): boolean {
   const state = useDouyin.getState()
   const inHost = inHostNow()
   const queue = state.queue
@@ -1230,10 +1230,11 @@ export function skip(direction: 1 | -1): void {
         openFullscreen: state.open,
         label,
       })
-      return
+      return true
     }
+    if (!inHost) return false
     send({ action: direction === 1 ? 'next' : 'previous' })
-    return
+    return true
   }
 
   const len = queue.items.length
@@ -1252,21 +1253,21 @@ export function skip(direction: 1 | -1): void {
       const freshItems = getFeedSlice(state, queue.source).items
       if (hasNovelVideos(freshItems, queue.items)) {
         playFromList(queue.source, freshItems, 0, { openFullscreen: state.open, boundToFeed: true })
-        return
+        return true
       }
     }
     // 2) In host mode, let douyin.js attempt fallback incremental fetch (4.5s) or loop back to 0 without UI flicker.
     if (inHost) {
       useDouyin.setState({ buffering: true, playbackError: null, userPaused: false })
       send({ action: 'next' })
-      return
+      return true
     }
   }
 
   // Single-item queue fallback: replay from start.
   if (len === 1) {
     replay()
-    return
+    return true
   }
 
   // Deterministic index transition (non-end step, or finite list loop-around, or preview feed loop-around).
@@ -1274,7 +1275,7 @@ export function skip(direction: 1 | -1): void {
   const nextVid = queue.items[nextIdx]
   if (!inHost) {
     playFromQueueIndex(nextIdx, state.open)
-    return
+    return true
   }
 
   send({ action: direction === 1 ? 'next' : 'previous' })
@@ -1285,6 +1286,7 @@ export function skip(direction: 1 | -1): void {
     playbackError: null,
     userPaused: false,
   })
+  return true
 }
 
 export function nextVideo(): void {

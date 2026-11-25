@@ -30,7 +30,7 @@ pub fn bridge_name() -> String {
     format!("Local\\WestPlay.Bridge.v{BRIDGE_VERSION}")
 }
 pub const BRIDGE_MAGIC: u32 = u32::from_le_bytes(*b"WPB7");
-pub const BRIDGE_VERSION: u32 = 31;
+pub const BRIDGE_VERSION: u32 = 32;
 
 /// Size of the app's frames, and the base size of the screen textures in the mod (`westplay_setup::game_mod`
 /// builds them from these).
@@ -411,16 +411,9 @@ pub struct PluginBlock {
     pub semaphores: SeqLock<SemaphoresBlock>,
     /// Each [`Keybind`]'s presses so far: the plugin counts them, the app acts on each new one.
     pub keybind_presses: [AtomicU32; KEYBIND_COUNT],
-    /// Each [`Keybind`]'s holds so far ([`KEYBIND_HOLD_MS`]: the volume keys held change the song), counted as
-    /// its presses are. A held key's press isn't counted: it's a hold.
-    pub keybind_holds: [AtomicU32; KEYBIND_COUNT],
     /// Discrete SCS gameplay events (job delivered/cancelled, fines, tolls, ferry/train crossings).
     pub gameplay_events: GameplayEventQueue,
 }
-
-/// How long (ms) a volume key held is a hold, not a press (owner 2026-11-13: one second, it was two): Volume up's the
-/// next song, Volume down's the one before (or the song's start, past its first seconds).
-pub const KEYBIND_HOLD_MS: u64 = 1000;
 
 /// The most of TruckersMP's players around the player the bridge carries (its streaming range holds far fewer).
 pub const NEARBY_MAX: usize = 128;
@@ -596,19 +589,24 @@ pub enum Keybind {
     /// The screen's brightness a step down and up (owner 2026-11-13: Alt+4 and Alt+5, shown as the volume is).
     BrightnessDown = 3,
     BrightnessUp = 4,
+    /// The playing media's previous and next track (Alt+6 and Alt+7 by default).
+    PreviousTrack = 5,
+    NextTrack = 6,
 }
 
 impl Keybind {
-    pub const ALL: [Keybind; KEYBIND_COUNT] =
-        [Keybind::VolumeUp, Keybind::VolumeDown, Keybind::PlayPause, Keybind::BrightnessDown, Keybind::BrightnessUp];
-
-    /// Whether it can be held ([`KEYBIND_HOLD_MS`]): the volume keys, whose press then counts as they're let go.
-    pub fn holds(self) -> bool {
-        matches!(self, Keybind::VolumeUp | Keybind::VolumeDown)
-    }
+    pub const ALL: [Keybind; KEYBIND_COUNT] = [
+        Keybind::VolumeUp,
+        Keybind::VolumeDown,
+        Keybind::PlayPause,
+        Keybind::BrightnessDown,
+        Keybind::BrightnessUp,
+        Keybind::PreviousTrack,
+        Keybind::NextTrack,
+    ];
 }
 
-pub const KEYBIND_COUNT: usize = 5;
+pub const KEYBIND_COUNT: usize = 7;
 
 /// A keybind as the bridge carries it: its key's virtual-key code, and whether it's pressed while holding the
 /// interaction key (using the screen) rather than alone.

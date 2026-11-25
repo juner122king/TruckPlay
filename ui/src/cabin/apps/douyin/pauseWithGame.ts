@@ -5,7 +5,12 @@ export const douyinPlayer: MusicPlayer = {
   name: 'douyin',
   pendingHere: () => {
     const s = useDouyin.getState()
-    return Boolean(s.buffering && s.playing)
+    return Boolean(s.buffering && !s.userPaused)
+  },
+  hasMedia: () => Boolean(useDouyin.getState().playback || useDouyin.getState().current),
+  trackTitle: () => {
+    const s = useDouyin.getState()
+    return s.current?.title || s.playback?.title || null
   },
   playingHere: () => Boolean(useDouyin.getState().playing),
   pauseHere: () => pauseAutomatically(),

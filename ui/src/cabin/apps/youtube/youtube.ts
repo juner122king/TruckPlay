@@ -12,7 +12,7 @@ import {
 } from '../../../shared/host'
 import { whenTransitionEnds } from '../../state/launch'
 import { type Account, keptAccount } from './account'
-import { follow, type Loading } from './follow'
+import { follow, LOAD_MS, type Loading } from './follow'
 import { previewAnswer } from './preview'
 
 /**
@@ -263,6 +263,11 @@ export function receiveAnswer(id: number, answer: YouTubeAnswer): void {
 
 // The video asked for and not yet reported by YouTube's player (follow.ts).
 let loading: Loading | null = null
+
+/** Whether a video load was requested and hasn't been reported by YouTube's player yet. */
+export function isLoading(): boolean {
+  return loading !== null && performance.now() - loading.at < LOAD_MS
+}
 // Whether a report has come since the page loaded (the first one puts YouTube's picture where it belongs).
 let reported = false
 

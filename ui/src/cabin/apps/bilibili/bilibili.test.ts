@@ -3,10 +3,12 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
   ask,
+  play,
   positionOf,
   receivePlayback,
   receiveState,
   setDanmaku,
+  skip,
   stopVideo,
   toggleDanmaku,
   useBilibili,
@@ -30,6 +32,8 @@ describe('bilibili store', () => {
       confirmedBvid: null,
       hostReady: false,
       buffering: false,
+      related: null,
+      watched: [],
     })
   })
 
@@ -146,6 +150,29 @@ describe('bilibili store', () => {
     expect(useBilibili.getState().danmaku).toBe(true)
     toggleDanmaku()
     expect(useBilibili.getState().danmaku).toBe(false)
+  })
+
+  it('skips related/watched videos while preserving background open state and ignoring live streams', () => {
+    const first = { bvid: 'BV1first', title: 'First video', author: 'UP1', duration: 200 }
+    const second = { bvid: 'BV1second', title: 'Second video', author: 'UP2', duration: 180 }
+
+    // Background playback (open = false, e.g. Maps or Dashboard): skip must NOT force fullscreen open.
+    play(first, false)
+    useBilibili.setState({ related: [second] })
+    expect(skip(1)).toBe(true)
+    expect(useBilibili.getState().current?.bvid).toBe('BV1second')
+    expect(useBilibili.getState().open).toBe(false)
+
+    // Previous within first 5 seconds goes back to the previously watched video without opening fullscreen.
+    expect(skip(-1)).toBe(true)
+    expect(useBilibili.getState().current?.bvid).toBe('BV1first')
+    expect(useBilibili.getState().open).toBe(false)
+
+    // Live stream: skip returns false and does not alter state.
+    play({ bvid: 'live:999', roomId: 999, isLive: true, title: 'Live room', author: 'Host' }, false)
+    expect(skip(1)).toBe(false)
+    expect(skip(-1)).toBe(false)
+    expect(useBilibili.getState().current?.bvid).toBe('live:999')
   })
 })
 

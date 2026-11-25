@@ -4,6 +4,8 @@ import { isPlaybackPending, playOrPause, sendVolume, setVolume, skip, useQqmusic
 export const qqmusicPlayer: MusicPlayer = {
   name: 'qqmusic',
   pendingHere: () => isPlaybackPending(),
+  hasMedia: () => Boolean(useQqmusic.getState().playback),
+  trackTitle: () => useQqmusic.getState().playback?.title || null,
   playingHere: () => Boolean(useQqmusic.getState().playing),
   pauseHere: () => {
     if (useQqmusic.getState().playing || isPlaybackPending()) playOrPause()

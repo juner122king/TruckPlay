@@ -22,7 +22,7 @@ import { routeClicksDuringTransitions } from './shell/clickThrough'
 import { installDragScroll } from './shell/dragScroll'
 import { Cursor } from './shell/Cursor'
 import { Shell } from './shell/Shell'
-import { showBrightness, showVolume } from './shell/volumeShown'
+import { showBrightness, showTrackChange, showVolume } from './shell/volumeShown'
 import { type Route, routeKey } from './state/navigation'
 import { nextPhaseAt, type PowerPhase } from './state/power'
 import { meterFrames } from './state/frameMeter'
@@ -127,7 +127,8 @@ function followKeybinds(): () => void {
       return
     }
     const shown = binds.press(action)
-    if (shown) showVolume(shown.volume)
+    if (shown?.kind === 'volume') showVolume(shown.volume)
+    else if (shown?.kind === 'track') showTrackChange(shown.direction, shown.title)
   })
   return () => {
     stop()

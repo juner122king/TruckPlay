@@ -83,13 +83,22 @@ export const DEFAULT_KEY = KEY_PRESETS.leftAlt
 /** Mirrors `westplay_host::settings::InteractionMode`. */
 export type InteractionMode = 'hold' | 'toggle'
 
-/** Mirrors `westplay_host::settings::Keybinds`: the playing music's volume up and down, play/pause, and the
- * screen's brightness down and up. */
-export type KeybindId = 'volumeUp' | 'volumeDown' | 'playPause' | 'brightnessDown' | 'brightnessUp'
+/** Mirrors `westplay_host::settings::Keybinds`: the playing music's volume up and down, play/pause, the
+ * screen's brightness down and up, and previous/next track. */
+export type KeybindId =
+  'volumeUp' | 'volumeDown' | 'playPause' | 'brightnessDown' | 'brightnessUp' | 'previousTrack' | 'nextTrack'
 
-/** In a row as their default keys are (1 to 5), as on a stereo: volume down, play/pause, volume up; then
- * brightness down and up. */
-export const KEYBIND_IDS: KeybindId[] = ['volumeDown', 'playPause', 'volumeUp', 'brightnessDown', 'brightnessUp']
+/** In a row as their default keys are (1 to 7): volume down, play/pause, volume up; brightness down and up;
+ * previous and next track. */
+export const KEYBIND_IDS: KeybindId[] = [
+  'volumeDown',
+  'playPause',
+  'volumeUp',
+  'brightnessDown',
+  'brightnessUp',
+  'previousTrack',
+  'nextTrack',
+]
 
 /** Mirrors `westplay_host::settings::Binding`: a key, pressed alone or while using the screen (holding its
  * key, or toggled on). */

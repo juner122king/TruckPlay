@@ -125,9 +125,10 @@ export function playOrPause(): void {
 }
 
 /** Next (1) or Back (-1): Back past a song's first seconds is the song's start. */
-export function skip(direction: 1 | -1): void {
-  if (!usePlayer.getState().playback) return
+export function skip(direction: 1 | -1): boolean {
+  if (!usePlayer.getState().playback) return false
   send({ action: direction === 1 ? 'next' : 'previous' })
+  return true
 }
 
 export function seek(seconds: number): void {

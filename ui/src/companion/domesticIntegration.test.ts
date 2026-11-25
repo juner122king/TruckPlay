@@ -54,6 +54,8 @@ describe('domestic edition integration', () => {
       expect(words.screen.coachSpeakers).toBeTruthy()
       expect(words.controls.brightnessDown).toBeTruthy()
       expect(words.controls.brightnessUp).toBeTruthy()
+      expect(words.controls.previousTrack).toBeTruthy()
+      expect(words.controls.nextTrack).toBeTruthy()
       expect(words.map.gameStopped.text).toBeTruthy()
       expect(words.update.manualOnly).toBeTruthy()
     }

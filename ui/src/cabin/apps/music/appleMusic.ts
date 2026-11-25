@@ -471,20 +471,20 @@ export function playOrPause(): void {
 
 /** The next song, or the one before (within a song's first seconds; later, its start). In the preview, the
  * app's own choice (a shuffle, any other song; past the last, the first again only on repeat). */
-export function skip(direction: 1 | -1): void {
+export function skip(direction: 1 | -1): boolean {
   const playback = useAppleMusic.getState().playback
-  if (!playback) return
+  if (!playback) return false
   const now = performance.now()
   if (isInHost()) {
     lastSkip = { direction, at: now }
     appleMusic({ action: direction === 1 ? 'next' : 'previous' })
     // Waiting for the next song: its time held, its bar breathing.
     if (playback.playing) showPlayback({ loading: true, position: positionOf(playback, now), at: now })
-    return
+    return true
   }
   if (direction === -1 && positionOf(playback, now) > 3) {
     showPlayback({ position: 0, at: now })
-    return
+    return true
   }
   const count = playback.tracks.length
   let index = playback.index + direction
@@ -494,12 +494,13 @@ export function skip(direction: 1 | -1): void {
   if (index >= count) {
     if (playback.repeat === 'off') {
       showPlayback({ index: 0, playing: false, position: 0, at: now })
-      return
+      return true
     }
     index = 0
   }
   const next = Math.max(0, index)
   showPlayback({ index: next, position: 0, at: now, direction, duration: lengthOf(playback.tracks[next]) })
+  return true
 }
 
 /** A song of Up Next pressed (`offset` songs on): it plays, from where it is. */

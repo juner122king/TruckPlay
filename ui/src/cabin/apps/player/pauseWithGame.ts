@@ -1,9 +1,15 @@
 import { type MusicPlayer, pauseMusicWithGame } from '../musicWithGame'
-import { pauseNow, playingNow, resumeNow, sendVolume, setVolume, skip, usePlayer } from './player'
+import { currentSong, nameOf, pauseNow, playingNow, resumeNow, sendVolume, setVolume, skip, usePlayer } from './player'
 
 /** Player as one of the cab's players (musicWithGame.ts, oneAtATime.ts, keybinds.ts). */
 export const playerAppPlayer: MusicPlayer = {
   name: 'player',
+  pendingHere: () => Boolean(usePlayer.getState().playback?.loading),
+  hasMedia: () => Boolean(usePlayer.getState().playback),
+  trackTitle: () => {
+    const song = currentSong(usePlayer.getState())
+    return song ? nameOf(song) : null
+  },
   playingHere: playingNow,
   pauseHere: pauseNow,
   resumeHere: resumeNow,

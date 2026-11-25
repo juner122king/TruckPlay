@@ -11,6 +11,8 @@ let chosen = 1
  */
 export const safariPlayer: MusicPlayer = {
   name: 'safari',
+  hasMedia: () => useSafari.getState().playing,
+  canSkip: false,
   playingHere: () => useSafari.getState().playing,
   pauseHere: () => send({ action: 'pause' }),
   resumeHere: () => send({ action: 'resume' }),
@@ -20,7 +22,7 @@ export const safariPlayer: MusicPlayer = {
     chosen = Math.min(1, Math.max(0, share))
     send({ action: 'level', level: chosen })
   },
-  skip: () => {},
+  skip: () => false,
   subscribe: (changed) => useSafari.subscribe((state, before) => changed(state.playing && !before.playing)),
 }
 

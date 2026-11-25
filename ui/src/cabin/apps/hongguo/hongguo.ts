@@ -903,16 +903,20 @@ export function playOrPause(): void {
   }
 }
 
-export function skip(direction: 1 | -1): void {
+export function skip(direction: 1 | -1): boolean {
   const { currentDrama, currentEpisode, open } = useHongguo.getState()
-  if (!currentDrama) return
+  if (!currentDrama) return false
   const total = currentDrama.totalEpisodes || Number.POSITIVE_INFINITY
   const targetEp = Math.max(1, Math.min(total, currentEpisode + direction))
-  if (targetEp === currentEpisode && direction === -1) {
-    seek(0)
-    return
+  if (targetEp === currentEpisode) {
+    if (direction === -1) {
+      seek(0)
+      return true
+    }
+    return false
   }
   selectEpisode(targetEp, open)
+  return true
 }
 
 export function selectEpisode(episode: number, openPlayer?: boolean): void {

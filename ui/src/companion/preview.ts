@@ -80,6 +80,8 @@ let settings: Settings = {
     volumeUp: { key: 0x33, withInteractionKey: true },
     brightnessDown: { key: 0x34, withInteractionKey: true },
     brightnessUp: { key: 0x35, withInteractionKey: true },
+    previousTrack: { key: 0x36, withInteractionKey: true },
+    nextTrack: { key: 0x37, withInteractionKey: true },
   },
   screen: { truckStrip: 'auto' },
   look: { wallpaper: null, iconSet: null, iconStyle: 'auto' },
@@ -366,6 +368,13 @@ function previewKeyName(key: number): string | null {
     0xa3: 'Right Ctrl',
     0xa4: 'Alt',
     0xa5: 'Right Alt',
+    0xad: 'Volume Mute',
+    0xae: 'Volume Down',
+    0xaf: 'Volume Up',
+    0xb0: 'Media Next',
+    0xb1: 'Media Previous',
+    0xb2: 'Media Stop',
+    0xb3: 'Media Play/Pause',
   }
   if (key >= 0x60 && key <= 0x69) return `Num ${key - 0x60}`
   return named[key] ?? null

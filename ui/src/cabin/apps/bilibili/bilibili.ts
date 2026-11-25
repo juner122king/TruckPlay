@@ -359,29 +359,39 @@ export function play(video?: BilibiliVideo, openPlayer = true, page?: number): v
     send({ action: 'danmaku', on: danmaku })
     send({ action: 'quality', quality })
     if (rate !== 1.0) send({ action: 'rate', rate })
-    useBilibili.setState({
-      current: video,
-      open: openPlayer,
-      confirmedBvid: inHost ? null : video.bvid,
-      hostReady: !inHost,
-      buffering: inHost,
-      queue: queue?.video.bvid === video.bvid ? { ...queue, page: page || queue.page } : null,
-      playback: {
-        bvid: video.bvid,
-        title: video.title,
-        artist: video.author,
-        artwork: video.artwork,
-        mid: video.mid,
-        duration: isLive ? 0 : video.duration || 300,
-        position: 0,
-        status: 'playing',
-        at: now,
-        page: page || 1,
-        isLive,
-        roomId: video.roomId,
-      },
-      playing: true,
-      returnToPlayer: openPlayer,
+    useBilibili.setState((state) => {
+      const prevWatched = state.watched.find((w) => w.video.bvid === video.bvid)
+      const nextWatched = isLive
+        ? state.watched
+        : [
+            { video, time: prevWatched?.time ?? 0, duration: prevWatched?.duration ?? (video.duration || 0) },
+            ...state.watched.filter((w) => w.video.bvid !== video.bvid),
+          ].slice(0, WATCHED_KEPT)
+      return {
+        current: video,
+        open: openPlayer,
+        confirmedBvid: inHost ? null : video.bvid,
+        hostReady: !inHost,
+        buffering: inHost,
+        queue: queue?.video.bvid === video.bvid ? { ...queue, page: page || queue.page } : null,
+        watched: nextWatched,
+        playback: {
+          bvid: video.bvid,
+          title: video.title,
+          artist: video.author,
+          artwork: video.artwork,
+          mid: video.mid,
+          duration: isLive ? 0 : video.duration || 300,
+          position: 0,
+          status: 'playing',
+          at: now,
+          page: page || 1,
+          isLive,
+          roomId: video.roomId,
+        },
+        playing: true,
+        returnToPlayer: openPlayer,
+      }
     })
     if (!isLive) {
       ask({ ask: 'related', bvid: video.bvid }).then((ans) => {
@@ -494,20 +504,36 @@ export function seekBy(seconds: number): void {
   seek(Math.min(duration, Math.max(0, now + seconds)))
 }
 
-export function skip(direction: 1 | -1): void {
-  const { queue, related } = useBilibili.getState()
+export function skip(direction: 1 | -1): boolean {
+  const { current, playback, open, queue, related, watched } = useBilibili.getState()
+  if (!current && !playback) return false
+  const isLive = Boolean(current?.isLive || playback?.isLive || playback?.bvid?.startsWith('live:'))
+  if (isLive) return false
   if (queue && queue.pages.length > 1) {
     const nextPage = queue.page + direction
     if (nextPage >= 1 && nextPage <= queue.pages.length) {
-      play(queue.video, true, nextPage)
-      return
+      play(queue.video, open, nextPage)
+      return true
     }
   }
+  const currentBvid = current?.bvid || playback?.bvid || ''
   if (direction === 1 && related && related.length > 0) {
-    play(related[0], true)
-    return
+    const nextVideo = related.find((v) => v.bvid && v.bvid !== currentBvid) ?? related[0]
+    if (nextVideo) {
+      play(nextVideo, open)
+      return true
+    }
+  }
+  if (direction === -1) {
+    const prevVideo = watched.find((w) => w.video.bvid && w.video.bvid !== currentBvid && !w.video.isLive)?.video
+    if (prevVideo) {
+      if (positionNow() > 5) seek(0)
+      else play(prevVideo, open)
+      return true
+    }
   }
   seekBy(direction * 10)
+  return true
 }
 
 export function setQuality(quality: number): void {

@@ -1214,11 +1214,10 @@ export function playOrPause(): void {
   }
 }
 
-export function skip(direction: 1 | -1): void {
+export function skip(direction: 1 | -1): boolean {
   const { queue, queueIndex, playMode, signedIn, playback } = useQqmusic.getState()
   if (queue.length === 0) {
-    send({ action: direction === 1 ? 'next' : 'previous' })
-    return
+    return false
   }
 
   autoSkipVisitedIds.clear()
@@ -1233,7 +1232,9 @@ export function skip(direction: 1 | -1): void {
   const nextTrack = queue[nextIdx]
   if (nextTrack) {
     startPlayTrack(nextTrack, queue, nextIdx, true, direction)
+    return true
   }
+  return false
 }
 
 export function seek(seconds: number): void {

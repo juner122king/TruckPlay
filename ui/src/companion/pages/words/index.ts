@@ -114,6 +114,8 @@ export interface CompanionWords {
     playPause: string
     brightnessDown: string
     brightnessUp: string
+    previousTrack: string
+    nextTrack: string
     /** A keybind listening for its new key. */
     pressKey: string
     /** `{key}`: the screen's key. */

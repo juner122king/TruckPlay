@@ -113,8 +113,8 @@ export interface JobInfo {
   income: number
 }
 
-/** What a keybind does: the music's volume a step up or down, or it paused or played on; or, a volume key held
- * (two seconds: owner 2026-11-03), the next song or the one before (or the song's start, past its first seconds). */
+/** What a keybind does: the music's volume a step up or down, play or pause, previous or next track, or the
+ * screen's brightness down or up. */
 export type KeybindAction =
   'volumeUp' | 'volumeDown' | 'playPause' | 'nextTrack' | 'previousTrack' | 'brightnessDown' | 'brightnessUp'
 

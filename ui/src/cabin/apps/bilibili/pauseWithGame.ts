@@ -3,6 +3,15 @@ import { playOrPause, sendVolume, skip, useBilibili } from './bilibili'
 
 export const bilibiliPlayer: MusicPlayer = {
   name: 'bilibili',
+  pendingHere: () => {
+    const s = useBilibili.getState()
+    return Boolean(s.buffering && s.playing)
+  },
+  hasMedia: () => Boolean(useBilibili.getState().playback || useBilibili.getState().current),
+  trackTitle: () => {
+    const s = useBilibili.getState()
+    return s.playback?.title || s.current?.title || null
+  },
   playingHere: () => Boolean(useBilibili.getState().playing),
   pauseHere: () => {
     if (useBilibili.getState().playing) playOrPause()

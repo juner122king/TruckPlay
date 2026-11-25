@@ -538,10 +538,9 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut safari_playing = false;
     // The settings generation last applied (`None`: apply them once at startup).
     let mut applied_settings = None;
-    // Each keybind's presses and holds the page was told of (`PluginBlock::keybind_presses`, `keybind_holds`).
+    // Each keybind's presses the page was told of (`PluginBlock::keybind_presses`).
     let mut keybind_presses =
         bridge.bridge().plugin.keybind_presses.each_ref().map(|count| count.load(Ordering::Acquire));
-    let mut keybind_holds = bridge.bridge().plugin.keybind_holds.each_ref().map(|count| count.load(Ordering::Acquire));
     let mut last_frames = 0;
     // The startup stages still to log (`startup`), checked every turn until all are reached. The game's
     // screen frame counter as found: a session before this one may have left it counting.
@@ -977,21 +976,16 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
         } else if let Some(mut pointer) = remote_pointer.take() {
             pointer.remote_touch(lan::Phase::Cancel, 0.0, 0.0, remote_place, &webview, web);
         }
-        // The player's keybinds pressed (and the volume keys held) in the game: the page acts on each.
+        // The player's keybinds pressed in the game: the page acts on each.
+        let plugin = &bridge.bridge().plugin;
         for keybind in Keybind::ALL {
-            let plugin = &bridge.bridge().plugin;
-            for (counts, told, held) in [
-                (&plugin.keybind_presses, &mut keybind_presses, false),
-                (&plugin.keybind_holds, &mut keybind_holds, true),
-            ] {
-                let count = counts[keybind as usize].load(Ordering::Acquire);
-                let new = count.wrapping_sub(told[keybind as usize]);
-                told[keybind as usize] = count;
-                // More at once than a player presses in a moment: another plugin's count (the game restarted).
-                if new <= MOST_KEYBIND_PRESSES {
-                    for _ in 0..new {
-                        let _ = webview.post_json(&keybind_message(keybind, held));
-                    }
+            let count = plugin.keybind_presses[keybind as usize].load(Ordering::Acquire);
+            let new = count.wrapping_sub(keybind_presses[keybind as usize]);
+            keybind_presses[keybind as usize] = count;
+            // More at once than a player presses in a moment: another plugin's count (the game restarted).
+            if new <= MOST_KEYBIND_PRESSES {
+                for _ in 0..new {
+                    let _ = webview.post_json(&keybind_message(keybind));
                 }
             }
         }
@@ -2792,17 +2786,16 @@ fn stops_message(id: Option<u32>, route: Option<&[u64]>, waypoints: &[u64], hidd
 const MOST_KEYBIND_PRESSES: u32 = 10;
 
 /// `{"type":"keybind","action":"volumeUp"|"volumeDown"|"playPause"|"nextTrack"|"previousTrack"|"brightnessDown"|
-/// "brightnessUp"}`: the player pressed a keybind in the game, or `held` a volume key (`KEYBIND_HOLD_MS`): Volume
-/// up's the next song, Volume down's the one before.
-fn keybind_message(keybind: Keybind, held: bool) -> String {
-    let action = match (keybind, held) {
-        (Keybind::VolumeUp, false) => "volumeUp",
-        (Keybind::VolumeDown, false) => "volumeDown",
-        (Keybind::VolumeUp, true) => "nextTrack",
-        (Keybind::VolumeDown, true) => "previousTrack",
-        (Keybind::PlayPause, _) => "playPause",
-        (Keybind::BrightnessDown, _) => "brightnessDown",
-        (Keybind::BrightnessUp, _) => "brightnessUp",
+/// "brightnessUp"}`: the player pressed a keybind in the game.
+fn keybind_message(keybind: Keybind) -> String {
+    let action = match keybind {
+        Keybind::VolumeUp => "volumeUp",
+        Keybind::VolumeDown => "volumeDown",
+        Keybind::PlayPause => "playPause",
+        Keybind::BrightnessDown => "brightnessDown",
+        Keybind::BrightnessUp => "brightnessUp",
+        Keybind::PreviousTrack => "previousTrack",
+        Keybind::NextTrack => "nextTrack",
     };
     serde_json::json!({ "type": "keybind", "action": action }).to_string()
 }
@@ -4036,5 +4029,22 @@ mod tests {
         assert_eq!(screen_message(0), r#"{"layout":null,"type":"screen"}"#);
         assert_eq!(screen_message(1), r#"{"layout":"generic","type":"screen"}"#);
         assert_eq!(screen_message(999), r#"{"layout":null,"type":"screen"}"#);
+    }
+
+    #[test]
+    fn keybind_message_names_every_action() {
+        let cases = [
+            (Keybind::VolumeUp, "volumeUp"),
+            (Keybind::VolumeDown, "volumeDown"),
+            (Keybind::PlayPause, "playPause"),
+            (Keybind::BrightnessDown, "brightnessDown"),
+            (Keybind::BrightnessUp, "brightnessUp"),
+            (Keybind::PreviousTrack, "previousTrack"),
+            (Keybind::NextTrack, "nextTrack"),
+        ];
+        for (keybind, expected) in cases {
+            let value: serde_json::Value = serde_json::from_str(&keybind_message(keybind)).unwrap();
+            assert_eq!(value, serde_json::json!({ "type": "keybind", "action": expected }));
+        }
     }
 }

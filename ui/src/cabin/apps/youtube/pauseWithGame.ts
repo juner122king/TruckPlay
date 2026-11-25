@@ -1,6 +1,6 @@
 import type { YouTubeState } from '../../../shared/host'
 import { type MusicPlayer, pauseMusicWithGame } from '../musicWithGame'
-import { command, nextVideo, play, positionNow, previousVideo, setVolume, useYouTube } from './youtube'
+import { command, isLoading, nextVideo, play, positionNow, previousVideo, setVolume, useYouTube } from './youtube'
 
 /** A video playing, or about to (buffering). */
 function isPlaying(state: YouTubeState | null): boolean {
@@ -10,6 +10,9 @@ function isPlaying(state: YouTubeState | null): boolean {
 /** YouTube as one of the cab's players (oneAtATime.ts). */
 export const youtubePlayer: MusicPlayer = {
   name: 'youtube',
+  pendingHere: isLoading,
+  hasMedia: () => useYouTube.getState().current !== null,
+  trackTitle: () => useYouTube.getState().current?.title ?? null,
   playingHere: () => isPlaying(useYouTube.getState().state),
   pauseHere: () => command({ action: 'pause' }),
   resumeHere: () => command({ action: 'play' }),
@@ -23,14 +26,17 @@ export const youtubePlayer: MusicPlayer = {
   // As its Now Playing's buttons (VideoWidget.tsx): the next video, or back to this one's start (past its first
   // five seconds, or with none before) or the one before; where it shows, as it is.
   skip: (direction) => {
+    if (!useYouTube.getState().current) return false
     if (direction === 1) {
       const next = nextVideo()
-      if (next) play(next, false)
-      return
+      if (!next) return false
+      play(next, false)
+      return true
     }
     const before = previousVideo()
     if (positionNow() > 5 || !before) command({ action: 'seek', seconds: 0 })
     else play(before, false)
+    return true
   },
   subscribe: (changed) =>
     useYouTube.subscribe((youtube, before) => changed(isPlaying(youtube.state) && !isPlaying(before.state))),

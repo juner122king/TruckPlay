@@ -3,6 +3,11 @@ import { playOrPause, send, sendVolumePercent, skip, useHongguo } from './honggu
 
 export const hongguoPlayer: MusicPlayer = {
   name: 'hongguo',
+  hasMedia: () => Boolean(useHongguo.getState().playback || useHongguo.getState().currentDrama),
+  trackTitle: () => {
+    const s = useHongguo.getState()
+    return s.playback?.title || (s.currentDrama ? `${s.currentDrama.title} · 第${s.currentEpisode}集` : null)
+  },
   playingHere: () => Boolean(useHongguo.getState().playing),
   pauseHere: () => {
     if (useHongguo.getState().playing) playOrPause()

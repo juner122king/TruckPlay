@@ -4,6 +4,8 @@ import { isPlaybackPending, playOrPause, sendVolume, setVolume, skip, useNetease
 export const neteasePlayer: MusicPlayer = {
   name: 'netease',
   pendingHere: () => isPlaybackPending(),
+  hasMedia: () => Boolean(useNetease.getState().playback),
+  trackTitle: () => useNetease.getState().playback?.title || null,
   playingHere: () => Boolean(useNetease.getState().playing),
   pauseHere: () => {
     if (useNetease.getState().playing || isPlaybackPending()) playOrPause()

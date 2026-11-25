@@ -748,7 +748,11 @@ function buildOfflineTracks(album: ExtendedXimalayaAlbum): ExtendedXimalayaTrack
   }))
 }
 
-async function fetchAlbumTracksPage(album: ExtendedXimalayaAlbum, page: number, asc: boolean): Promise<ExtendedXimalayaTrack[]> {
+async function fetchAlbumTracksPage(
+  album: ExtendedXimalayaAlbum,
+  page: number,
+  asc: boolean,
+): Promise<ExtendedXimalayaTrack[]> {
   const seq = ++albumSeq
   useXimalaya.setState({
     albumPage: page,
@@ -994,13 +998,18 @@ export function playOrPause(): void {
   else play()
 }
 
-export function skip(direction: 1 | -1): void {
+export function skip(direction: 1 | -1): boolean {
   const state = useXimalaya.getState()
   const live = state.playback?.owner === 'radio'
   const queue = live ? state.liveQueue : state.queue
+  if (queue.length === 0) return false
   const index = live ? queue.findIndex((t) => t.radioId === state.playback?.radioId) : state.queueIndex
-  if (queue.length) play(queue[(index + direction + queue.length) % queue.length], queue)
-  else send({ action: direction === 1 ? 'next' : 'previous' })
+  const currentIdx = index >= 0 && index < queue.length ? index : direction === 1 ? -1 : 0
+  const nextIdx = (currentIdx + direction + queue.length) % queue.length
+  const target = queue[nextIdx]
+  if (!target) return false
+  void play(target, queue)
+  return true
 }
 
 export function seek(seconds: number): void {

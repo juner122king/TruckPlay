@@ -923,7 +923,9 @@ export function receivePlayback(playback: NeteasePlayback | null): void {
     if (endKey === lastEndedSessionKey) return
 
     const shouldAdvance =
-      playbackWanted || state.playing === true || (playback.trackId !== undefined && playback.trackId === playbackPendingTrackId)
+      playbackWanted ||
+      state.playing === true ||
+      (playback.trackId !== undefined && playback.trackId === playbackPendingTrackId)
 
     playbackStartedInHost = true
     lastEndedSessionKey = endKey
@@ -951,7 +953,9 @@ export function receivePlayback(playback: NeteasePlayback | null): void {
     if (!matchesCurrent) return
 
     const wasActiveOrPending =
-      playbackWanted || state.playing === true || (playback.trackId !== undefined && playback.trackId === playbackPendingTrackId)
+      playbackWanted ||
+      state.playing === true ||
+      (playback.trackId !== undefined && playback.trackId === playbackPendingTrackId)
 
     playbackPendingTrackId = null
     if (!wasActiveOrPending) {
@@ -1138,11 +1142,10 @@ export function playOrPause(): void {
   }
 }
 
-export function skip(direction: 1 | -1): void {
+export function skip(direction: 1 | -1): boolean {
   const { queue, queueIndex, playMode, signedIn, playback } = useNetease.getState()
   if (queue.length === 0) {
-    send({ action: direction === 1 ? 'next' : 'previous' })
-    return
+    return false
   }
 
   autoSkipVisitedIds.clear()
@@ -1158,7 +1161,9 @@ export function skip(direction: 1 | -1): void {
   const nextTrack = queue[nextIdx]
   if (nextTrack) {
     startPlayTrack(nextTrack, queue, nextIdx, true, direction)
+    return true
   }
+  return false
 }
 
 export function seek(seconds: number): void {

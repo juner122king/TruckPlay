@@ -108,6 +108,8 @@ export const words: CompanionWords = {
     playPause: 'Play/Pause',
     brightnessDown: 'Brightness down',
     brightnessUp: 'Brightness up',
+    previousTrack: 'Previous track',
+    nextTrack: 'Next track',
     pressKey: 'Press a key…',
     keybindsNote:
       'Click a keybind, then press its new key. Hold {key} as you press it, and it works only while you use the screen. Esc cancels.',
