@@ -3,6 +3,14 @@
 What changed in each release of TruckPlay (independent GPL-3.0-or-later fork of WestPlay 2.4.x). The newest release's
 notes are what the app shows when it offers the update.
 
+## 1.0.0 (2026-11-25)
+- **TruckPlay 1.0.0 首个正式版本发布**：支持应用内自动检查更新与签名安装升级（`juner122king/TruckPlay` GitHub Releases），保留 `1.0.0-rc.1` 及此前版本用户数据、地图缓存与插件兼容平滑升级。
+- 新增 CarPlay **Phone（电话）** 应用与紧凑型顶部来电横幅：升级共享内存桥接至 v31（支持 Win32 + DirectInput 合成按键序列与 `GameActionBlock`），扩展 `game.sii` / `controls.sii` 解析以同步银行余额/贷款、车库、雇佣司机、二手卡车报价与快捷键配置；提供道路救援（拖车至维修厂 / 拖车至路面 / 紧急加油）、银行、二手卡车、车队通讯录、最近通话与拨号键盘。
+- 新增 **QQ 音乐（QQ Music）** 车机应用：贯通宿主、Tauri、车机 UI（播放队列抽屉、正在播放与自适应布局）及 Companion 账号管理。
+- 重构并恢复 **抖音（Douyin）** 车机应用：采用 CarPlay Liquid Glass 视觉风格，修复登录态与视频流抓取、支持 H.264 直连播放与官方频道、解耦分页视频列表与播放队列（切换标签页不中断当前播放），并强化闲置资源回收、冷启动指令缓冲与生命周期稳定性。
+- 车机与 Companion 体验优化：侧边栏采用真实 CarPlay 比例与对称内边距，默认开启驾驶勿扰（DND v2 存储迁移），精简 Companion 启动自动账号检查、引导登录步骤与 Support 区块，并修复发布脚本在 `gh release view` 下的 PowerShell 异常处理。
+- First official **TruckPlay 1.0.0** release with signed in-app auto-updates via `juner122king/TruckPlay` GitHub Releases: adds CarPlay **Phone** app (v31 shared bridge game actions, roadside assistance, bank, used trucks, fleet directory, incoming-call banner), **QQ Music** integration, restored Liquid Glass **Douyin** app (decoupled feed/queue, direct H.264 playback, hardened lifecycle), real CarPlay sidebar proportions, default DND v2 migration, and streamlined Companion startup.
+
 ## 1.0.0-rc.1 (2026-11-24)
 - 成立独立个人开源项目 **TruckPlay**：基于 WestPlay 2.4.0 / 2.4.1（GPL-3.0-or-later）开源版本独立维护，应用标识切换为 `io.github.juner122king.truckplay`，内置自动更新指向 `juner122king/TruckPlay` GitHub Releases（保留既有用户数据、地图缓存与插件文件兼容以实现平滑升级），桌面端主程序统一命名为 `TruckPlay.exe` 并配备全新品牌图标与托盘/单实例唤醒体验。
 - 车机 UI 与驾驶室交互升级：新增 **Companion** 玻璃窗体与 **Options** 设置页并规避 Edge WebView2 158 `STATUS_BREAKPOINT` 崩溃；以 CarPlay Liquid Glass 风格重构 **Freight（货运 HUD）**（修复 HOS 超时与延迟时间线缓冲计算）与 **喜马拉雅（Ximalaya）**（修复主站 API、登录态鉴权与自动播放队列）；新增 SCS 游戏事件桥接，推出 CarPlay **Messages** 短信、**Calendar** 行程日志与全局驾驶提醒。
