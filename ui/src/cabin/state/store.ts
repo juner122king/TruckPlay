@@ -54,6 +54,11 @@ import {
   receivePlayback as receiveNeteasePlayback,
   receiveState as receiveNeteaseState,
 } from '../apps/netease/netease'
+import {
+  receiveAnswer as receiveQqmusicAnswer,
+  receivePlayback as receiveQqmusicPlayback,
+  receiveState as receiveQqmusicState,
+} from '../apps/qqmusic/qqmusic'
 import { receiveAnswer, receiveState, useYouTube } from '../apps/youtube/youtube'
 import { receiveFolder, receivePlayback as receivePlayerPlayback } from '../apps/player/player'
 import {
@@ -859,6 +864,31 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         break
       case 'neteasePlayback':
         receiveNeteasePlayback(message.playback)
+        break
+      case 'qqmusic':
+        receiveQqmusicState(
+          message.signedIn,
+          message.playing,
+          message.signingIn,
+          message.nickname,
+          message.avatarUrl,
+          message.vipType,
+        )
+        break
+      case 'qqmusicAnswer':
+        receiveQqmusicAnswer(
+          message.id,
+          message.failed,
+          message.error,
+          message.songs,
+          message.playlists,
+          message.lyric,
+          message.radios,
+          message.artists,
+        )
+        break
+      case 'qqmusicPlayback':
+        receiveQqmusicPlayback(message.playback)
         break
       case 'appleMusic':
         useAppleMusic.setState({

@@ -3,7 +3,8 @@
  * Dashboard shows it, and its controls.
  */
 
-export type MusicService = 'appleMusic' | 'bilibili' | 'ximalaya' | 'douyin' | 'hongguo' | 'netease' | 'player'
+export type MusicService =
+  'appleMusic' | 'bilibili' | 'ximalaya' | 'douyin' | 'hongguo' | 'netease' | 'qqmusic' | 'player'
 
 export interface MediaSource {
   /** Which player it is (`westplay-apple-music`). */

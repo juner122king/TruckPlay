@@ -114,6 +114,7 @@ const accounts = {
   douyin: false as boolean | null,
   hongguo: false as boolean | null,
   netease: false as boolean | null,
+  qqmusic: false as boolean | null,
   signingIn: '',
 }
 
@@ -196,6 +197,8 @@ function status(): HostStatus {
     hongguoSigningIn: accounts.signingIn === 'hongguo',
     neteaseSignedIn: accounts.netease,
     neteaseSigningIn: accounts.signingIn === 'netease',
+    qqmusicSignedIn: accounts.qqmusic,
+    qqmusicSigningIn: accounts.signingIn === 'qqmusic',
     map,
     mapFolder: null,
     mapBuilt: map.state === 'ready' ? Math.floor(Date.now() / 1000) - 3 * 86_400 : null,
@@ -271,7 +274,9 @@ function setLook(change: Partial<Settings['look']>) {
 const later = <T>(value: T, ms = 300) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
 /** A sign-in: Google's, Apple's or domestic apps' window "open" a moment, then signed in. */
-function signIn(service: 'youtube' | 'appleMusic' | 'bilibili' | 'ximalaya' | 'douyin' | 'hongguo' | 'netease') {
+function signIn(
+  service: 'youtube' | 'appleMusic' | 'bilibili' | 'ximalaya' | 'douyin' | 'hongguo' | 'netease' | 'qqmusic',
+) {
   accounts.signingIn = service
   emit('host-status', status())
   setTimeout(() => {
@@ -425,6 +430,7 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
     case 'douyin_check':
     case 'hongguo_check':
     case 'netease_check':
+    case 'qqmusic_check':
       return later(undefined)
     case 'youtube_sign_in':
       signIn('youtube')
@@ -446,6 +452,9 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
       return later(undefined)
     case 'netease_sign_in':
       signIn('netease')
+      return later(undefined)
+    case 'qqmusic_sign_in':
+      signIn('qqmusic')
       return later(undefined)
     case 'app_log_place':
       return later('C:\\Users\\Player\\Documents\\WestPlay\\logs\\app.log')
@@ -488,6 +497,12 @@ export function answer(command: string, args?: Record<string, unknown>): Promise
     case 'netease_sign_out':
       setTimeout(() => {
         accounts.netease = false
+        emit('host-status', status())
+      }, 1200)
+      return later(undefined)
+    case 'qqmusic_sign_out':
+      setTimeout(() => {
+        accounts.qqmusic = false
         emit('host-status', status())
       }, 1200)
       return later(undefined)

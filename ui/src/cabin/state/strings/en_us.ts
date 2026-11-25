@@ -678,6 +678,7 @@ export const strings: Strings = {
     ximalaya: 'Ximalaya',
     radio: 'Radio',
     netease: 'NetEase Music',
+    qqmusic: 'QQ Music',
     douyin: 'Douyin',
     hongguo: 'Hongguo',
     youtube: 'YouTube',

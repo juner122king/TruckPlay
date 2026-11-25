@@ -21,6 +21,7 @@ export const GLOW = {
   douyin: 'oklch(0.6 0.22 15)',
   hongguo: 'oklch(0.62 0.21 28)',
   netease: 'oklch(0.58 0.22 25)',
+  qqmusic: 'oklch(0.68 0.17 156)',
   weather: 'oklch(0.66 0.13 232)',
   dashboard: 'oklch(0.64 0.15 240)',
 }

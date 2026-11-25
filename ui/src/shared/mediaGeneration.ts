@@ -6,6 +6,7 @@ export const MEDIA_APPS = [
   'douyin',
   'hongguo',
   'netease',
+  'qqmusic',
   'player',
 ] as const
 export type MediaApp = (typeof MEDIA_APPS)[number]

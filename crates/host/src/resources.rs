@@ -16,11 +16,12 @@ pub enum App {
     Douyin,
     Hongguo,
     Netease,
+    Qqmusic,
     Player,
 }
 
 impl App {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Youtube,
         Self::AppleMusic,
         Self::Bilibili,
@@ -28,6 +29,7 @@ impl App {
         Self::Douyin,
         Self::Hongguo,
         Self::Netease,
+        Self::Qqmusic,
         Self::Player,
     ];
     pub fn name(self) -> &'static str {
@@ -39,6 +41,7 @@ impl App {
             Self::Douyin => "douyin",
             Self::Hongguo => "hongguo",
             Self::Netease => "netease",
+            Self::Qqmusic => "qqmusic",
             Self::Player => "player",
         }
     }

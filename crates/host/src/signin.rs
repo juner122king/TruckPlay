@@ -120,6 +120,16 @@ pub const NETEASE: Site = Site {
     cookie: Some("MUSIC_U"),
 };
 
+/// QQ Music's sign-in with desktop QQ / WeChat QR code.
+pub const QQMUSIC: Site = Site {
+    sign_in: "https://y.qq.com/",
+    title: "Sign in to QQ Music - WestPlay",
+    home: "https://y.qq.com/",
+    not_yet: None,
+    page_says: Some(include_str!("qqmusic_sign_in.js")),
+    cookie: Some("qm_keyst"),
+};
+
 /// Apple Music's sign-in: the dialog of its own web player, opened at once (`apple_music_sign_in.js`).
 pub const APPLE_MUSIC: Site = Site {
     sign_in: "https://music.apple.com/",

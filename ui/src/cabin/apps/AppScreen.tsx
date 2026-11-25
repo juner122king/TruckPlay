@@ -14,6 +14,7 @@ import { BilibiliApp } from './bilibili/BilibiliApp'
 import { XimalayaApp } from './ximalaya/XimalayaApp'
 import { RadioApp } from './radio/RadioApp'
 import { NeteaseApp } from './netease/NeteaseApp'
+import { QqmusicApp } from './qqmusic/QqmusicApp'
 import { DouyinApp } from './douyin/DouyinApp'
 import { HongguoApp } from './hongguo/HongguoApp'
 import { WeatherApp } from './weather/WeatherApp'
@@ -100,6 +101,8 @@ function AppContent({ app }: { app: AppId }) {
       return <RadioApp />
     case 'netease':
       return <NeteaseApp />
+    case 'qqmusic':
+      return <QqmusicApp />
     case 'douyin':
       return <DouyinApp />
     case 'hongguo':

@@ -21,17 +21,20 @@ async function players() {
   const { safariPlayer } = await import('./safari/pauseWithGame')
   const { bilibiliPlayer } = await import('./bilibili/pauseWithGame')
   const { neteasePlayer } = await import('./netease/pauseWithGame')
+  const { qqmusicPlayer } = await import('./qqmusic/pauseWithGame')
   const { ximalayaPlayer } = await import('./ximalaya/pauseWithGame')
   const { douyinPlayer } = await import('./douyin/pauseWithGame')
   const { hongguoPlayer } = await import('./hongguo/pauseWithGame')
   const { useBilibili } = await import('./bilibili/bilibili')
   const { useNetease } = await import('./netease/netease')
+  const { useQqmusic } = await import('./qqmusic/qqmusic')
   const { useXimalaya } = await import('./ximalaya/ximalaya')
   const { useDouyin } = await import('./douyin/douyin')
   const { useHongguo } = await import('./hongguo/hongguo')
   const domestic = {
     bilibili: { player: bilibiliPlayer, playing: (playing: boolean) => useBilibili.setState({ playing }) },
     netease: { player: neteasePlayer, playing: (playing: boolean) => useNetease.setState({ playing }) },
+    qqmusic: { player: qqmusicPlayer, playing: (playing: boolean) => useQqmusic.setState({ playing }) },
     ximalaya: { player: ximalayaPlayer, playing: (playing: boolean) => useXimalaya.setState({ playing }) },
     douyin: { player: douyinPlayer, playing: (playing: boolean) => useDouyin.setState({ playing }) },
     hongguo: { player: hongguoPlayer, playing: (playing: boolean) => useHongguo.setState({ playing }) },
@@ -45,7 +48,7 @@ async function players() {
 }
 
 describe('Safari with the domestic players', () => {
-  it.each(['bilibili', 'netease', 'ximalaya', 'douyin', 'hongguo'] as const)(
+  it.each(['bilibili', 'netease', 'qqmusic', 'ximalaya', 'douyin', 'hongguo'] as const)(
     'pauses %s for Safari and Safari for it, without giving Safari an idle-resource generation',
     async (name) => {
       const p = await players()

@@ -789,7 +789,7 @@ impl OffscreenWebView {
     pub fn post_json(&self, json: &str) -> windows::core::Result<()> {
         // Only media reports need instance tags; ordinary telemetry avoids parsing on this path.
         let mut tagged = None;
-        if ["youtube", "appleMusic", "bilibili", "ximalaya", "douyin", "hongguo", "netease", "playerPlayback"]
+        if ["youtube", "appleMusic", "bilibili", "ximalaya", "douyin", "hongguo", "netease", "qqmusic", "playerPlayback"]
             .iter()
             .any(|kind| json.contains(kind))
             && let Ok(mut message) = serde_json::from_str::<serde_json::Value>(json)

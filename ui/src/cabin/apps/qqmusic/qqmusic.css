@@ -1,0 +1,2577 @@
+/* ============================================================================
+ * WestPlay QQ Music CarPlay Liquid Glass UI
+ * Emerald green (#31C27C / #1ECC94) theme + floating glass bar & mini-player
+ * + fullscreen Vinyl / Synced Lyrics / Inline Queue Now Playing
+ * ============================================================================ */
+
+@property --qqm-fade-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --qqm-fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* --------------------------------------------------------------------------
+ * 1. Design Tokens & Root Container
+ * -------------------------------------------------------------------------- */
+.shell .qqmusic-app,
+.shell .qqm-now {
+  --qqm-key: #1ecc94;
+  --qqm-key-strong: #31c27c;
+  --qqm-key-soft: rgb(30 204 148 / 0.16);
+  --qqm-key-border: rgb(49 194 124 / 0.38);
+
+  --qqm-label: var(--apple-label);
+  --qqm-dim: var(--apple-label-secondary);
+  --qqm-faint: var(--apple-label-tertiary);
+  --qqm-fill: var(--apple-fill-tertiary);
+  --qqm-fill-hover: var(--apple-fill-secondary);
+  --qqm-pressed: var(--apple-fill);
+  --qqm-rule: var(--apple-separator);
+  --qqm-surface: rgb(255 255 255 / 0.05);
+  --qqm-surface-hover: rgb(255 255 255 / 0.09);
+  --qqm-card-bg: var(--apple-card);
+  --qqm-card-raised: var(--apple-card-raised);
+
+  --qqm-tile: 196px;
+  --qqm-corner: 16px;
+  --qqm-corner-small: 10px;
+  --qqm-bar: 76px;
+  --qqm-bar-inset: max(0px, calc((var(--panel-radius) - var(--qqm-bar) / 2) * var(--corner-inset)));
+  --qqm-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 12px);
+  --qqm-gutter: 24px;
+}
+
+.shell.appearance-light .qqmusic-app,
+.shell.appearance-light .qqm-now {
+  --qqm-key: #15a866;
+  --qqm-key-strong: #12985b;
+  --qqm-key-soft: rgb(21 168 102 / 0.11);
+  --qqm-key-border: rgb(21 168 102 / 0.32);
+  --qqm-surface: rgb(0 0 0 / 0.04);
+  --qqm-surface-hover: rgb(0 0 0 / 0.075);
+}
+
+.shell .qqmusic-app,
+.shell .qqm-now,
+.shell .qqm-bar {
+  --qqm-type-title: calc(46px * var(--text-scale, 1));
+  --qqm-type-section: calc(28px * var(--text-scale, 1));
+  --qqm-type-name: calc(22px * var(--text-scale, 1));
+  --qqm-type-sub: calc(18px * var(--text-scale, 1));
+  --qqm-type-label: calc(15px * var(--text-scale, 1));
+}
+
+.shell .qqmusic-app {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--panel-radius);
+  background: var(--app-background);
+  color: var(--qqm-label);
+  isolation: isolate;
+  container-type: size;
+  container-name: qqmusic;
+}
+
+.shell .qqmusic-app button,
+.shell .qqm-now button {
+  transition:
+    background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease),
+    color 160ms var(--motion-ease),
+    scale 150ms var(--motion-ease),
+    opacity 160ms var(--motion-ease);
+}
+
+.shell .qqmusic-app button.glass,
+.shell .qqm-now button.glass {
+  background: var(--glass);
+}
+
+.shell .qqmusic-app :is(button, input):focus-visible,
+.shell .qqm-now :is(button, input):focus-visible {
+  outline: 3px solid var(--qqm-key);
+  outline-offset: 2px;
+}
+
+.shell .qqmusic-app button:disabled,
+.shell .qqm-now button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+/* --------------------------------------------------------------------------
+ * 2. Floating Top Navigation Bar
+ * -------------------------------------------------------------------------- */
+.shell .qqm-bar {
+  --text-scale: 1;
+  --qqm-bar-inset: max(0px, calc((var(--panel-radius) - var(--qqm-bar) / 2) * var(--corner-inset)));
+  position: relative;
+  z-index: 4;
+  flex: none;
+  height: var(--qqm-bar);
+  margin: var(--qqm-bar-inset) var(--qqm-bar-inset) 0;
+}
+
+.shell .qqm-bar-side {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.shell .qqm-bar-side.end {
+  left: auto;
+  right: 0;
+}
+
+.shell .qqm-round {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--qqm-label);
+}
+
+.shell .qqm-round:active {
+  scale: 0.93;
+}
+
+.shell .qqm-tabs {
+  position: relative;
+  height: 100%;
+  pointer-events: none;
+}
+
+.shell .qqm-tab-bar {
+  position: absolute;
+  top: 0;
+  height: var(--qqm-bar);
+  overflow: hidden;
+  border-radius: calc(var(--qqm-bar) / 2);
+  pointer-events: auto;
+}
+
+.shell .qqm-bar:not(.ready) .qqm-tab-bar,
+.shell .qqm-bar:not(.ready) .qqm-search {
+  visibility: hidden;
+}
+
+.shell .qqm-bar.ready .qqm-tab-bar,
+.shell .qqm-bar.ready .qqm-search {
+  transition:
+    transform 420ms var(--motion-ease),
+    clip-path 420ms var(--motion-ease);
+}
+
+.shell .qqm-tab-list {
+  display: flex;
+  gap: 4px;
+  width: max-content;
+  height: 100%;
+  padding: 6px;
+  transition: opacity 200ms var(--motion-ease);
+}
+
+.shell .qqm-tabs.searching .qqm-tab-list {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.shell .qqmusic-app button.qqm-close-search {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: var(--qqm-bar);
+  opacity: 0;
+  pointer-events: none;
+  color: var(--qqm-label);
+  transition: opacity 200ms var(--motion-ease);
+}
+
+.shell .qqm-tabs.searching button.qqm-close-search {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 160ms;
+}
+
+.shell .qqm-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 96px;
+  height: 100%;
+  padding-inline: 18px;
+  border-radius: calc((var(--qqm-bar) - 12px) / 2);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--qqm-label);
+  white-space: nowrap;
+}
+
+.shell .qqm-tab.on {
+  color: var(--qqm-key);
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.shell .qqm-tab:active {
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+  scale: 0.96;
+}
+
+.shell .qqm-search {
+  position: absolute;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: var(--qqm-bar);
+  border-radius: calc(var(--qqm-bar) / 2);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.shell .qqm-search.open {
+  padding-inline: 10px;
+}
+
+.shell .qqm-search.open .text-field {
+  animation: qqm-field-in 260ms var(--motion-ease) 120ms both;
+}
+
+@keyframes qqm-field-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.shell .qqm-search-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--qqm-bar);
+  height: 100%;
+  color: var(--qqm-label);
+}
+
+.shell .qqmusic-app .text-field {
+  flex: 1;
+  min-inline-size: 0;
+  height: calc(var(--qqm-bar) - 16px);
+  border-radius: 999px;
+  background: transparent;
+  font-size: var(--qqm-type-sub);
+}
+
+.shell .qqmusic-app .text-field.typing {
+  box-shadow: none;
+}
+
+.shell .qqmusic-app .text-field > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--qqm-dim);
+}
+
+.shell .qqmusic-app .text-field-caret {
+  background: var(--qqm-key);
+}
+
+/* Account controls */
+.shell .qqm-sign-in {
+  min-height: 58px;
+  padding-inline: 22px;
+  border-radius: 999px;
+  font-size: var(--qqm-type-sub);
+  font-weight: 700;
+  color: var(--qqm-key);
+  white-space: nowrap;
+}
+
+.shell .qqm-signing-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  font-size: var(--qqm-type-label);
+  font-weight: 650;
+  color: var(--qqm-key);
+  white-space: nowrap;
+}
+
+.shell .qqm-spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid var(--qqm-key-border);
+  border-top-color: var(--qqm-key);
+  border-radius: 50%;
+  animation: qqm-spin 0.8s linear infinite;
+}
+
+@keyframes qqm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.shell .qqm-account {
+  position: relative;
+}
+
+.shell .qqmusic-app button.qqm-me {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-me.vip {
+  box-shadow:
+    inset 0 0 0 2px var(--qqm-key),
+    var(--shadow-raised);
+}
+
+.shell .qqm-me img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.shell .qqm-me-vip-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--qqm-key-strong);
+  color: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.45);
+}
+
+.shell .qqm-account-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 20;
+  min-width: 260px;
+  padding: 10px;
+  border-radius: 24px;
+  background: var(--qqm-card-raised);
+  box-shadow: var(--shadow-raised-large);
+  animation: qqm-pop-in 180ms var(--motion-ease) both;
+}
+
+@keyframes qqm-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+}
+
+.shell .qqm-account-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--qqm-rule);
+  margin-bottom: 6px;
+}
+
+.shell .qqm-account-name {
+  font-size: var(--qqm-type-sub);
+  font-weight: 700;
+  color: var(--qqm-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-account-tier {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--qqm-fill);
+  color: var(--qqm-dim);
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 650;
+}
+
+.shell .qqm-account-tier.vip {
+  background: var(--qqm-key-soft);
+  color: var(--qqm-key);
+}
+
+.shell .qqm-account-signout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding-inline: 14px;
+  border-radius: 16px;
+  font-size: var(--qqm-type-sub);
+  font-weight: 650;
+  color: var(--apple-red);
+  text-align: left;
+}
+
+.shell .qqm-account-signout:hover,
+.shell .qqm-account-signout:active {
+  background: var(--qqm-fill);
+}
+
+/* --------------------------------------------------------------------------
+ * 3. Scrollable Main Viewport & Notices
+ * -------------------------------------------------------------------------- */
+.shell .qqm-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-top: calc(-1 * (var(--qqm-bar) + var(--qqm-bar-inset)));
+  padding: calc(var(--qqm-bar) + var(--qqm-bar-inset) + 20px) max(var(--qqm-gutter), var(--qqm-corner-clear))
+    max(48px, var(--qqm-corner-clear));
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    transparent calc(var(--qqm-bar-inset) + 8px),
+    #000 calc(var(--qqm-bar) + var(--qqm-bar-inset) + 18px)
+  );
+}
+
+.shell .qqm-scroll.has-mini {
+  padding-bottom: 132px;
+}
+
+.shell .qqm-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .qqm-qr-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--qqm-key-border);
+  background: var(--qqm-key-soft);
+}
+
+.shell .qqm-qr-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--qqm-key-soft);
+  color: var(--qqm-key);
+}
+
+.shell .qqm-qr-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.shell .qqm-qr-copy strong {
+  font-size: var(--qqm-type-sub);
+  font-weight: 700;
+  color: var(--qqm-label);
+}
+
+.shell .qqm-qr-copy span {
+  font-size: var(--qqm-type-label);
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--qqm-key-border);
+  background: color-mix(in srgb, var(--qqm-key-strong) 18%, var(--apple-card));
+}
+
+.shell .qqm-inline-notice {
+  margin-bottom: 16px;
+}
+
+.shell .qqm-notice-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--qqm-key);
+}
+
+.shell .qqm-notice-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--qqm-type-label);
+  font-weight: 550;
+  line-height: 1.35;
+  color: var(--qqm-label);
+}
+
+.shell .qqm-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.shell .qqm-notice-signin {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--qqm-key-strong);
+  color: #fff;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 650;
+}
+
+.shell .qqm-notice-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-notice-close:hover {
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+/* --------------------------------------------------------------------------
+ * 4. Page Headers, Hero Bento Cards, Sections & Secondary Pills
+ * -------------------------------------------------------------------------- */
+.shell .qqm-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.shell .qqm-page-title {
+  margin: 0;
+  font-size: var(--qqm-type-title);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+}
+
+.shell .qqm-greeting-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--qqm-fill);
+  color: var(--qqm-dim);
+  font-size: var(--qqm-type-label);
+  font-weight: 650;
+}
+
+.shell .qqm-sync-badge {
+  font-size: var(--qqm-type-label);
+  font-weight: 600;
+  color: var(--qqm-key);
+}
+
+.shell .qqm-search-go {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--qqm-key-strong);
+  color: #fff;
+  font-size: var(--qqm-type-label);
+  font-weight: 650;
+}
+
+.shell .qqm-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.shell .qqm-hero-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  text-align: left;
+  color: #fff;
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .qqm-hero-card:hover {
+  filter: brightness(1.06);
+}
+
+.shell .qqm-hero-card:active {
+  scale: 0.97;
+}
+
+.shell .qqm-hero-card.hero-daily {
+  background: linear-gradient(135deg, #1ecc94 0%, #0b6e4b 100%);
+}
+
+.shell .qqm-hero-card.hero-radio {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0c4a6e 100%);
+}
+
+.shell .qqm-hero-card.hero-soar {
+  background: linear-gradient(135deg, #f59e0b 0%, #78350f 100%);
+}
+
+.shell .qqm-hero-card.hero-trend {
+  background: linear-gradient(135deg, #10b981 0%, #115e59 100%);
+}
+
+.shell .qqm-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shell .qqm-hero-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.16);
+}
+
+.shell .qqm-hero-badge {
+  font-size: var(--qqm-type-sub);
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.shell .qqm-hero-sub {
+  margin-top: 12px;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 550;
+  color: rgb(255 255 255 / 0.86);
+  line-height: 1.3;
+}
+
+.shell .qqm-section {
+  margin-top: 28px;
+}
+
+.shell .qqm-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.shell .qqm-section-head h2 {
+  margin: 0;
+  font-size: var(--qqm-type-section);
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.shell .qqm-sub-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 6px;
+  margin-bottom: 18px;
+  scrollbar-width: none;
+  scroll-snap-type: inline proximity;
+  scroll-padding-inline: 28px;
+  --fade-size: 28px;
+  mask:
+    linear-gradient(black, black) no-clip subtract,
+    linear-gradient(to right, black, transparent) 0 0 / var(--qqm-fade-start) 100% no-repeat no-clip,
+    linear-gradient(to right, transparent, black) 100% 0 / var(--qqm-fade-end) 100% no-repeat no-clip;
+}
+
+@supports (animation-timeline: scroll()) {
+  .shell .qqm-sub-tabs {
+    animation:
+      qqm-reveal-fade-start linear both,
+      qqm-hide-fade-end linear both;
+    animation-timeline: scroll(self inline);
+    animation-range:
+      0 var(--fade-size),
+      calc(100% - var(--fade-size)) 100%;
+  }
+}
+
+@keyframes qqm-reveal-fade-start {
+  to {
+    --qqm-fade-start: var(--fade-size);
+  }
+}
+
+@keyframes qqm-hide-fade-end {
+  from {
+    --qqm-fade-end: var(--fade-size);
+  }
+}
+
+.shell .qqm-sub-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .qqm-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: var(--qqm-type-sub);
+  font-weight: 600;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  border: 1px solid transparent;
+}
+
+.shell .qqm-pill.brand {
+  background: var(--qqm-key-soft);
+  border-color: var(--qqm-key-border);
+  color: var(--qqm-key);
+}
+
+.shell .qqm-pill.brand.active {
+  background: var(--qqm-key-strong);
+  border-color: var(--qqm-key-strong);
+  color: #fff;
+}
+
+.shell .qqm-pill.genre {
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+.shell .qqm-pill.genre:hover {
+  background: var(--qqm-fill-hover);
+}
+
+.shell .qqm-pill.genre.active {
+  background: var(--qqm-label);
+  color: var(--app-background);
+}
+
+.shell .qqm-pill:active {
+  scale: 0.96;
+}
+
+/* --------------------------------------------------------------------------
+ * 5. Playlists / Radios / Artists Grids & Collection Detail Header
+ * -------------------------------------------------------------------------- */
+.shell .qqm-playlists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--qqm-tile), 1fr));
+  gap: 24px 18px;
+}
+
+.shell .qqm-pl-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+  color: var(--qqm-label);
+}
+
+.shell .qqm-pl-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--qqm-corner);
+  overflow: hidden;
+  background: var(--qqm-fill);
+  margin-bottom: 10px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  transition:
+    scale 180ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease);
+}
+
+.shell.appearance-light .qqm-pl-thumb {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+
+.shell .qqm-pl-card:hover .qqm-pl-thumb {
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .qqm-pl-card:active .qqm-pl-thumb {
+  scale: 0.96;
+}
+
+.shell .qqm-pl-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .qqm-cover-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-pl-play-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.56);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-pl-title {
+  font-size: var(--qqm-type-sub);
+  font-weight: 650;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.shell .qqm-pl-sub {
+  margin-top: 3px;
+  font-size: var(--qqm-type-label);
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-artist-card {
+  align-items: center;
+  text-align: center;
+}
+
+.shell .qqm-artist-thumb {
+  border-radius: 50%;
+}
+
+.shell .qqm-pl-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shell .qqm-pl-skel-cover {
+  aspect-ratio: 1;
+  border-radius: var(--qqm-corner);
+  background: var(--qqm-fill);
+  animation: qqm-pulse 1.4s ease-in-out infinite alternate;
+}
+
+.shell .qqm-pl-skel-cover.round {
+  border-radius: 50%;
+}
+
+.shell .qqm-pl-skel-line {
+  width: 78%;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--qqm-fill);
+  animation: qqm-pulse 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes qqm-pulse {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.shell .qqm-collection-head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.shell .qqm-collection-cover {
+  flex: none;
+  width: 196px;
+  aspect-ratio: 1;
+  border-radius: var(--qqm-corner);
+  overflow: hidden;
+  background: var(--qqm-fill);
+  box-shadow: var(--shadow-raised);
+}
+
+.shell .qqm-collection-cover.round {
+  border-radius: 50%;
+}
+
+.shell .qqm-collection-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .qqm-collection-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.shell .qqm-collection-title {
+  margin: 0 0 8px;
+  font-size: calc(36px * var(--text-scale, 1));
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.shell .qqm-collection-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  font-size: var(--qqm-type-sub);
+  font-weight: 600;
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-collection-actions,
+.shell .qqm-radio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.shell .qqm-btn-primary,
+.shell .qqm-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: var(--qqm-type-sub);
+  font-weight: 700;
+}
+
+.shell .qqm-btn-primary {
+  background: var(--qqm-key-strong);
+  color: #fff;
+  box-shadow: 0 6px 18px rgb(49 194 124 / 0.34);
+}
+
+.shell .qqm-btn-primary.large {
+  min-height: 54px;
+  padding: 0 28px;
+  font-size: var(--qqm-type-name);
+}
+
+.shell .qqm-btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.shell .qqm-btn-secondary {
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+.shell .qqm-btn-secondary:hover {
+  background: var(--qqm-fill-hover);
+}
+
+.shell .qqm-btn-primary:active,
+.shell .qqm-btn-secondary:active {
+  scale: 0.96;
+}
+
+.shell .qqm-radio-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 24px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgb(30 204 148 / 0.22) 0%, rgb(14 165 233 / 0.16) 100%);
+  border: 1px solid var(--qqm-rule);
+}
+
+.shell .qqm-radio-badge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.12);
+  color: var(--qqm-label);
+}
+
+.shell .qqm-radio-info h2 {
+  margin: 0 0 6px;
+  font-size: var(--qqm-type-section);
+  font-weight: 750;
+}
+
+.shell .qqm-radio-info p {
+  margin: 0 0 16px;
+  font-size: var(--qqm-type-sub);
+  color: var(--qqm-dim);
+  line-height: 1.4;
+}
+
+.shell .qqm-empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 24px;
+  border-radius: 24px;
+  background: var(--qqm-surface);
+}
+
+.shell .qqm-empty-emblem {
+  margin-bottom: 14px;
+}
+
+.shell .qqm-empty-card h2 {
+  margin: 0 0 8px;
+  font-size: var(--qqm-type-section);
+  font-weight: 750;
+}
+
+.shell .qqm-empty-card p {
+  margin: 0 0 22px;
+  max-width: 460px;
+  font-size: var(--qqm-type-sub);
+  color: var(--qqm-dim);
+  line-height: 1.45;
+}
+
+.shell .qqm-search-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.shell .qqm-tags-label {
+  font-size: var(--qqm-type-label);
+  font-weight: 650;
+  color: var(--qqm-dim);
+}
+
+/* --------------------------------------------------------------------------
+ * 6. CarPlay Song List
+ * -------------------------------------------------------------------------- */
+.shell .qqm-song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shell .qqm-song-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 16px;
+  transition: background-color 150ms var(--motion-ease);
+}
+
+.shell .qqm-song-row:hover {
+  background: var(--qqm-surface-hover);
+}
+
+.shell .qqm-song-row.is-playing {
+  background: var(--qqm-key-soft);
+}
+
+.shell .qqm-song-row.is-unplayable {
+  opacity: 0.54;
+}
+
+.shell .qqm-song-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 4px 6px;
+  border-radius: 12px;
+  text-align: left;
+  color: var(--qqm-label);
+}
+
+.shell .qqm-song-idx {
+  flex: none;
+  width: 30px;
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-idx-num {
+  font-size: var(--qqm-type-sub);
+  font-weight: 650;
+  color: var(--qqm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-idx-num.top {
+  color: var(--qqm-key);
+  font-weight: 800;
+}
+
+.shell .qqm-sound-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 16px;
+}
+
+.shell .qqm-sound-bars i {
+  display: block;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--qqm-key);
+}
+
+.shell .qqm-sound-bars i.b1 {
+  height: 7px;
+}
+.shell .qqm-sound-bars i.b2 {
+  height: 14px;
+}
+.shell .qqm-sound-bars i.b3 {
+  height: 9px;
+}
+
+.shell .qqm-sound-bars i.anim {
+  animation: qqm-bar-wave 0.75s ease-in-out infinite alternate;
+}
+
+.shell .qqm-sound-bars i.b2.anim {
+  animation-delay: 0.2s;
+}
+.shell .qqm-sound-bars i.b3.anim {
+  animation-delay: 0.4s;
+}
+
+@keyframes qqm-bar-wave {
+  from {
+    height: 4px;
+  }
+  to {
+    height: 16px;
+  }
+}
+
+.shell .qqm-song-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--qqm-corner-small);
+  overflow: hidden;
+  background: var(--qqm-fill);
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-song-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .qqm-song-thumb-fallback {
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-song-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .qqm-song-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .qqm-song-title {
+  font-size: var(--qqm-type-name);
+  font-weight: 650;
+  color: var(--qqm-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-song-row.is-playing .qqm-song-title {
+  color: var(--qqm-key);
+}
+
+.shell .qqm-badge-vip,
+.shell .qqm-badge-muted {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.shell .qqm-badge-vip {
+  color: var(--qqm-key);
+  background: var(--qqm-key-soft);
+  border: 1px solid var(--qqm-key-border);
+}
+
+.shell .qqm-badge-muted {
+  color: var(--qqm-dim);
+  border: 1px solid var(--qqm-rule);
+}
+
+.shell .qqm-song-artist {
+  font-size: var(--qqm-type-sub);
+  color: var(--qqm-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-song-duration {
+  flex: none;
+  margin-left: 8px;
+  font-size: var(--qqm-type-label);
+  font-weight: 600;
+  color: var(--qqm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-song-action {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-song-action:hover {
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+.shell .qqm-song-like.liked {
+  color: var(--qqm-key);
+}
+
+.shell .qqm-song-play {
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+.shell .qqm-song-row:hover .qqm-song-play,
+.shell .qqm-song-row.is-playing .qqm-song-play {
+  background: var(--qqm-key-strong);
+  color: #fff;
+}
+
+.shell .qqm-list-loading,
+.shell .qqm-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 20px;
+  font-size: var(--qqm-type-sub);
+  color: var(--qqm-dim);
+}
+
+/* --------------------------------------------------------------------------
+ * 7. Floating Glass Mini Player Capsule
+ * -------------------------------------------------------------------------- */
+.shell .qqm-mini {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(760px, calc(100% - 48px));
+  height: 84px;
+  padding: 8px 14px 8px 12px;
+  overflow: hidden;
+  border-radius: 42px;
+  translate: -50% 0;
+  --mini-ink: var(--qqm-label);
+  --mini-dim: var(--qqm-dim);
+  color: var(--mini-ink);
+  transition:
+    translate 420ms var(--motion-ease),
+    opacity 300ms var(--motion-ease),
+    color 500ms ease;
+}
+
+.shell .qqm-mini.on-light {
+  --mini-ink: rgb(0 0 0 / 0.88);
+  --mini-dim: rgb(0 0 0 / 0.58);
+}
+
+.shell .qqm-mini.away {
+  opacity: 0;
+  translate: -50% 140%;
+  pointer-events: none;
+}
+
+.shell .qqm-mini-open {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border-radius: 34px;
+  text-align: left;
+  color: inherit;
+}
+
+.shell .qqm-mini-vinyl {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  padding: 7px;
+  background: radial-gradient(circle, #2a2b32 0%, #111216 70%, #050507 100%);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.35);
+  display: grid;
+  place-items: center;
+  animation: qqm-spin 16s linear infinite;
+  animation-play-state: paused;
+}
+
+.shell .qqm-mini-vinyl.spinning {
+  animation-play-state: running;
+}
+
+.shell .qqm-mini-vinyl img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.shell .qqm-mini-art-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--qqm-fill);
+  color: #fff;
+}
+
+.shell .qqm-mini-spindle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  box-shadow: 0 0 3px rgb(0 0 0 / 0.7);
+}
+
+.shell .qqm-mini-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .qqm-mini-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shell .qqm-mini-name {
+  overflow: hidden;
+  font-size: var(--qqm-type-name);
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-mini-by {
+  overflow: hidden;
+  font-size: var(--qqm-type-sub);
+  color: var(--mini-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: color 500ms ease;
+}
+
+.shell .qqm-mini-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: var(--mini-ink);
+}
+
+.shell .qqm-mini-button:hover {
+  background: color-mix(in srgb, var(--mini-ink) 10%, transparent);
+}
+
+.shell .qqm-mini-button:active {
+  background: color-mix(in srgb, var(--mini-ink) 20%, transparent);
+  scale: 0.92;
+}
+
+.shell .qqm-mini-button.active {
+  color: var(--qqm-key);
+  background: var(--qqm-key-soft);
+}
+
+.shell .qqm-mini-progress {
+  position: absolute;
+  inset: auto 42px 0;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--qqm-key-strong);
+  clip-path: inset(0 calc((1 - var(--share, 0)) * 100%) 0 0);
+}
+
+/* --------------------------------------------------------------------------
+ * 8. Slide-In Queue Drawer
+ * -------------------------------------------------------------------------- */
+.shell .qqm-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(0 0 0 / 0.44);
+  backdrop-filter: blur(8px);
+  animation: qqm-fade-in 200ms var(--motion-ease) both;
+}
+
+@keyframes qqm-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.shell .qqm-drawer {
+  width: min(440px, 88%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--qqm-card-bg) 92%, transparent);
+  backdrop-filter: blur(32px) saturate(160%);
+  border-left: 1px solid var(--qqm-rule);
+  box-shadow: -12px 0 36px rgb(0 0 0 / 0.45);
+  animation: qqm-slide-drawer 260ms var(--motion-ease) both;
+}
+
+@keyframes qqm-slide-drawer {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+.shell .qqm-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--qqm-rule);
+  flex: none;
+}
+
+.shell .qqm-drawer-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.shell .qqm-drawer-title {
+  margin: 0;
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .qqm-drawer-count {
+  font-size: var(--qqm-type-label);
+  color: var(--qqm-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.shell .qqm-drawer-mode-btn,
+.shell .qqm-drawer-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .qqm-drawer-clear-btn:hover {
+  color: var(--apple-red);
+}
+
+.shell .qqm-drawer-close-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+.shell .qqm-drawer-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 24px;
+  scrollbar-width: none;
+}
+
+.shell .qqm-drawer-list::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .qqm-drawer-empty {
+  padding: 56px 20px;
+  text-align: center;
+  font-size: var(--qqm-type-sub);
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 12px;
+  padding: 2px 4px;
+}
+
+.shell .qqm-queue-row:hover {
+  background: var(--qqm-surface-hover);
+}
+
+.shell .qqm-queue-row.active {
+  background: var(--qqm-key-soft);
+}
+
+.shell .qqm-queue-row.unplayable {
+  opacity: 0.54;
+}
+
+.shell .qqm-queue-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--qqm-label);
+}
+
+.shell .qqm-queue-indicator {
+  flex: none;
+  width: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-queue-num {
+  font-size: var(--qqm-type-label);
+  color: var(--qqm-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-queue-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shell .qqm-queue-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shell .qqm-queue-title {
+  font-size: var(--qqm-type-sub);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-queue-row.active .qqm-queue-title {
+  color: var(--qqm-key);
+}
+
+.shell .qqm-queue-artist {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--qqm-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-queue-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--qqm-dim);
+}
+
+.shell .qqm-queue-remove:hover {
+  background: var(--qqm-fill);
+  color: var(--qqm-label);
+}
+
+/* --------------------------------------------------------------------------
+ * 9. Fullscreen CarPlay Now Playing Overlay (Vinyl / Synced Lyrics / Queue)
+ * -------------------------------------------------------------------------- */
+.shell .qqm-now {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  color: var(--text);
+  translate: 0 100%;
+  visibility: hidden;
+  transition:
+    translate 520ms var(--motion-ease),
+    visibility 0s 520ms;
+}
+
+.shell .qqm-now.open {
+  translate: 0 0;
+  visibility: visible;
+  transition:
+    translate 520ms var(--motion-ease),
+    visibility 0s;
+}
+
+.shell .qqm-now-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 34%, #0b4a33 0%, #052218 62%, #02100b 100%);
+}
+
+.shell.appearance-light .qqm-now-backdrop {
+  background: radial-gradient(circle at 50% 34%, #e5faf0 0%, #d4f0e3 62%, #c6e6d8 100%);
+}
+
+.shell .qqm-now-backdrop img {
+  position: absolute;
+  inset: -15%;
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  filter: blur(80px) saturate(150%);
+}
+
+.shell .qqm-now-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.shell.appearance-light .qqm-now-backdrop::after {
+  background: rgb(255 255 255 / 0.46);
+}
+
+.shell .qqm-now-panel {
+  container-type: size;
+  container-name: qqmusic-now;
+}
+
+.shell .qqm-now-layout {
+  --qqm-now-inset: max(0px, calc((var(--panel-radius) - 32px) * var(--corner-inset)));
+  position: absolute;
+  inset: var(--qqm-now-inset) var(--qqm-now-inset) var(--qqm-now-inset) 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    'header header'
+    'info art'
+    'progress progress'
+    'extras extras';
+  column-gap: 44px;
+}
+
+.shell .qqm-now-header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.shell .qqm-now-corners {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shell .qqm-corner {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.shell .qqm-corner:active {
+  scale: 0.92;
+}
+
+.shell .qqm-corner.qqm-on {
+  background: color-mix(in srgb, var(--text) 28%, transparent);
+}
+
+.shell .qqm-corner-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #31c27c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-now-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--text-dim);
+}
+
+.shell .qqm-now-info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
+}
+
+.shell .qqm-now-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  animation: qqm-now-from-right 420ms var(--motion-ease) both;
+}
+
+.shell .qqm-now-text.from-left {
+  animation-name: qqm-now-from-left;
+}
+
+@keyframes qqm-now-from-right {
+  from {
+    opacity: 0;
+    translate: 40px 0;
+  }
+}
+
+@keyframes qqm-now-from-left {
+  from {
+    opacity: 0;
+    translate: -40px 0;
+  }
+}
+
+.shell .qqm-now-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+}
+
+.shell .qqm-now-title {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: calc(40px * var(--text-scale, 1));
+  font-weight: 750;
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+}
+
+.shell .qqm-now-vip {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: 6px;
+  background: rgb(30 204 148 / 0.24);
+  border: 1px solid rgb(49 194 124 / 0.52);
+  color: #31c27c;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .qqm-now-artist {
+  max-width: 100%;
+  margin: 8px 0 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(28px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shell .qqm-now-album {
+  max-width: 100%;
+  margin: 4px 0 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(20px * var(--text-scale, 1));
+  font-weight: 550;
+  color: var(--text-dim);
+}
+
+.shell .qqm-now-notice {
+  margin-top: 14px;
+  max-width: 100%;
+}
+
+.shell .qqm-now-controls {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  margin-top: 24px;
+}
+
+.shell .qqm-now-button {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.shell .qqm-now-button.primary {
+  width: 108px;
+  height: 108px;
+}
+
+.shell .qqm-now-button.small {
+  width: 58px;
+  height: 58px;
+  color: var(--text-dim);
+}
+
+.shell .qqm-now-button:hover {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.shell .qqm-now-button:active {
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  scale: 0.92;
+}
+
+.shell .qqm-now-button.small.active,
+.shell .qqm-like-btn.liked {
+  color: var(--qqm-key);
+  background: color-mix(in srgb, var(--qqm-key) 20%, transparent);
+}
+
+/* Vinyl Turntable Stage */
+.shell .qqm-vinyl-stage {
+  grid-area: art;
+  align-self: center;
+  justify-self: end;
+  height: min(100%, 36cqw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-vinyl-assembly {
+  position: relative;
+  width: 92%;
+  height: 92%;
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-vinyl-platter {
+  width: 92%;
+  height: 92%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #25262c 0%, #15161b 60%, #0d0e12 100%);
+  border: 7px solid #08090b;
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.72),
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    inset 0 0 16px rgb(0 0 0 / 0.9);
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-vinyl-disc {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  animation: qqm-spin 20s linear infinite;
+}
+
+.shell .qqm-vinyl-assembly.paused .qqm-vinyl-disc {
+  animation-play-state: paused;
+}
+
+.shell .qqm-vinyl-grooves {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.04) 0px,
+    rgb(255 255 255 / 0.04) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.shell .qqm-vinyl-label {
+  position: relative;
+  width: 52%;
+  height: 52%;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid #1a1a20;
+  background: #2a2a32;
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-vinyl-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.shell .qqm-vinyl-fallback {
+  color: rgb(255 255 255 / 0.65);
+}
+
+.shell .qqm-vinyl-spindle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #f3f4f6 30%, #9ca3af 70%, #374151 100%);
+  box-shadow: 0 0 4px rgb(0 0 0 / 0.8);
+}
+
+.shell .qqm-tonearm {
+  position: absolute;
+  top: -6%;
+  right: -4%;
+  width: 38%;
+  height: 68%;
+  pointer-events: none;
+  z-index: 2;
+  transform-origin: 78% 13%;
+  transition: transform 550ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shell .qqm-tonearm.arm-playing {
+  transform: rotate(0deg);
+}
+
+.shell .qqm-tonearm.arm-paused {
+  transform: rotate(-28deg);
+}
+
+.shell .qqm-tonearm-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Real-Time Synced Lyrics Stage */
+.shell .qqm-lyrics,
+.shell .qqm-lyrics-box {
+  grid-area: art;
+  align-self: stretch;
+  width: min(540px, 44cqw);
+  min-height: 0;
+}
+
+.shell .qqm-lyrics {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 24px 6px 40cqh 0;
+  mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 82%, transparent);
+}
+
+.shell .qqm-lyrics::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .qqm-lyrics .lyric {
+  display: block;
+  margin: 0;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-align: start;
+  font-size: calc(30px * var(--text-scale, 1));
+  font-weight: 750;
+  line-height: 1.28;
+  color: var(--text);
+  opacity: 0.32;
+  transition:
+    opacity 0.4s ease,
+    color 0.3s ease;
+}
+
+.shell .qqm-lyrics .lyric.now,
+.shell .qqm-lyrics p.lyric {
+  opacity: 1;
+}
+
+.shell .qqm-lyrics .lyric.now {
+  color: var(--qqm-key);
+}
+
+.shell .qqm-lyrics button.lyric:active {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.shell .qqm-lyrics .lyric.stanza {
+  margin-top: 22px;
+}
+
+.shell .qqm-lyrics-box {
+  display: grid;
+  place-items: center;
+}
+
+.shell .qqm-lyrics-none {
+  margin: 0;
+  font-size: calc(26px * var(--text-scale, 1));
+  font-weight: 650;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+/* Inline Queue Panel in Now Playing */
+.shell .qqm-now-queue {
+  grid-area: art;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 44cqw);
+  min-height: 0;
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.shell .qqm-now-queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex: none;
+}
+
+.shell .qqm-now-queue-head h3 {
+  margin: 0;
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 750;
+}
+
+.shell .qqm-now-queue-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .qqm-now-queue-clear:hover {
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text);
+}
+
+.shell .qqm-now-queue-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.shell .qqm-now-queue-list::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .qqm-now-queue-empty {
+  margin: auto;
+  font-size: var(--qqm-type-sub);
+  color: var(--text-dim);
+}
+
+.shell .qqm-now-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.shell .qqm-now-queue-row.active {
+  background: color-mix(in srgb, var(--qqm-key) 22%, transparent);
+  border-radius: 10px;
+  border-bottom-color: transparent;
+}
+
+.shell .qqm-now-queue-row.unplayable {
+  opacity: 0.52;
+}
+
+.shell .qqm-now-queue-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--text);
+}
+
+.shell .qqm-now-queue-idx {
+  flex: none;
+  width: 24px;
+  display: grid;
+  place-items: center;
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .qqm-now-queue-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell .qqm-now-queue-meta strong {
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-now-queue-meta span {
+  font-size: calc(14px * var(--text-scale, 1));
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .qqm-now-queue-remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--text-dim);
+}
+
+.shell .qqm-now-queue-remove:hover {
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  color: var(--text);
+}
+
+/* Range Sliders */
+.shell .qqm-now-progress {
+  grid-area: progress;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.shell .qqm-now-time {
+  min-width: 3.4em;
+  font-size: calc(20px * var(--text-scale, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.shell .qqm-now-time:last-child {
+  text-align: right;
+}
+
+.shell .qqm-range {
+  --slider-track-size: 8px;
+  --slider-thumb-size: 18px;
+  --slider-track-color: color-mix(in srgb, var(--text) 24%, transparent);
+  --slider-fill-color: var(--text);
+  --slider-thumb-color: var(--text);
+  appearance: none;
+  inline-size: 100%;
+  block-size: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.shell .qqm-seek-range {
+  --slider-fill-color: #1ecc94;
+  --slider-thumb-color: #ffffff;
+}
+
+.shell .qqm-volume-range {
+  --slider-track-size: 6px;
+  --slider-thumb-size: 18px;
+  flex: 1;
+}
+
+.shell .qqm-range::-webkit-slider-runnable-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--slider-fill-color) var(--slider-progress, 0%),
+    var(--slider-track-color) var(--slider-progress, 0%)
+  );
+}
+
+.shell .qqm-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  margin-block-start: calc((var(--slider-track-size) - var(--slider-thumb-size)) / 2);
+  border: 0;
+  border-radius: 50%;
+  background: var(--slider-thumb-color);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.45);
+}
+
+.shell .qqm-range::-moz-range-track {
+  block-size: var(--slider-track-size);
+  border: 0;
+  border-radius: 999px;
+  background: var(--slider-track-color);
+}
+
+.shell .qqm-range::-moz-range-progress {
+  block-size: var(--slider-track-size);
+  border-radius: 999px;
+  background: var(--slider-fill-color);
+}
+
+.shell .qqm-range::-moz-range-thumb {
+  inline-size: var(--slider-thumb-size);
+  block-size: var(--slider-thumb-size);
+  border: 0;
+  border-radius: 50%;
+  background: var(--slider-thumb-color);
+}
+
+/* Extras Row */
+.shell .qqm-now-extras {
+  grid-area: extras;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.shell .qqm-now-mode-pill {
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  color: var(--text-dim);
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 600;
+}
+
+.shell .qqm-volume {
+  display: flex;
+  flex: 0 1 360px;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* --------------------------------------------------------------------------
+ * 10. Container Query Responsive Adaptations
+ * -------------------------------------------------------------------------- */
+@container qqmusic (max-width: 760px) {
+  .shell .qqm-hero-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shell .qqm-collection-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .shell .qqm-collection-cover {
+    width: 156px;
+  }
+}
+
+@container qqmusic (max-height: 520px) {
+  .shell .qqmusic-app,
+  .shell .qqm-bar,
+  .shell .qqm-scroll {
+    --qqm-bar: 58px;
+    --qqm-bar-inset: max(0px, calc((var(--panel-radius) - 29px) * var(--corner-inset)));
+    --qqm-gutter: 18px;
+    --qqm-tile: 148px;
+  }
+
+  .shell .qqm-round,
+  .shell .qqmusic-app button.qqm-me {
+    width: 48px;
+    height: 48px;
+  }
+
+  .shell .qqm-tab {
+    min-width: 82px;
+    padding-inline: 14px;
+    font-size: 13px;
+  }
+
+  .shell .qqm-hero-card {
+    min-height: 98px;
+    padding: 12px 14px;
+  }
+
+  .shell .qqm-scroll.has-mini {
+    padding-bottom: 104px;
+  }
+
+  .shell .qqm-mini {
+    height: 70px;
+    border-radius: 35px;
+    width: min(640px, calc(100% - 36px));
+  }
+
+  .shell .qqm-mini-vinyl {
+    width: 52px;
+    height: 52px;
+    padding: 5px;
+  }
+
+  .shell .qqm-mini-button {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@container qqmusic-now (aspect-ratio < 1) {
+  .shell .qqm-now-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'header'
+      'art'
+      'info'
+      'progress'
+      'extras';
+  }
+
+  .shell .qqm-vinyl-stage {
+    justify-self: center;
+    height: min(32cqh, 60cqw);
+  }
+
+  .shell .qqm-now-queue,
+  .shell .qqm-lyrics,
+  .shell .qqm-lyrics-box {
+    width: 100%;
+    max-height: 36cqh;
+  }
+
+  .shell .qqm-lyrics {
+    padding-bottom: 10cqh;
+  }
+}
+
+@container qqmusic-now (max-height: 520px) {
+  .shell .qqm-corner {
+    width: 48px;
+    height: 48px;
+  }
+
+  .shell .qqm-now-header {
+    margin-bottom: 8px;
+  }
+
+  .shell .qqm-now-controls {
+    gap: 28px;
+    margin-top: 12px;
+  }
+
+  .shell .qqm-now-button {
+    width: 68px;
+    height: 68px;
+  }
+
+  .shell .qqm-now-button.primary {
+    width: 84px;
+    height: 84px;
+  }
+
+  .shell .qqm-now-progress {
+    margin-top: 10px;
+  }
+
+  .shell .qqm-now-extras {
+    margin-top: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell .qqmusic-app *,
+  .shell .qqm-now,
+  .shell .qqm-now * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

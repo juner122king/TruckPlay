@@ -4,6 +4,7 @@ import { type NowPlayingSource, shownSource } from './nowPlaying'
 const none: Record<NowPlayingSource, boolean> = {
   video: false,
   netease: false,
+  qqmusic: false,
   bilibili: false,
   ximalaya: false,
   douyin: false,
@@ -32,6 +33,8 @@ describe("the Dashboard's Now Playing", () => {
 
   it('shows the first that has something when nothing has played, and Not Playing with nothing at all', () => {
     expect(shownSource(none, only('netease', 'bilibili'), null)).toBe('netease')
+    expect(shownSource(none, only('qqmusic', 'bilibili'), null)).toBe('qqmusic')
+    expect(shownSource(none, only('video', 'qqmusic'), 'qqmusic')).toBe('qqmusic')
     expect(shownSource(none, none, null)).toBeNull()
     expect(shownSource(none, none, 'netease')).toBeNull()
   })

@@ -7,6 +7,7 @@ describe('the apps this release has', () => {
       'maps',
       'music',
       'netease',
+      'qqmusic',
       'bilibili',
       'ximalaya',
       'radio',
@@ -25,6 +26,7 @@ describe('the apps this release has', () => {
 
   it('opens none of the later ones from a saved screen or recent', () => {
     expect(isReleasedApp('podcasts')).toBe(false)
+    expect(isReleasedApp('qqmusic')).toBe(true)
     expect(isReleasedApp('ximalaya')).toBe(true)
     expect(isReleasedApp('douyin')).toBe(true)
     expect(isReleasedApp('hongguo')).toBe(false)

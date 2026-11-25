@@ -8,6 +8,7 @@ import { pauseXimalayaWithGame, ximalayaPlayer } from './apps/ximalaya/pauseWith
 import { douyinPlayer, pauseDouyinWithGame } from './apps/douyin/pauseWithGame'
 import { hongguoPlayer, pauseHongguoWithGame } from './apps/hongguo/pauseWithGame'
 import { neteasePlayer, pauseNeteaseWithGame } from './apps/netease/pauseWithGame'
+import { pauseQqmusicWithGame, qqmusicPlayer } from './apps/qqmusic/pauseWithGame'
 import { pauseYouTubeWithGame, youtubePlayer } from './apps/youtube/pauseWithGame'
 import { pausePlayerWithGame, playerAppPlayer } from './apps/player/pauseWithGame'
 import { pauseSafariWithGame, safariPlayer } from './apps/safari/pauseWithGame'
@@ -39,6 +40,7 @@ const FOLLOW_POWER = isInHost() || new URLSearchParams(location.search).has('pow
 const PLAYERS = [
   youtubePlayer,
   neteasePlayer,
+  qqmusicPlayer,
   bilibiliPlayer,
   ximalayaPlayer,
   douyinPlayer,
@@ -57,6 +59,7 @@ export function CabinApp() {
   // on after.
   useEffect(() => pauseYouTubeWithGame(), [])
   useEffect(() => pauseNeteaseWithGame(), [])
+  useEffect(() => pauseQqmusicWithGame(), [])
   useEffect(() => pauseBilibiliWithGame(), [])
   useEffect(() => pauseXimalayaWithGame(), [])
   useEffect(() => pauseDouyinWithGame(), [])

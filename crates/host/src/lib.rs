@@ -37,6 +37,7 @@ mod planner;
 mod play_log;
 mod player;
 mod pointer;
+mod qqmusic;
 mod resources;
 pub mod route;
 mod route_change;
@@ -151,6 +152,8 @@ pub struct Status {
     pub hongguo_signing_in: bool,
     pub netease_signed_in: Option<bool>,
     pub netease_signing_in: bool,
+    pub qqmusic_signed_in: Option<bool>,
+    pub qqmusic_signing_in: bool,
     /// The map of the profile played: ready, being built, waiting for the game to close...
     pub map: maps::MapStatus,
     /// The map the cab shows: its folder in WestPlay's maps, and when it was built (the companion's
@@ -173,6 +176,7 @@ pub struct AccountRequests {
     pub douyin: AccountRequest,
     pub hongguo: AccountRequest,
     pub netease: AccountRequest,
+    pub qqmusic: AccountRequest,
 }
 
 /// One service's request, the latest not carried out yet.
@@ -485,6 +489,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut douyin_log = play_log::PlayLog::new("douyin");
     let mut hongguo_log = play_log::PlayLog::new("hongguo");
     let mut netease_log = play_log::PlayLog::new("netease");
+    let mut qqmusic_log = play_log::PlayLog::new("qqmusic");
     let (mut youtube_window_open, mut youtube_confirming) = (false, false);
     // Apple Music's web player.
     let mut apple_music: Option<apple_music::AppleMusic> = None;
@@ -517,6 +522,11 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut netease_state: Option<netease::State> = None;
     let (mut netease_window_open, netease_confirming) = (false, false);
     let mut netease_playback: Option<String> = None;
+    // QQ Music's web player.
+    let mut qqmusic: Option<qqmusic::Qqmusic> = None;
+    let mut qqmusic_state: Option<qqmusic::State> = None;
+    let (mut qqmusic_window_open, qqmusic_confirming) = (false, false);
+    let mut qqmusic_playback: Option<String> = None;
     // Player's own player (music_folder.rs), while the page uses it, and what it last said played.
     let mut music_player: Option<music_folder::Player> = None;
     let mut music_player_playback: Option<String> = None;
@@ -554,6 +564,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 (resources::App::Douyin, douyin.is_some(), douyin_window_open || douyin_confirming),
                 (resources::App::Hongguo, hongguo.is_some(), hongguo_window_open || hongguo_confirming),
                 (resources::App::Netease, netease.is_some(), netease_window_open || netease_confirming),
+                (resources::App::Qqmusic, qqmusic.is_some(), qqmusic_window_open || qqmusic_confirming),
                 (resources::App::Player, music_player.is_some(), false),
             ]);
         };
@@ -681,6 +692,15 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 AccountAction::SignIn => netease::Command::SignIn,
                 AccountAction::SignOut => netease::Command::SignOut,
                 AccountAction::Check => netease::Command::Start,
+            });
+        }
+        if let Some(action) = config.accounts.qqmusic.take()
+            && let Some(player) = start_qqmusic(&mut qqmusic, &stage, &config)
+        {
+            player.command(&match action {
+                AccountAction::SignIn => qqmusic::Command::SignIn,
+                AccountAction::SignOut => qqmusic::Command::SignOut,
+                AccountAction::Check => qqmusic::Command::Start,
             });
         }
 
@@ -824,6 +844,9 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 }
                 if let Some(netease) = &netease {
                     profiles.push((performance::Profile::NetEase, netease.view().environment()));
+                }
+                if let Some(qqmusic) = &qqmusic {
+                    profiles.push((performance::Profile::QQMusic, qqmusic.view().environment()));
                 }
                 if let Some(apple_music) = &apple_music {
                     profiles.push((performance::Profile::AppleMusic, apple_music.view().environment()));
@@ -1132,6 +1155,14 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                             let _ = webview.post_json(playback);
                         }
                     }
+                    if qqmusic.is_some() {
+                        let signing_in = qqmusic_window_open || qqmusic_confirming;
+                        let message = qqmusic::state_message(qqmusic_state.as_ref(), signing_in);
+                        let _ = webview.post_json(&message);
+                        if let Some(playback) = &qqmusic_playback {
+                            let _ = webview.post_json(playback);
+                        }
+                    }
                     if let Some(listing) = &music_listing {
                         let _ = webview.post_json(listing);
                     }
@@ -1274,6 +1305,13 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     if netease.is_none() && matches!(command, netease::Command::Pause) {
                         // Nothing to pause.
                     } else if let Some(player) = start_netease(&mut netease, &stage, &config) {
+                        player.command(&command);
+                    }
+                }
+                Some(PageMessage::Qqmusic { command }) => {
+                    if qqmusic.is_none() && matches!(command, qqmusic::Command::Pause) {
+                        // Nothing to pause.
+                    } else if let Some(player) = start_qqmusic(&mut qqmusic, &stage, &config) {
                         player.command(&command);
                     }
                 }
@@ -1851,6 +1889,78 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             }
         }
 
+        // What QQ Music says, and its WebView failing or game exit closing it.
+        if let Some(player) = &qqmusic {
+            if player.failed() || players_closing {
+                if players_closing {
+                    log!("[qqmusic] closed with the game");
+                } else {
+                    log!("[qqmusic] its browser failed: closed, the page opens it again");
+                }
+                if let Some(line) = qqmusic_log.heard(None) {
+                    log!("{line}");
+                }
+                if let Some(failed) = qqmusic.take() {
+                    failed.close(&stage);
+                }
+                qqmusic_state = None;
+                qqmusic_playback = None;
+                qqmusic_window_open = false;
+                status.qqmusic_signed_in = None;
+                status.qqmusic_signing_in = false;
+                (config.on_status)(&status);
+                let _ = webview.post_json(&qqmusic::state_message(None, false));
+                let _ = webview.post_json(&qqmusic::playback_message(None));
+            } else {
+                let mut state_changed = false;
+                for report in player.take_reports() {
+                    match report {
+                        qqmusic::Report::Spectrum(bars) => {
+                            let _ = webview.post_json(&speakers::spectrum_message(&bars));
+                        }
+                        qqmusic::Report::State(state) => {
+                            if status.qqmusic_signed_in != Some(state.signed_in) {
+                                status.qqmusic_signed_in = Some(state.signed_in);
+                                (config.on_status)(&status);
+                            }
+                            qqmusic_state = Some(state);
+                            state_changed = true;
+                        }
+                        qqmusic::Report::SignInWindow(open) => {
+                            qqmusic_window_open = open;
+                            status.qqmusic_signing_in = qqmusic_window_open || qqmusic_confirming;
+                            (config.on_status)(&status);
+                            state_changed = true;
+                        }
+                        qqmusic::Report::Answer(answer) => {
+                            let _ = webview.post_json(&qqmusic::answer_message(&answer));
+                        }
+                        qqmusic::Report::Playback(playback) => {
+                            let heard = playback.as_ref().map(|pb| play_log::Heard {
+                                doing: if pb.status == "playing" {
+                                    play_log::Doing::Playing
+                                } else {
+                                    play_log::Doing::Paused
+                                },
+                                track: Some(pb.title.as_str()),
+                                position: pb.position,
+                            });
+                            if let Some(line) = qqmusic_log.heard(heard) {
+                                log!("{line}");
+                            }
+                            let message = qqmusic::playback_message(playback.as_ref());
+                            let _ = webview.post_json(&message);
+                            qqmusic_playback = playback.as_ref().map(|_| message);
+                        }
+                    }
+                }
+                if state_changed {
+                    let signing_in = qqmusic_window_open || qqmusic_confirming;
+                    let _ = webview.post_json(&qqmusic::state_message(qqmusic_state.as_ref(), signing_in));
+                }
+            }
+        }
+
         // What Apple Music's page says, and its sign-in window, for the page; its WebView failing closes it.
         if let Some(player) = &apple_music {
             if player.failed() || players_closing {
@@ -2089,6 +2199,14 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         netease_playback = None;
                         let _ = netease_log.heard(None);
                     }
+                    resources::App::Qqmusic => {
+                        if let Some(closing) = qqmusic.take() {
+                            closing.close(&stage);
+                        }
+                        qqmusic_state = None;
+                        qqmusic_playback = None;
+                        let _ = qqmusic_log.heard(None);
+                    }
                     resources::App::Player => {
                         if let Some(closing) = music_player.take() {
                             closing.close(&stage);
@@ -2160,6 +2278,9 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
             }
             if let Some(player) = &netease {
+                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+            }
+            if let Some(player) = &qqmusic {
                 let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
             }
             if let Some(player) = &music_player {
@@ -2877,6 +2998,24 @@ fn start_netease<'a>(
     netease.as_ref()
 }
 
+fn start_qqmusic<'a>(
+    qqmusic: &'a mut Option<qqmusic::Qqmusic>,
+    stage: &Stage,
+    config: &Config,
+) -> Option<&'a qqmusic::Qqmusic> {
+    if qqmusic.is_none() {
+        let user_data = config.data_dir.join("webview2");
+        match qqmusic::Qqmusic::start(stage, config.width, config.height, &user_data) {
+            Ok(started) => {
+                log!("[qqmusic] opened");
+                *qqmusic = Some(started)
+            }
+            Err(e) => startup::mark(&format!("host: QQ Music couldn't start: {e}")),
+        }
+    }
+    qqmusic.as_ref()
+}
+
 fn build_pipeline(
     config: &Config,
     stage: &Stage,
@@ -3093,6 +3232,10 @@ enum PageMessage {
     /// A command for NetEase Cloud Music (`netease`): its sign-in, a question, its controls.
     Netease {
         command: netease::Command,
+    },
+    /// A command for QQ Music (`qqmusic`): its sign-in, a question, its controls.
+    Qqmusic {
+        command: qqmusic::Command,
     },
     /// A command for Player's own player (`player`): what to play from the music folder, its controls.
     Player {
@@ -3618,10 +3761,13 @@ mod tests {
         requests.youtube.request(AccountAction::SignOut);
         requests.youtube.request(AccountAction::SignIn);
         requests.netease.request(AccountAction::Check);
+        requests.qqmusic.request(AccountAction::SignIn);
         assert_eq!(requests.youtube.take(), Some(AccountAction::SignIn));
         assert_eq!(requests.youtube.take(), None);
         assert_eq!(requests.netease.take(), Some(AccountAction::Check));
         assert_eq!(requests.netease.take(), None);
+        assert_eq!(requests.qqmusic.take(), Some(AccountAction::SignIn));
+        assert_eq!(requests.qqmusic.take(), None);
         // The companion hears whether YouTube is signed in, and nothing more of the account.
         let status = super::Status { youtube_signed_in: Some(true), youtube_signing_in: false, ..Default::default() };
         let json = serde_json::to_value(&status).unwrap();
@@ -3643,6 +3789,8 @@ mod tests {
             bilibili_signing_in: false,
             netease_signed_in: Some(false),
             netease_signing_in: true,
+            qqmusic_signed_in: Some(true),
+            qqmusic_signing_in: false,
             ximalaya_signed_in: Some(true),
             ximalaya_signing_in: false,
             douyin_signed_in: Some(false),
@@ -3676,6 +3824,7 @@ mod tests {
         for (service, signed_in, signing_in) in [
             ("bilibili", true, false),
             ("netease", false, true),
+            ("qqmusic", true, false),
             ("ximalaya", true, false),
             ("douyin", false, true),
             ("hongguo", true, false),
