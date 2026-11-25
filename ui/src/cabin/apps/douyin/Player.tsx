@@ -2,25 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { isInHost } from '../../../shared/host'
 import { useCabin } from '../../state/store'
 import { useLanguage } from '../../state/text'
-import {
-  BackGlyph,
-  CheckGlyph,
-  CloseGlyph,
-  PauseGlyph,
-  PlayGlyph,
-  QueueGlyph,
-  VolumeGlyph,
-} from '../youtube/glyphs'
+import { BackGlyph, CheckGlyph, CloseGlyph, PauseGlyph, PlayGlyph, QueueGlyph, VolumeGlyph } from '../youtube/glyphs'
 import { followArea } from '../youtube/youtube'
 import {
   closePlayer,
-  DOUYIN_CHANNELS,
   formatClock,
   formatCount,
   leavePlayer,
-  play,
+  playFromQueueIndex,
   playOrPause,
   positionOf,
+  queueSourceLabel,
+  retryCurrent,
   seek,
   seekBy,
   send,
@@ -104,15 +97,15 @@ function OpenDouyinPlayer() {
   const playing = useDouyin((s) => s.playing)
   const hostReady = useDouyin((s) => s.hostReady)
   const buffering = useDouyin((s) => s.buffering)
-  const videos = useDouyin((s) => s.videos)
-  const currentVideoIndex = useDouyin((s) => s.currentVideoIndex)
+  const playbackError = useDouyin((s) => s.playbackError)
+  const queue = useDouyin((s) => s.queue)
   const crop = useDouyin((s) => s.crop)
   const autoScroll = useDouyin((s) => s.autoScroll)
   const rate = useDouyin((s) => s.rate)
   const likedMap = useDouyin((s) => s.liked)
   const collectedMap = useDouyin((s) => s.collected)
-  const tab = useDouyin((s) => s.tab)
-  const channelId = useDouyin((s) => s.channelId)
+  const queueItems = queue?.items ?? []
+  const queueIndex = queue?.index ?? -1
 
   const [controls, setControls] = useState(true)
   const [showDrawer, setShowDrawer] = useState(false)
@@ -216,14 +209,7 @@ function OpenDouyinPlayer() {
   const inHost = isInHost()
   const showCover = inHost && !hostReady
 
-  const channelLabel =
-    tab === 'jingxuan'
-      ? t('精选', 'Featured')
-      : tab === 'follow'
-        ? t('关注', 'Following')
-        : tab === 'channels'
-          ? (DOUYIN_CHANNELS.find((c) => c.id === channelId)?.[chinese ? 'zh' : 'en'] ?? t('频道', 'Channel'))
-          : t('推荐', 'For You')
+  const channelLabel = queueSourceLabel(queue, chinese)
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (showDrawer || showSpeedMenu) return
@@ -241,7 +227,11 @@ function OpenDouyinPlayer() {
       onWheel={handleWheel}
       onPointerDown={(event) => {
         const hit = event.target as HTMLElement | null
-        if (hit?.closest('.dy-player-top, .dy-player-rail, .dy-player-bottom, .dy-speed-menu, .dy-drawer-backdrop')) {
+        if (
+          hit?.closest(
+            '.dy-player-top, .dy-player-rail, .dy-player-bottom, .dy-speed-menu, .dy-drawer-backdrop, .dy-playback-error',
+          )
+        ) {
           return
         }
         swiped.current = false
@@ -266,7 +256,11 @@ function OpenDouyinPlayer() {
           swiped.current = false
           return
         }
-        if (hit?.closest('.dy-player-top, .dy-player-rail, .dy-player-bottom, .dy-speed-menu, .dy-drawer-backdrop')) {
+        if (
+          hit?.closest(
+            '.dy-player-top, .dy-player-rail, .dy-player-bottom, .dy-speed-menu, .dy-drawer-backdrop, .dy-playback-error',
+          )
+        ) {
           return
         }
         if (showSpeedMenu) {
@@ -337,6 +331,21 @@ function OpenDouyinPlayer() {
       {/* Mid-playback buffering */}
       {inHost && hostReady && buffering && (
         <div className="dy-spinner large floating" role="progressbar" aria-label={t('正在缓冲', 'Buffering')} />
+      )}
+
+      {/* Playback failure fallback notice */}
+      {playbackError && !buffering && (
+        <div className="dy-playback-error glass" role="alert">
+          <span>{playbackError}</span>
+          <div className="dy-playback-error-actions">
+            <button type="button" className="dy-pglass dy-ppill" onClick={retryCurrent}>
+              {t('重试', 'Retry')}
+            </button>
+            <button type="button" className="dy-pglass dy-ppill on" onClick={() => skip(1)}>
+              {t('下一条', 'Next')}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Double-tap seek indicator */}
@@ -520,7 +529,7 @@ function OpenDouyinPlayer() {
               }}
             >
               <QueueGlyph />
-              <span>{videos.length}</span>
+              <span>{queueItems.length}</span>
             </button>
           </div>
         </div>
@@ -559,9 +568,17 @@ function OpenDouyinPlayer() {
             if (e.target === e.currentTarget) setShowDrawer(false)
           }}
         >
-          <div className="dy-drawer" role="dialog" aria-modal="true" aria-label={t('当前推荐队列', 'Current queue')}>
+          <div
+            className="dy-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('当前播放队列', 'Current playback queue')}
+          >
             <div className="dy-drawer-head">
-              <h3>{t('推荐视频队列', 'Up Next')}</h3>
+              <div className="dy-drawer-title-group">
+                <h3>{t('当前播放队列', 'Up Next')}</h3>
+                <span className="dy-drawer-source">{channelLabel}</span>
+              </div>
               <button
                 type="button"
                 className="dy-pglass dy-pround"
@@ -573,15 +590,15 @@ function OpenDouyinPlayer() {
             </div>
 
             <div className="dy-drawer-list">
-              {videos.map((v, idx) => {
-                const active = v.id === activeId || idx === currentVideoIndex
+              {queueItems.map((v, idx) => {
+                const active = activeId ? v.id === activeId : idx === queueIndex
                 return (
                   <button
                     key={v.id}
                     type="button"
                     className={`dy-drawer-item${active ? ' active' : ''}`}
                     onClick={() => {
-                      play(v, idx, true)
+                      playFromQueueIndex(idx, true)
                       setShowDrawer(false)
                     }}
                   >

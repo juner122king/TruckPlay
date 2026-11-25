@@ -988,10 +988,10 @@ export interface NeteaseAnswers {
 
 /** What the Douyin app asks of Douyin's web player (`westplay_host::douyin::Command`). */
 export type DouyinCommand =
-  | { action: 'start' }
+  | { action: 'start'; autoPlay?: boolean }
   | { action: 'signIn' }
   | { action: 'signOut' }
-  | { action: 'play'; video?: DouyinVideo; index?: number }
+  | { action: 'play'; video?: DouyinVideo; index?: number; source?: string; queueIds?: string[] }
   | { action: 'pause' }
   | { action: 'toggle' }
   | { action: 'next' }
@@ -1002,7 +1002,7 @@ export type DouyinCommand =
   | { action: 'rate'; rate: number }
   | { action: 'autoScroll'; on: boolean }
   | { action: 'channel'; channel: string }
-  | { action: 'refresh' }
+  | { action: 'refresh'; channel?: string }
   | { action: 'like'; id?: string }
   | { action: 'collect'; id?: string }
   | { action: 'show'; x: number; y: number; width: number; height: number; crop?: boolean }
@@ -1010,10 +1010,7 @@ export type DouyinCommand =
   | { action: 'hide' }
   | { action: 'ask'; id: number; question: DouyinQuestion }
 
-export type DouyinQuestion =
-  | { ask: 'feed'; channel?: string }
-  | { ask: 'search'; query: string }
-  | { ask: 'profile' }
+export type DouyinQuestion = { ask: 'feed'; channel?: string } | { ask: 'search'; query: string } | { ask: 'profile' }
 
 export interface DouyinVideo {
   id: string
@@ -1058,6 +1055,8 @@ export interface DouyinPlayback {
   hostReady?: boolean
   isVertical?: boolean
   channel?: string
+  queueSource?: string
+  error?: string
 }
 
 export interface DouyinAnswers {

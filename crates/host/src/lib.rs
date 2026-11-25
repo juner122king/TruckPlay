@@ -662,7 +662,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             let _ = player.command(&match action {
                 AccountAction::SignIn => douyin::Command::SignIn,
                 AccountAction::SignOut => douyin::Command::SignOut,
-                AccountAction::Check => douyin::Command::Start,
+                AccountAction::Check => douyin::Command::Start { auto_play: false },
             });
         }
         if let Some(action) = config.accounts.hongguo.take()

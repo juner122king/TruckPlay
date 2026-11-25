@@ -135,6 +135,7 @@ impl Resources {
                 | "ask"
                 | "load"
                 | "play"
+                | "refresh"
                 | "search"
                 | "suggest"
                 | "related"
@@ -403,5 +404,12 @@ mod tests {
         open(&mut resources, now);
         assert!(!resources.command(&json!({"type":"bilibili","generation":1,"command":{"action":"play"}}), now));
         assert!(resources.command(&json!({"type":"bilibili","generation":2,"command":{"action":"play"}}), now));
+    }
+
+    #[test]
+    fn douyin_refresh_starts_an_idle_reclaimed_page() {
+        let now = Instant::now();
+        let mut resources = Resources::default();
+        assert!(resources.command(&json!({"type":"douyin","command":{"action":"refresh","channel":"recommend"}}), now));
     }
 }

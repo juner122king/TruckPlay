@@ -85,7 +85,10 @@ where
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "action", rename_all = "camelCase")]
 pub enum Command {
-    Start,
+    Start {
+        #[serde(default)]
+        auto_play: bool,
+    },
     SignIn,
     SignOut,
     Play {
@@ -93,6 +96,10 @@ pub enum Command {
         video: Option<Video>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         index: Option<usize>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        queue_ids: Option<Vec<String>>,
     },
     Pause,
     Toggle,
@@ -116,7 +123,10 @@ pub enum Command {
     Channel {
         channel: String,
     },
-    Refresh,
+    Refresh {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        channel: Option<String>,
+    },
     Like {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
@@ -242,6 +252,10 @@ pub struct Playback {
     pub is_vertical: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -278,11 +292,84 @@ pub enum Report {
     Spectrum(Vec<u8>),
 }
 
+/// Commands queued until the Douyin page script reports `{"ready":true}` (messages posted before
+/// initial navigation finishes are dropped by WebView2). Also replays preferences and pending
+/// cold-start autoplay if Douyin redirects/reloads before playback starts.
+#[derive(Default)]
+struct Outbox {
+    ready: bool,
+    held: Vec<String>,
+    auto_play: bool,
+    crop: Option<String>,
+    volume: Option<String>,
+    mute: Option<String>,
+    rate: Option<String>,
+    auto_scroll: Option<String>,
+}
+
+impl Outbox {
+    fn send(&mut self, command: &Command) -> Option<String> {
+        let message = serde_json::to_string(command).ok()?;
+        match command {
+            Command::Start { auto_play } => {
+                if *auto_play {
+                    self.auto_play = true;
+                }
+            }
+            Command::Play { .. } | Command::Next | Command::Previous => {
+                self.auto_play = true;
+            }
+            Command::Pause | Command::SignOut => {
+                self.auto_play = false;
+            }
+            Command::Crop { .. } => self.crop = Some(message.clone()),
+            Command::Volume { .. } => self.volume = Some(message.clone()),
+            Command::Mute { .. } => self.mute = Some(message.clone()),
+            Command::Rate { .. } => self.rate = Some(message.clone()),
+            Command::AutoScroll { .. } => self.auto_scroll = Some(message.clone()),
+            _ => {}
+        }
+        if self.ready {
+            Some(message)
+        } else {
+            self.held.push(message);
+            None
+        }
+    }
+
+    fn ready(&mut self) -> Vec<String> {
+        if std::mem::replace(&mut self.ready, true) {
+            let mut replay: Vec<String> = [&self.crop, &self.volume, &self.mute, &self.rate, &self.auto_scroll]
+                .into_iter()
+                .flatten()
+                .cloned()
+                .collect();
+            if self.auto_play
+                && let Ok(start) = serde_json::to_string(&Command::Start { auto_play: true })
+            {
+                replay.push(start);
+            }
+            replay
+        } else {
+            std::mem::take(&mut self.held)
+        }
+    }
+
+    fn reset_navigation(&mut self, keep_auto_play: bool) {
+        self.ready = false;
+        self.held.clear();
+        if !keep_auto_play {
+            self.auto_play = false;
+        }
+    }
+}
+
 pub struct Douyin {
     view: OffscreenWebView,
     frame: PageSize,
     sign_in: RefCell<Option<SignInWindow>>,
     pending: RefCell<Vec<Report>>,
+    outbox: RefCell<Outbox>,
     checked_initial_cookie: Cell<bool>,
     told: RefCell<CabCache>,
 }
@@ -301,6 +388,7 @@ impl Douyin {
             frame,
             sign_in: RefCell::new(None),
             pending: RefCell::new(Vec::new()),
+            outbox: RefCell::new(Outbox::default()),
             checked_initial_cookie: Cell::new(false),
             told: RefCell::default(),
         })
@@ -345,6 +433,7 @@ impl Douyin {
             Command::SignOut => {
                 let _ = self.view.delete_cookies();
                 self.told.borrow_mut().reset();
+                self.outbox.borrow_mut().reset_navigation(false);
                 let _ = self.view.navigate(HOME);
                 self.pending.borrow_mut().push(Report::State(State {
                     signed_in: false,
@@ -359,7 +448,7 @@ impl Douyin {
     }
 
     fn pass(&self, command: &Command) -> windows::core::Result<()> {
-        if let Ok(json) = serde_json::to_string(command) {
+        if let Some(json) = self.outbox.borrow_mut().send(command) {
             self.view.post_json(&json)?;
         }
         Ok(())
@@ -399,6 +488,7 @@ impl Douyin {
             self.sign_in.borrow_mut().take();
             reports.push(Report::SignInWindow(false));
             self.told.borrow_mut().reset();
+            self.outbox.borrow_mut().reset_navigation(false);
             let _ = self.view.navigate(HOME);
             let signed_in =
                 p == Progress::SignedIn || self.view.has_cookie(COOKIE_URL, &["sessionid", "sessionid_ss", "sid_tt"]);
@@ -411,6 +501,13 @@ impl Douyin {
                 continue;
             }
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(&message) {
+                if value.get("ready").and_then(serde_json::Value::as_bool) == Some(true) {
+                    self.told.borrow_mut().reset();
+                    for queued in self.outbox.borrow_mut().ready() {
+                        let _ = self.view.post_json(&queued);
+                    }
+                    continue;
+                }
                 let msg_type = value.get("type").and_then(|t| t.as_str()).unwrap_or("");
                 match msg_type {
                     "diag" => {
@@ -522,12 +619,21 @@ mod tests {
     #[test]
     fn round_trips_extended_commands() {
         let cmds = [
+            Command::Start { auto_play: true },
+            Command::Start { auto_play: false },
+            Command::Play {
+                video: None,
+                index: Some(2),
+                source: Some("search".into()),
+                queue_ids: Some(vec!["7400001".into(), "7400002".into()]),
+            },
             Command::Channel { channel: "jingxuan".into() },
             Command::Rate { rate: 1.5 },
             Command::Mute { muted: true },
             Command::AutoScroll { on: false },
             Command::Collect { id: Some("7400001".into()) },
-            Command::Refresh,
+            Command::Refresh { channel: Some("music".into()) },
+            Command::Refresh { channel: None },
             Command::Ask { id: 7, question: Question::Feed { channel: Some("car".into()) } },
         ];
         for cmd in cmds {
@@ -535,6 +641,11 @@ mod tests {
             let back: Command = serde_json::from_str(&json).unwrap();
             assert_eq!(back, cmd);
         }
+        // Verify legacy payloads without optional fields still deserialize cleanly.
+        let legacy_start: Command = serde_json::from_str(r#"{"action":"start"}"#).unwrap();
+        assert_eq!(legacy_start, Command::Start { auto_play: false });
+        let legacy_refresh: Command = serde_json::from_str(r#"{"action":"refresh"}"#).unwrap();
+        assert_eq!(legacy_refresh, Command::Refresh { channel: None });
     }
 
     #[test]
@@ -575,5 +686,32 @@ mod tests {
         assert_eq!(msg["playing"], true);
         assert_eq!(msg["nickname"], "老张重卡");
         assert_eq!(msg["avatar"], "https://example.com/a.jpg");
+    }
+
+    #[test]
+    fn outbox_holds_cold_start_commands_until_ready_and_replays_autoplay_on_reload() {
+        let mut outbox = Outbox::default();
+        assert_eq!(outbox.send(&Command::Start { auto_play: true }), None);
+        assert_eq!(outbox.send(&Command::Rate { rate: 1.25 }), None);
+        assert_eq!(outbox.send(&Command::Volume { percent: 80.0 }), None);
+
+        let first_flush = outbox.ready();
+        assert_eq!(first_flush.len(), 3);
+        assert_eq!(serde_json::from_str::<Command>(&first_flush[0]).unwrap(), Command::Start { auto_play: true });
+        assert_eq!(serde_json::from_str::<Command>(&first_flush[1]).unwrap(), Command::Rate { rate: 1.25 });
+
+        // After ready, commands pass straight through.
+        assert!(outbox.send(&Command::Mute { muted: false }).is_some());
+
+        // If the page redirects/reloads while autoplay is wanted, ready() replays prefs + Start{auto_play:true}.
+        let second_flush = outbox.ready();
+        let decoded: Vec<Command> = second_flush.iter().map(|s| serde_json::from_str(s).unwrap()).collect();
+        assert!(decoded.contains(&Command::Start { auto_play: true }));
+        assert!(decoded.contains(&Command::Rate { rate: 1.25 }));
+
+        // After explicit Pause, a reload no longer replays autoplay.
+        assert!(outbox.send(&Command::Pause).is_some());
+        let after_pause: Vec<Command> = outbox.ready().iter().map(|s| serde_json::from_str(s).unwrap()).collect();
+        assert!(!after_pause.contains(&Command::Start { auto_play: true }));
     }
 }

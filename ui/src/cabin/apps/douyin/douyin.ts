@@ -12,12 +12,17 @@ import {
 } from '../../../shared/host'
 import type { MediaSource } from '../../../shared/media'
 import { whenTransitionEnds } from '../../state/launch'
+import { isOtherPlayerActive } from '../oneAtATime'
 import type { Hole } from '../youtube/youtube'
 
 export type { Hole }
 
 export type DouyinTab = 'recommend' | 'jingxuan' | 'follow' | 'channels' | 'library' | 'search'
 export type DouyinLibrarySection = 'liked' | 'history'
+export type DouyinChannelId = 'knowledge' | 'music' | 'film' | 'food' | 'game' | 'sports' | 'entertainment' | 'anime'
+export type DouyinFeedKey = 'recommend' | 'jingxuan' | 'follow' | DouyinChannelId
+export type DouyinQueueSource = DouyinFeedKey | 'search' | 'liked' | 'history'
+export type DouyinLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export interface DouyinProfile {
   nickname: string | null
@@ -25,9 +30,26 @@ export interface DouyinProfile {
 }
 
 export interface DouyinChannel {
-  id: string
+  id: DouyinChannelId
   zh: string
   en: string
+}
+
+export interface DouyinFeedSlice {
+  items: DouyinVideo[]
+  status: DouyinLoadStatus
+  refreshing: boolean
+  error: string | null
+  updatedAt: number | null
+}
+
+export interface DouyinPlayQueue {
+  source: DouyinQueueSource
+  label?: string
+  items: DouyinVideo[]
+  index: number
+  /** Whether passive feed appends for `source` extend this queue (detached on manual refresh). */
+  boundToFeed: boolean
 }
 
 export const DOUYIN_CHANNELS: readonly DouyinChannel[] = [
@@ -40,6 +62,12 @@ export const DOUYIN_CHANNELS: readonly DouyinChannel[] = [
   { id: 'entertainment', zh: '搞笑娱乐', en: 'Fun' },
   { id: 'anime', zh: '二次元', en: 'Anime' },
 ]
+
+const FEED_KEY_SET = new Set<string>(['recommend', 'jingxuan', 'follow', ...DOUYIN_CHANNELS.map((c) => c.id)])
+
+export function isFeedSource(source: string | undefined | null): source is DouyinFeedKey {
+  return Boolean(source && FEED_KEY_SET.has(source))
+}
 
 export const DOUYIN_HOT_KEYWORDS: readonly string[] = [
   '川藏线重卡',
@@ -87,7 +115,7 @@ export const MOCK_DOUYIN_VIDEOS: DouyinVideo[] = [
     comments: 3410,
     collects: 14300,
     music: '公路漫游者 - 雨夜驾驶舱',
-    channel: 'car',
+    channel: 'game',
   },
   {
     id: 'dy_04',
@@ -99,7 +127,7 @@ export const MOCK_DOUYIN_VIDEOS: DouyinVideo[] = [
     comments: 4120,
     collects: 18700,
     music: '西域风情 - 苍茫戈壁长调',
-    channel: 'travel',
+    channel: 'film',
   },
   {
     id: 'dy_05',
@@ -127,6 +155,14 @@ export const MOCK_DOUYIN_VIDEOS: DouyinVideo[] = [
   },
 ]
 
+export const EMPTY_FEED_SLICE: DouyinFeedSlice = {
+  items: [],
+  status: 'idle',
+  refreshing: false,
+  error: null,
+  updatedAt: null,
+}
+
 export interface DouyinState {
   signedIn: boolean | null
   signingIn: boolean
@@ -135,18 +171,23 @@ export interface DouyinState {
   hostReady: boolean
   buffering: boolean
   tab: DouyinTab
-  channelId: string
+  channelId: DouyinChannelId
   librarySection: DouyinLibrarySection
-  videos: DouyinVideo[]
-  feedLoading: boolean
-  feedError: string | null
+  /** Independent per-tab/per-channel browsed lists, decoupled from active playback queue. */
+  feeds: Record<string, DouyinFeedSlice>
   searchQuery: string
   searchResults: DouyinVideo[]
-  searchLoading: boolean
+  searchStatus: DouyinLoadStatus
+  searchError: string | null
   recentSearches: string[]
-  currentVideoIndex: number
+  /** Single source of truth for actual playback list, independent of the browsed tab. */
+  queue: DouyinPlayQueue | null
   current: DouyinVideo | null
   playback: (DouyinPlayback & { at: number }) | null
+  playbackError: string | null
+  /** Resident session lifecycle flags (reset on sign-out and 30s idle resource reclamation). */
+  sessionStarted: boolean
+  userPaused: boolean
   open: boolean
   returnToPlayer: boolean
   crop: boolean
@@ -161,85 +202,247 @@ export interface DouyinState {
   hole: Hole | null
 }
 
-const IN_HOST = typeof window !== 'undefined' && isInHost()
 const ANSWER_TIMEOUT_MS = 10000
+const FEED_FALLBACK_MS = 2200
 const MAX_HISTORY = 30
 const MAX_LIKED = 40
 const MAX_SEARCHES = 8
+const MAX_QUEUE_ITEMS = 120
 
 let nextAskId = 1
-const pendingAsks = new Map<number, { resolve: (ans: DouyinAnswers & { failed?: boolean; error?: string }) => void; timer: ReturnType<typeof setTimeout> }>()
+const pendingAsks = new Map<
+  number,
+  { resolve: (ans: DouyinAnswers & { failed?: boolean; error?: string }) => void; timer: ReturnType<typeof setTimeout> }
+>()
+
+let sessionGeneration = 0
+let searchEpoch = 0
+const feedEpochs = new Map<string, number>()
+const feedTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const tabScrollTop = new Map<string, number>()
+
+function inHostNow(): boolean {
+  return typeof window !== 'undefined' && isInHost()
+}
+
+function dedupeVideos(items: readonly DouyinVideo[]): DouyinVideo[] {
+  const seen = new Set<string>()
+  const out: DouyinVideo[] = []
+  for (const v of items) {
+    if (!v || !v.id || seen.has(v.id)) continue
+    seen.add(v.id)
+    out.push(v)
+  }
+  return out
+}
+
+function buildInitialState(): DouyinState {
+  const inHost = inHostNow()
+  const previewVideos = inHost ? [] : MOCK_DOUYIN_VIDEOS
+  return {
+    signedIn: inHost ? null : false,
+    signingIn: false,
+    profile: null,
+    playing: false,
+    hostReady: !inHost,
+    buffering: false,
+    tab: 'recommend',
+    channelId: 'knowledge',
+    librarySection: 'liked',
+    feeds: inHost
+      ? {}
+      : {
+          recommend: {
+            items: previewVideos,
+            status: 'ready',
+            refreshing: false,
+            error: null,
+            updatedAt: null,
+          },
+        },
+    searchQuery: '',
+    searchResults: [],
+    searchStatus: 'idle',
+    searchError: null,
+    recentSearches: [],
+    queue: inHost
+      ? null
+      : {
+          source: 'recommend',
+          items: previewVideos,
+          index: 0,
+          boundToFeed: true,
+        },
+    current: previewVideos[0] ?? null,
+    playback: null,
+    playbackError: null,
+    sessionStarted: false,
+    userPaused: false,
+    open: false,
+    returnToPlayer: false,
+    crop: false,
+    autoScroll: true,
+    rate: 1.0,
+    volume: 1,
+    muted: false,
+    liked: {},
+    collected: {},
+    likedVideos: [],
+    watchedHistory: [],
+    hole: null,
+  }
+}
 
 export const useDouyin = create<DouyinState>()(
-  persist(
-    (): DouyinState => ({
-      signedIn: IN_HOST ? null : false,
-      signingIn: false,
-      profile: null,
-      playing: false,
-      hostReady: !IN_HOST,
-      buffering: false,
-      tab: 'recommend',
-      channelId: 'knowledge',
-      librarySection: 'liked',
-      videos: IN_HOST ? [] : MOCK_DOUYIN_VIDEOS,
-      feedLoading: IN_HOST,
-      feedError: null,
-      searchQuery: '',
-      searchResults: [],
-      searchLoading: false,
-      recentSearches: [],
-      currentVideoIndex: 0,
-      current: IN_HOST ? null : (MOCK_DOUYIN_VIDEOS[0] ?? null),
-      playback: null,
-      open: false,
-      returnToPlayer: false,
-      crop: false,
-      autoScroll: true,
-      rate: 1.0,
-      volume: 1,
-      muted: false,
-      liked: {},
-      collected: {},
-      likedVideos: [],
-      watchedHistory: [],
-      hole: null,
+  persist(buildInitialState, {
+    name: 'westplay.douyin',
+    version: 1,
+    storage: createJSONStorage(() => localStorage),
+    partialize: (s) => ({
+      crop: s.crop,
+      autoScroll: s.autoScroll,
+      rate: s.rate,
+      volume: s.volume,
+      muted: s.muted,
+      liked: s.liked,
+      collected: s.collected,
+      likedVideos: s.likedVideos,
+      watchedHistory: s.watchedHistory,
+      recentSearches: s.recentSearches,
     }),
-    {
-      name: 'westplay.douyin',
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({
-        crop: s.crop,
-        autoScroll: s.autoScroll,
-        rate: s.rate,
-        volume: s.volume,
-        muted: s.muted,
-        liked: s.liked,
-        collected: s.collected,
-        likedVideos: s.likedVideos,
-        watchedHistory: s.watchedHistory,
-        recentSearches: s.recentSearches,
-      }),
-      merge: (stored, current) => {
-        const s = (stored ?? {}) as Partial<DouyinState>
-        return {
-          ...current,
-          crop: typeof s.crop === 'boolean' ? s.crop : current.crop,
-          autoScroll: typeof s.autoScroll === 'boolean' ? s.autoScroll : current.autoScroll,
-          rate: typeof s.rate === 'number' && s.rate >= 0.5 && s.rate <= 2.5 ? s.rate : 1.0,
-          volume: typeof s.volume === 'number' && Number.isFinite(s.volume) ? Math.max(0, Math.min(1, s.volume)) : 1,
-          muted: Boolean(s.muted),
-          liked: s.liked && typeof s.liked === 'object' ? s.liked : {},
-          collected: s.collected && typeof s.collected === 'object' ? s.collected : {},
-          likedVideos: Array.isArray(s.likedVideos) ? s.likedVideos.slice(0, MAX_LIKED) : [],
-          watchedHistory: Array.isArray(s.watchedHistory) ? s.watchedHistory.slice(0, MAX_HISTORY) : [],
-          recentSearches: Array.isArray(s.recentSearches) ? s.recentSearches.slice(0, MAX_SEARCHES) : [],
-        }
-      },
+    merge: (stored, current) => {
+      const s = (stored ?? {}) as Partial<DouyinState>
+      return {
+        ...current,
+        crop: typeof s.crop === 'boolean' ? s.crop : current.crop,
+        autoScroll: typeof s.autoScroll === 'boolean' ? s.autoScroll : current.autoScroll,
+        rate: typeof s.rate === 'number' && s.rate >= 0.5 && s.rate <= 2.5 ? s.rate : 1.0,
+        volume: typeof s.volume === 'number' && Number.isFinite(s.volume) ? Math.max(0, Math.min(1, s.volume)) : 1,
+        muted: Boolean(s.muted),
+        liked: s.liked && typeof s.liked === 'object' ? s.liked : {},
+        collected: s.collected && typeof s.collected === 'object' ? s.collected : {},
+        likedVideos: Array.isArray(s.likedVideos) ? s.likedVideos.slice(0, MAX_LIKED) : [],
+        watchedHistory: Array.isArray(s.watchedHistory) ? s.watchedHistory.slice(0, MAX_HISTORY) : [],
+        recentSearches: Array.isArray(s.recentSearches) ? s.recentSearches.slice(0, MAX_SEARCHES) : [],
+      }
     },
-  ),
+  }),
 )
+
+export function activeFeedKey(tab: DouyinTab, channelId: DouyinChannelId): DouyinFeedKey {
+  if (tab === 'channels') return channelId
+  if (tab === 'jingxuan' || tab === 'follow') return tab
+  return 'recommend'
+}
+
+export function activeBrowseSource(
+  state: Pick<DouyinState, 'tab' | 'channelId' | 'librarySection'>,
+): DouyinQueueSource {
+  if (state.tab === 'search') return 'search'
+  if (state.tab === 'library') return state.librarySection
+  return activeFeedKey(state.tab, state.channelId)
+}
+
+export function getFeedSlice(state: Pick<DouyinState, 'feeds'>, key: string): DouyinFeedSlice {
+  return state.feeds[key] ?? EMPTY_FEED_SLICE
+}
+
+export function getDisplayedList(
+  state: Pick<
+    DouyinState,
+    'tab' | 'channelId' | 'librarySection' | 'feeds' | 'searchResults' | 'likedVideos' | 'watchedHistory'
+  >,
+): DouyinVideo[] {
+  if (state.tab === 'search') return state.searchResults
+  if (state.tab === 'library') return state.librarySection === 'liked' ? state.likedVideos : state.watchedHistory
+  return getFeedSlice(state, activeFeedKey(state.tab, state.channelId)).items
+}
+
+export function queueSourceLabel(queue: DouyinPlayQueue | null, chinese: boolean): string {
+  const t = (zh: string, en: string) => (chinese ? zh : en)
+  if (!queue) return t('推荐', 'For You')
+  if (queue.source === 'recommend') return t('推荐', 'For You')
+  if (queue.source === 'jingxuan') return t('精选', 'Featured')
+  if (queue.source === 'follow') return t('关注', 'Following')
+  if (queue.source === 'search') {
+    return queue.label ? t(`搜索 · ${queue.label}`, `Search · ${queue.label}`) : t('搜索结果', 'Search')
+  }
+  if (queue.source === 'liked') return t('我赞过的', 'Liked')
+  if (queue.source === 'history') return t('最近看过', 'History')
+  const ch = DOUYIN_CHANNELS.find((c) => c.id === queue.source)
+  return ch ? (chinese ? ch.zh : ch.en) : t('频道', 'Channel')
+}
+
+export function getTabScrollTop(key: string): number {
+  return tabScrollTop.get(key) ?? 0
+}
+
+export function setTabScrollTop(key: string, top: number): void {
+  tabScrollTop.set(key, Math.max(0, top))
+}
+
+function clearFeedTimer(key: string): void {
+  const existing = feedTimers.get(key)
+  if (existing) {
+    clearTimeout(existing)
+    feedTimers.delete(key)
+  }
+}
+
+function nextFeedEpoch(key: string): number {
+  const next = (feedEpochs.get(key) ?? 0) + 1
+  feedEpochs.set(key, next)
+  return next
+}
+
+function cancelPendingRequests(): void {
+  sessionGeneration++
+  searchEpoch++
+  for (const [, entry] of pendingAsks) {
+    clearTimeout(entry.timer)
+    entry.resolve({ failed: true, error: 'cancelled' })
+  }
+  pendingAsks.clear()
+  for (const [, timer] of feedTimers) {
+    clearTimeout(timer)
+  }
+  feedTimers.clear()
+  feedEpochs.clear()
+}
+
+function setFeedSlice(
+  key: string,
+  patch: Partial<DouyinFeedSlice> | ((prev: DouyinFeedSlice) => DouyinFeedSlice),
+): void {
+  useDouyin.setState((s) => {
+    const prev = s.feeds[key] ?? EMPTY_FEED_SLICE
+    const next = typeof patch === 'function' ? patch(prev) : { ...prev, ...patch }
+    return { feeds: { ...s.feeds, [key]: next } }
+  })
+}
+
+function findVideoMetadata(state: DouyinState, id: string | undefined): DouyinVideo | null {
+  if (!id) return null
+  const inQueue = state.queue?.items.find((v) => v.id === id)
+  if (inQueue) return inQueue
+  for (const slice of Object.values(state.feeds)) {
+    const hit = slice.items.find((v) => v.id === id)
+    if (hit) return hit
+  }
+  const inSearch = state.searchResults.find((v) => v.id === id)
+  if (inSearch) return inSearch
+  const inLiked = state.likedVideos.find((v) => v.id === id)
+  if (inLiked) return inLiked
+  const inHistory = state.watchedHistory.find((v) => v.id === id)
+  if (inHistory) return inHistory
+  return null
+}
+
+function hasNovelVideos(candidate: readonly DouyinVideo[], existing: readonly DouyinVideo[]): boolean {
+  if (candidate.length === 0) return false
+  const existingIds = new Set(existing.map((v) => v.id))
+  return candidate.some((v) => !existingIds.has(v.id))
+}
 
 export function send(command: DouyinCommand): void {
   if (isInHost()) postToHost({ type: 'douyin', command })
@@ -250,7 +453,10 @@ export function ask(question: DouyinQuestion): Promise<DouyinAnswers & { failed?
     if (question.ask === 'search') {
       const q = question.query.trim().toLowerCase()
       const matched = MOCK_DOUYIN_VIDEOS.filter(
-        (v) => v.title.toLowerCase().includes(q) || v.author.toLowerCase().includes(q) || (v.music ?? '').toLowerCase().includes(q),
+        (v) =>
+          v.title.toLowerCase().includes(q) ||
+          v.author.toLowerCase().includes(q) ||
+          (v.music ?? '').toLowerCase().includes(q),
       )
       return Promise.resolve({ videos: matched.length > 0 ? matched : MOCK_DOUYIN_VIDEOS.slice(0, 4) })
     }
@@ -260,7 +466,10 @@ export function ask(question: DouyinQuestion): Promise<DouyinAnswers & { failed?
         const filtered = MOCK_DOUYIN_VIDEOS.filter((v) => v.channel === ch)
         return Promise.resolve({
           channel: ch,
-          videos: filtered.length > 0 ? [...filtered, ...MOCK_DOUYIN_VIDEOS.filter((v) => v.channel !== ch)] : MOCK_DOUYIN_VIDEOS,
+          videos:
+            filtered.length > 0
+              ? [...filtered, ...MOCK_DOUYIN_VIDEOS.filter((v) => v.channel !== ch)]
+              : MOCK_DOUYIN_VIDEOS,
         })
       }
       return Promise.resolve({ channel: ch, videos: MOCK_DOUYIN_VIDEOS })
@@ -279,14 +488,43 @@ export function ask(question: DouyinQuestion): Promise<DouyinAnswers & { failed?
   })
 }
 
+/**
+ * Lifecycle entry point when `DouyinApp` mounts.
+ * - First entry in a resident session: syncs preferences and requests auto-play ONLY if no other media
+ *   is active and the user has not manually paused.
+ * - Subsequent re-entries (e.g. returning from Dashboard/Maps): never hijacks playback or wipes cached tabs.
+ */
+export function enterDouyin(): void {
+  const state = useDouyin.getState()
+  if (!state.sessionStarted) {
+    const autoPlay = !state.userPaused && !state.playback && !isOtherPlayerActive('douyin')
+    useDouyin.setState({ sessionStarted: true })
+    send({ action: 'start', autoPlay })
+    send({ action: 'rate', rate: state.rate })
+    send({ action: 'mute', muted: state.muted })
+    send({ action: 'volume', percent: Math.round(state.volume * 100) })
+    send({ action: 'autoScroll', on: state.autoScroll })
+    if (autoPlay && !inHostNow()) {
+      const initialList = getFeedSlice(state, 'recommend').items
+      if (initialList.length > 0) {
+        playFromList('recommend', initialList, 0, { openFullscreen: false })
+      }
+    }
+  }
+
+  if (state.tab === 'recommend' || state.tab === 'jingxuan' || state.tab === 'follow' || state.tab === 'channels') {
+    if (state.tab === 'follow' && state.signedIn === false) return
+    const key = activeFeedKey(state.tab, state.channelId)
+    const slice = getFeedSlice(state, key)
+    if (slice.status === 'idle' || (slice.status === 'error' && slice.items.length === 0)) {
+      requestFeedForKey(key, { isInitialRecommend: key === 'recommend' && !state.sessionStarted })
+    }
+  }
+}
+
+/** Backwards-compatible alias for `enterDouyin`. */
 export function sendStart(): void {
-  const { rate, muted, volume, autoScroll } = useDouyin.getState()
-  send({ action: 'start' })
-  send({ action: 'rate', rate })
-  send({ action: 'mute', muted })
-  send({ action: 'volume', percent: Math.round(volume * 100) })
-  send({ action: 'autoScroll', on: autoScroll })
-  void loadFeed()
+  enterDouyin()
 }
 
 export function sendSignIn(): void {
@@ -294,14 +532,41 @@ export function sendSignIn(): void {
 }
 
 export function sendSignOut(): void {
+  cancelPendingRequests()
+  tabScrollTop.clear()
   send({ action: 'signOut' })
+  const inHost = inHostNow()
+  const previewVideos = inHost ? [] : MOCK_DOUYIN_VIDEOS
   useDouyin.setState({
+    signedIn: false,
     profile: null,
-    videos: IN_HOST ? [] : MOCK_DOUYIN_VIDEOS,
-    current: IN_HOST ? null : (MOCK_DOUYIN_VIDEOS[0] ?? null),
+    feeds: inHost
+      ? {}
+      : {
+          recommend: {
+            items: previewVideos,
+            status: 'ready',
+            refreshing: false,
+            error: null,
+            updatedAt: null,
+          },
+        },
+    queue: inHost
+      ? null
+      : {
+          source: 'recommend',
+          items: previewVideos,
+          index: 0,
+          boundToFeed: true,
+        },
+    current: previewVideos[0] ?? null,
     playback: null,
+    playbackError: null,
     playing: false,
-    feedLoading: IN_HOST,
+    buffering: false,
+    hostReady: !inHost,
+    sessionStarted: false,
+    userPaused: false,
   })
 }
 
@@ -320,16 +585,81 @@ export function receiveState(
         avatar: avatar ?? prev.profile?.avatar ?? null,
       }
     : null
+
+  if (becameSignedIn && inHostNow()) {
+    cancelPendingRequests()
+    useDouyin.setState({
+      signedIn,
+      playing: false,
+      signingIn,
+      profile,
+      feeds: {},
+      queue: null,
+      current: null,
+      playback: null,
+      playbackError: null,
+      buffering: false,
+      hostReady: false,
+      sessionStarted: false,
+      userPaused: false,
+    })
+    if (prev.sessionStarted) {
+      enterDouyin()
+    }
+    return
+  }
+
   useDouyin.setState({
     signedIn,
-    playing,
+    playing: playing ?? prev.playing,
     signingIn,
     profile,
-    ...(becameSignedIn && IN_HOST ? { videos: [], current: null, playback: null, feedLoading: true } : {}),
   })
-  if (becameSignedIn && IN_HOST) {
-    void loadFeed()
+}
+
+function applyFeedVideos(key: string, rawVideos: DouyinVideo[]): void {
+  const videos = dedupeVideos(rawVideos)
+  if (videos.length === 0) return
+
+  const state = useDouyin.getState()
+  const nextFeeds: Record<string, DouyinFeedSlice> = {
+    ...state.feeds,
+    [key]: {
+      items: videos,
+      status: 'ready',
+      refreshing: false,
+      error: null,
+      updatedAt: Date.now(),
+    },
   }
+
+  const patch: Partial<DouyinState> = { feeds: nextFeeds }
+
+  // Extend active queue ONLY when it is still bound to this feed source (not detached by manual refresh).
+  if (state.queue?.boundToFeed && state.queue.source === key) {
+    const existingIds = new Set(state.queue.items.map((v) => v.id))
+    const appended = videos.filter((v) => !existingIds.has(v.id))
+    if (appended.length > 0) {
+      let nextItems = [...state.queue.items, ...appended]
+      let nextIndex = state.queue.index
+      if (nextItems.length > MAX_QUEUE_ITEMS) {
+        const overflow = nextItems.length - MAX_QUEUE_ITEMS
+        const safeTrim = Math.max(0, Math.min(overflow, Math.max(0, nextIndex - 10)))
+        if (safeTrim > 0) {
+          nextItems = nextItems.slice(safeTrim)
+          nextIndex -= safeTrim
+        }
+      }
+      patch.queue = { ...state.queue, items: nextItems, index: nextIndex }
+    }
+  } else if (!state.current && !state.playback && !state.queue) {
+    const browseKey = activeFeedKey(state.tab, state.channelId)
+    if (key === browseKey && state.tab !== 'search' && state.tab !== 'library') {
+      patch.current = videos[0] ?? null
+    }
+  }
+
+  useDouyin.setState(patch)
 }
 
 export function receiveAnswer(
@@ -345,22 +675,15 @@ export function receiveAnswer(
     pendingAsks.delete(id)
     pending.resolve({ failed, error, videos, channel })
   }
-  // Passive feed pushes (id === 0) hydrate the active queue if it matches the active tab/channel.
-  // Never replace the currently playing video (`current`) when browsing another tab!
+
+  // Passive feed pushes (id === 0) hydrate the matching channel bucket regardless of which tab is currently open,
+  // so background-fetched feeds are ready immediately when the user switches back.
   if (!failed && videos && videos.length > 0 && id === 0) {
     const state = useDouyin.getState()
-    if (state.tab !== 'search' && state.tab !== 'library') {
-      const expected = activeChannelKey(state.tab, state.channelId)
-      if (!channel || channel === expected) {
-        const idx = state.current ? videos.findIndex((v) => v.id === state.current?.id) : -1
-        useDouyin.setState({
-          videos,
-          feedLoading: false,
-          feedError: null,
-          ...(idx >= 0 ? { currentVideoIndex: idx } : {}),
-          ...(!state.current && !state.playback ? { current: videos[0] ?? null, currentVideoIndex: 0 } : {}),
-        })
-      }
+    const key = channel || activeFeedKey(state.tab, state.channelId)
+    if (isFeedSource(key)) {
+      clearFeedTimer(key)
+      applyFeedVideos(key, videos)
     }
   }
 }
@@ -375,13 +698,12 @@ function recordWatched(video: DouyinVideo): void {
 
 export function receivePlayback(playback: DouyinPlayback | null): void {
   if (!playback) {
-    useDouyin.setState({ playback: null, playing: false, buffering: false })
+    useDouyin.setState({ playback: null, playing: false, buffering: false, playbackError: null })
     return
   }
   const now = performance.now()
   const state = useDouyin.getState()
-  const matchedIdx = playback.id ? state.videos.findIndex((v) => v.id === playback.id) : -1
-  const matchedVideo = matchedIdx >= 0 ? state.videos[matchedIdx] : null
+  const matchedVideo = findVideoMetadata(state, playback.id)
 
   const isGenericTitle = (t?: string) => !t || t === '抖音精选短视频'
   const isGenericAuthor = (a?: string) => !a || a === '抖音创作者'
@@ -415,16 +737,63 @@ export function receivePlayback(playback: DouyinPlayback | null): void {
     channel: playback.channel ?? matchedVideo?.channel ?? state.current?.channel,
   }
 
+  const rawSource = playback.queueSource || playback.channel || state.queue?.source || 'recommend'
+  const resolvedSource: DouyinQueueSource =
+    rawSource === 'search' || rawSource === 'liked' || rawSource === 'history' || isFeedSource(rawSource)
+      ? rawSource
+      : 'recommend'
+
+  // Keep active playback queue index & handoffs aligned with host truth without disturbing unrelated browsed tabs.
+  let nextQueue = state.queue
+  if (mergedCurrent.id !== 'dy_current') {
+    const existingIdx = state.queue ? state.queue.items.findIndex((v) => v.id === mergedCurrent.id) : -1
+    if (state.queue && existingIdx >= 0) {
+      nextQueue = { ...state.queue, index: existingIdx }
+    } else if (isFeedSource(resolvedSource)) {
+      const feedItems = getFeedSlice(state, resolvedSource).items
+      const idxInFeed = feedItems.findIndex((v) => v.id === mergedCurrent.id)
+      if (idxInFeed >= 0) {
+        nextQueue = {
+          source: resolvedSource,
+          items: feedItems,
+          index: idxInFeed,
+          boundToFeed: true,
+        }
+      } else if (!state.queue) {
+        nextQueue = {
+          source: resolvedSource,
+          items: [mergedCurrent],
+          index: 0,
+          boundToFeed: true,
+        }
+      }
+    } else if (!state.queue) {
+      nextQueue = {
+        source: resolvedSource,
+        items: [mergedCurrent],
+        index: 0,
+        boundToFeed: false,
+      }
+    }
+  }
+
   const resolvedHostReady = Boolean(playback.hostReady || playback.position > 0 || state.hostReady)
-  const resolvedBuffering = Boolean(playback.buffering && playback.status !== 'paused' && playback.position === 0)
+  const resolvedBuffering = Boolean(playback.buffering && !playback.error && playback.status !== 'paused')
 
   useDouyin.setState({
-    playback: { ...playback, title: mergedCurrent.title, author: mergedCurrent.author, artist: mergedCurrent.author, at: now },
+    playback: {
+      ...playback,
+      title: mergedCurrent.title,
+      author: mergedCurrent.author,
+      artist: mergedCurrent.author,
+      at: now,
+    },
     playing: playback.status === 'playing',
     hostReady: resolvedHostReady,
     buffering: resolvedBuffering,
+    playbackError: playback.error ?? null,
     current: mergedCurrent,
-    ...(matchedIdx >= 0 ? { currentVideoIndex: matchedIdx } : {}),
+    queue: nextQueue,
     ...(typeof playback.rate === 'number' ? { rate: playback.rate } : {}),
     ...(typeof playback.muted === 'boolean' ? { muted: playback.muted } : {}),
     ...(typeof playback.autoScroll === 'boolean' ? { autoScroll: playback.autoScroll } : {}),
@@ -480,134 +849,179 @@ function show(change: Partial<DouyinPlayback>): void {
   })
 }
 
-function activeChannelKey(tab: DouyinTab, channelId: string): string {
-  if (tab === 'channels') return channelId
-  if (tab === 'jingxuan' || tab === 'follow') return tab
-  return 'recommend'
-}
-
-let feedEpoch = 0
-let feedFallbackTimer: ReturnType<typeof setTimeout> | null = null
-
-export async function loadFeed(channelOverride?: string, epoch?: number): Promise<void> {
-  const myEpoch = epoch ?? ++feedEpoch
+export async function loadFeed(
+  channelOverride?: DouyinFeedKey,
+  opts?: { epoch?: number; generation?: number },
+): Promise<void> {
   const state = useDouyin.getState()
-  const channel = channelOverride ?? activeChannelKey(state.tab, state.channelId)
-  useDouyin.setState({ feedLoading: true, feedError: null })
-  const ans = await ask({ ask: 'feed', channel })
-  if (myEpoch !== feedEpoch) return
+  const key = channelOverride ?? activeFeedKey(state.tab, state.channelId)
+  const myGen = opts?.generation ?? sessionGeneration
+  const myEpoch = opts?.epoch ?? nextFeedEpoch(key)
+  clearFeedTimer(key)
+
+  setFeedSlice(key, (prev) => ({
+    ...prev,
+    status: prev.items.length > 0 ? prev.status : 'loading',
+    refreshing: prev.items.length > 0 ? true : prev.refreshing,
+    error: null,
+  }))
+
+  const ans = await ask({ ask: 'feed', channel: key })
+  if (myGen !== sessionGeneration || feedEpochs.get(key) !== myEpoch) return
+
   if (ans.failed) {
-    if (useDouyin.getState().videos.length === 0) {
-      useDouyin.setState({ feedLoading: false, feedError: ans.error ?? '加载失败' })
-    } else {
-      useDouyin.setState({ feedLoading: false })
-    }
+    setFeedSlice(key, (prev) => ({
+      ...prev,
+      status: prev.items.length > 0 ? 'ready' : 'error',
+      refreshing: false,
+      error: ans.error ?? '加载失败',
+    }))
     return
   }
+
   if (ans.videos && ans.videos.length > 0) {
-    const videos = ans.videos
-    const cur = useDouyin.getState().current
-    const pb = useDouyin.getState().playback
-    const idx = cur ? videos.findIndex((v) => v.id === cur.id) : -1
-    useDouyin.setState({
-      videos,
-      feedLoading: false,
-      feedError: null,
-      ...(idx >= 0 ? { currentVideoIndex: idx } : {}),
-      ...(!cur && !pb ? { current: videos[0] ?? null, currentVideoIndex: 0 } : {}),
-    })
+    applyFeedVideos(key, ans.videos)
   } else {
-    useDouyin.setState({ feedLoading: false })
+    setFeedSlice(key, (prev) => ({
+      ...prev,
+      status: prev.items.length > 0 ? 'ready' : 'ready',
+      refreshing: false,
+    }))
   }
 }
 
-function scheduleFeedFallback(channel: string, epoch: number): void {
-  if (feedFallbackTimer) clearTimeout(feedFallbackTimer)
-  if (!IN_HOST) {
-    void loadFeed(channel, epoch)
+function scheduleFeedFallback(key: DouyinFeedKey, epoch: number, generation: number): void {
+  clearFeedTimer(key)
+  if (!inHostNow()) {
+    void loadFeed(key, { epoch, generation })
     return
   }
-  // Wait for the newly navigated Douyin page to push its captured feed (id === 0);
-  // only query via `ask` if nothing has arrived after navigation settles.
-  feedFallbackTimer = setTimeout(() => {
-    feedFallbackTimer = null
-    if (epoch !== feedEpoch) return
-    if (useDouyin.getState().videos.length === 0) {
-      void loadFeed(channel, epoch)
+  const timer = setTimeout(() => {
+    feedTimers.delete(key)
+    if (generation !== sessionGeneration || feedEpochs.get(key) !== epoch) return
+    const slice = getFeedSlice(useDouyin.getState(), key)
+    if (slice.status === 'loading' || slice.refreshing || slice.items.length === 0) {
+      void loadFeed(key, { epoch, generation })
     }
-  }, 2200)
+  }, FEED_FALLBACK_MS)
+  feedTimers.set(key, timer)
+}
+
+function requestFeedForKey(key: DouyinFeedKey, opts?: { isInitialRecommend?: boolean }): void {
+  const gen = sessionGeneration
+  const epoch = nextFeedEpoch(key)
+  setFeedSlice(key, (prev) => ({
+    ...prev,
+    status: prev.items.length > 0 ? prev.status : 'loading',
+    error: null,
+  }))
+  if (!opts?.isInitialRecommend) {
+    send({ action: 'channel', channel: key })
+  }
+  scheduleFeedFallback(key, epoch, gen)
 }
 
 export function selectTab(tab: DouyinTab): void {
-  const prev = useDouyin.getState().tab
-  const switchingFeed =
-    prev !== tab && (tab === 'recommend' || tab === 'jingxuan' || tab === 'follow' || tab === 'channels')
-  const epoch = switchingFeed ? ++feedEpoch : feedEpoch
-  useDouyin.setState({
-    tab,
-    ...(switchingFeed && IN_HOST ? { videos: [], feedLoading: true, feedError: null } : {}),
-  })
+  const state = useDouyin.getState()
+  useDouyin.setState({ tab })
   if (tab === 'recommend' || tab === 'jingxuan' || tab === 'follow' || tab === 'channels') {
-    const ch = activeChannelKey(tab, useDouyin.getState().channelId)
-    if (prev !== tab) {
-      send({ action: 'channel', channel: ch })
-      scheduleFeedFallback(ch, epoch)
-    } else if (useDouyin.getState().videos.length === 0) {
-      void loadFeed(ch, epoch)
+    if (tab === 'follow' && state.signedIn === false) return
+    const key = activeFeedKey(tab, state.channelId)
+    const slice = getFeedSlice(useDouyin.getState(), key)
+    if (slice.status === 'idle' || (slice.status === 'error' && slice.items.length === 0)) {
+      requestFeedForKey(key)
     }
   }
 }
 
-export function selectChannel(channelId: string): void {
-  const prev = useDouyin.getState()
-  const changed = prev.tab !== 'channels' || prev.channelId !== channelId
-  const epoch = ++feedEpoch
-  useDouyin.setState({
-    tab: 'channels',
-    channelId,
-    ...(changed && IN_HOST ? { videos: [], feedLoading: true, feedError: null } : {}),
-  })
-  send({ action: 'channel', channel: channelId })
-  scheduleFeedFallback(channelId, epoch)
+export function selectChannel(channelId: DouyinChannelId): void {
+  useDouyin.setState({ tab: 'channels', channelId })
+  const slice = getFeedSlice(useDouyin.getState(), channelId)
+  if (slice.status === 'idle' || (slice.status === 'error' && slice.items.length === 0)) {
+    requestFeedForKey(channelId)
+  }
 }
 
 export function refreshFeed(): void {
   const state = useDouyin.getState()
-  if (state.tab === 'search' && state.searchQuery.trim()) {
-    void search(state.searchQuery)
+  if (state.tab === 'library') return
+  if (state.tab === 'search') {
+    if (state.searchQuery.trim()) void search(state.searchQuery)
     return
   }
-  const epoch = ++feedEpoch
-  const ch = activeChannelKey(state.tab, state.channelId)
-  send({ action: 'refresh' })
-  if (!isInHost()) {
-    const rotated = [...state.videos.slice(1), state.videos[0]].filter(Boolean)
-    useDouyin.setState({ videos: rotated, currentVideoIndex: 0 })
-    void loadFeed(ch, epoch)
+  if (state.tab === 'follow' && state.signedIn === false) return
+
+  const key = activeFeedKey(state.tab, state.channelId)
+  setTabScrollTop(key, 0)
+
+  // Detach active play queue if refreshing the same source so active playback & queue stay intact.
+  if (state.queue && state.queue.source === key && state.queue.boundToFeed) {
+    useDouyin.setState({ queue: { ...state.queue, boundToFeed: false } })
+  }
+
+  if (!inHostNow()) {
+    const existing = getFeedSlice(useDouyin.getState(), key).items
+    const base = existing.length > 0 ? existing : MOCK_DOUYIN_VIDEOS
+    const rotated = base.length > 1 ? [...base.slice(1), base[0]] : [...base]
+    setFeedSlice(key, {
+      items: rotated,
+      status: 'ready',
+      refreshing: false,
+      error: null,
+      updatedAt: Date.now(),
+    })
     return
   }
-  useDouyin.setState({ videos: [], feedLoading: true, feedError: null })
-  scheduleFeedFallback(ch, epoch)
+
+  const gen = sessionGeneration
+  const epoch = nextFeedEpoch(key)
+  setFeedSlice(key, (prev) => ({
+    ...prev,
+    status: prev.items.length > 0 ? prev.status : 'loading',
+    refreshing: true,
+    error: null,
+  }))
+  send({ action: 'refresh', channel: key })
+  scheduleFeedFallback(key, epoch, gen)
 }
 
 export async function search(query: string): Promise<void> {
   const trimmed = query.trim()
   if (!trimmed) return
+  const myGen = sessionGeneration
+  const myEpoch = ++searchEpoch
+  setTabScrollTop('search', 0)
+
   useDouyin.setState((s) => ({
     tab: 'search',
     searchQuery: trimmed,
-    searchLoading: true,
+    searchStatus: 'loading',
+    searchError: null,
     recentSearches: [trimmed, ...s.recentSearches.filter((q) => q !== trimmed)].slice(0, MAX_SEARCHES),
   }))
+
   const ans = await ask({ ask: 'search', query: trimmed })
+  if (myGen !== sessionGeneration || myEpoch !== searchEpoch) return
+
+  if (ans.failed) {
+    useDouyin.setState({
+      searchStatus: 'error',
+      searchError: ans.error ?? '搜索失败',
+    })
+    return
+  }
+
   useDouyin.setState({
-    searchLoading: false,
-    searchResults: ans.videos ?? [],
+    searchStatus: 'ready',
+    searchError: null,
+    searchResults: dedupeVideos(ans.videos ?? []),
   })
 }
 
 export function clearSearch(): void {
-  useDouyin.setState({ searchQuery: '', searchResults: [], searchLoading: false })
+  searchEpoch++
+  setTabScrollTop('search', 0)
+  useDouyin.setState({ searchQuery: '', searchResults: [], searchStatus: 'idle', searchError: null })
 }
 
 export function clearRecentSearches(): void {
@@ -622,81 +1036,255 @@ export function clearHistory(): void {
   useDouyin.setState({ watchedHistory: [] })
 }
 
+function applyOptimisticPlay(targetVideo: DouyinVideo, queue: DouyinPlayQueue, openFullscreen: boolean): void {
+  const state = useDouyin.getState()
+  const inHost = inHostNow()
+  const now = performance.now()
+  useDouyin.setState({
+    queue,
+    current: targetVideo,
+    userPaused: false,
+    playbackError: null,
+    hostReady: !inHost,
+    buffering: inHost,
+    playback: {
+      id: targetVideo.id,
+      title: targetVideo.title,
+      artist: targetVideo.author,
+      author: targetVideo.author,
+      avatar: targetVideo.avatar,
+      artwork: targetVideo.artwork,
+      duration: targetVideo.duration || 120,
+      position: 0,
+      status: 'playing',
+      liked: state.liked[targetVideo.id] ?? targetVideo.liked ?? false,
+      collected: state.collected[targetVideo.id] ?? targetVideo.collected ?? false,
+      likes: targetVideo.likes,
+      comments: targetVideo.comments,
+      music: targetVideo.music,
+      rate: state.rate,
+      muted: state.muted,
+      autoScroll: state.autoScroll,
+      channel: queue.source,
+      queueSource: queue.source,
+      at: now,
+    },
+    playing: true,
+    ...(openFullscreen ? { open: true } : {}),
+  })
+  recordWatched(targetVideo)
+}
+
+export function playFromList(
+  source: DouyinQueueSource,
+  items: readonly DouyinVideo[],
+  index: number,
+  options?: { openFullscreen?: boolean; label?: string; boundToFeed?: boolean },
+): void {
+  const deduped = dedupeVideos(items)
+  if (deduped.length === 0) return
+  const safeIndex = Math.max(0, Math.min(deduped.length - 1, index))
+  const targetVideo = deduped[safeIndex]
+  const queue: DouyinPlayQueue = {
+    source,
+    label: options?.label,
+    items: deduped,
+    index: safeIndex,
+    boundToFeed: options?.boundToFeed ?? isFeedSource(source),
+  }
+  send({
+    action: 'play',
+    video: targetVideo,
+    index: safeIndex,
+    source,
+    queueIds: deduped.map((v) => v.id),
+  })
+  applyOptimisticPlay(targetVideo, queue, Boolean(options?.openFullscreen))
+}
+
+export function playFromQueueIndex(index: number, openFullscreen?: boolean): void {
+  const state = useDouyin.getState()
+  const queue = state.queue
+  if (!queue || queue.items.length === 0) return
+  const safeIndex = Math.max(0, Math.min(queue.items.length - 1, index))
+  const targetVideo = queue.items[safeIndex]
+  const nextQueue: DouyinPlayQueue = { ...queue, index: safeIndex }
+  send({
+    action: 'play',
+    video: targetVideo,
+    index: safeIndex,
+    source: queue.source,
+    queueIds: queue.items.map((v) => v.id),
+  })
+  applyOptimisticPlay(targetVideo, nextQueue, openFullscreen ?? state.open)
+}
+
 export function play(video?: DouyinVideo, index?: number, openFullscreen = false): void {
   const state = useDouyin.getState()
-  const list = state.tab === 'search' && state.searchResults.length > 0 ? state.searchResults : state.videos
-  const targetVideo = video ?? state.current ?? list[0]
-  const targetIndex =
-    typeof index === 'number'
-      ? index
-      : targetVideo
-        ? state.videos.findIndex((v) => v.id === targetVideo.id)
-        : state.currentVideoIndex
+  const source = activeBrowseSource(state)
+  const displayed = getDisplayedList(state)
+  const label = source === 'search' ? state.searchQuery || undefined : undefined
 
-  send({ action: 'play', video: targetVideo, index: targetIndex >= 0 ? targetIndex : undefined })
-
-  if (targetVideo) {
-    const now = performance.now()
-    useDouyin.setState({
-      currentVideoIndex: targetIndex >= 0 ? targetIndex : state.currentVideoIndex,
-      current: targetVideo,
-      hostReady: !IN_HOST,
-      playback: {
-        id: targetVideo.id,
-        title: targetVideo.title,
-        artist: targetVideo.author,
-        author: targetVideo.author,
-        avatar: targetVideo.avatar,
-        artwork: targetVideo.artwork,
-        duration: targetVideo.duration || 120,
-        position: 0,
-        status: 'playing',
-        liked: state.liked[targetVideo.id] ?? targetVideo.liked ?? false,
-        collected: state.collected[targetVideo.id] ?? targetVideo.collected ?? false,
-        likes: targetVideo.likes,
-        comments: targetVideo.comments,
-        music: targetVideo.music,
-        rate: state.rate,
-        muted: state.muted,
-        autoScroll: state.autoScroll,
-        channel: targetVideo.channel,
-        at: now,
-      },
-      playing: true,
-      ...(openFullscreen ? { open: true } : {}),
+  if (video) {
+    const inDisplayed = displayed.findIndex((v) => v.id === video.id)
+    if (inDisplayed >= 0) {
+      playFromList(source, displayed, inDisplayed, { openFullscreen, label })
+      return
+    }
+    if (state.queue) {
+      const inQueue = state.queue.items.findIndex((v) => v.id === video.id)
+      if (inQueue >= 0) {
+        playFromQueueIndex(inQueue, openFullscreen)
+        return
+      }
+    }
+    const list = displayed.length > 0 ? [video, ...displayed.filter((v) => v.id !== video.id)] : [video]
+    playFromList(source, list, typeof index === 'number' ? Math.max(0, Math.min(list.length - 1, index)) : 0, {
+      openFullscreen,
+      label,
     })
-    recordWatched(targetVideo)
-  } else {
+    return
+  }
+
+  if (state.queue && state.queue.items.length > 0) {
+    playFromQueueIndex(typeof index === 'number' ? index : state.queue.index, openFullscreen)
+    return
+  }
+
+  if (displayed.length > 0) {
+    playFromList(source, displayed, typeof index === 'number' ? index : 0, { openFullscreen, label })
+    return
+  }
+
+  send({ action: 'play' })
+  useDouyin.setState({ userPaused: false, playbackError: null })
+  show({ status: 'playing' })
+  if (openFullscreen) useDouyin.setState({ open: true })
+}
+
+export function retryCurrent(): void {
+  const state = useDouyin.getState()
+  if (state.queue && state.queue.items.length > 0) {
+    playFromQueueIndex(state.queue.index, state.open)
+    return
+  }
+  if (state.current) {
+    play(state.current, 0, state.open)
+  }
+}
+
+function togglePlayback(automatic: boolean): void {
+  const state = useDouyin.getState()
+  const { playing, playback, current, queue } = state
+  if (playing) {
+    send({ action: 'pause' })
+    useDouyin.setState({
+      playing: false,
+      buffering: false,
+      ...(automatic ? {} : { userPaused: true }),
+    })
+    show({ status: 'paused' })
+  } else if (playback) {
+    send({ action: 'play' })
+    useDouyin.setState({
+      playbackError: null,
+      ...(automatic ? {} : { userPaused: false }),
+    })
     show({ status: 'playing' })
-    if (openFullscreen) useDouyin.setState({ open: true })
+  } else if (queue && queue.items.length > 0) {
+    playFromQueueIndex(queue.index, state.open)
+  } else {
+    const displayed = getDisplayedList(state)
+    const fallback = current ?? displayed[0]
+    if (fallback) {
+      play(fallback, 0, state.open)
+    }
   }
 }
 
 export function playOrPause(): void {
-  const { playing, playback, current, videos, currentVideoIndex } = useDouyin.getState()
-  if (playing) {
-    send({ action: 'pause' })
-    show({ status: 'paused' })
-  } else if (playback) {
-    send({ action: 'play' })
-    show({ status: 'playing' })
-  } else {
-    play(current ?? videos[currentVideoIndex] ?? videos[0], currentVideoIndex)
-  }
+  togglePlayback(false)
+}
+
+export function pauseAutomatically(): void {
+  const s = useDouyin.getState()
+  if (s.playing || s.buffering) togglePlayback(true)
+}
+
+export function resumeAutomatically(): void {
+  if (!useDouyin.getState().playing) togglePlayback(true)
 }
 
 export function skip(direction: 1 | -1): void {
-  send({ action: direction === 1 ? 'next' : 'previous' })
   const state = useDouyin.getState()
-  if (state.videos.length > 0) {
-    const nextIdx = (state.currentVideoIndex + direction + state.videos.length) % state.videos.length
-    const nextVid = state.videos[nextIdx]
-    if (!isInHost() && nextVid) {
-      play(nextVid, nextIdx, state.open)
-    } else {
-      useDouyin.setState({ currentVideoIndex: nextIdx, ...(nextVid ? { current: nextVid } : {}) })
+  const inHost = inHostNow()
+  const queue = state.queue
+
+  // Bootstrap queue from current browsed list if none exists yet.
+  if (!queue || queue.items.length === 0) {
+    const displayed = getDisplayedList(state)
+    if (displayed.length > 0) {
+      const source = activeBrowseSource(state)
+      const label = source === 'search' ? state.searchQuery || undefined : undefined
+      playFromList(source, displayed, direction === 1 ? 0 : displayed.length - 1, {
+        openFullscreen: state.open,
+        label,
+      })
+      return
+    }
+    send({ action: direction === 1 ? 'next' : 'previous' })
+    return
+  }
+
+  const len = queue.items.length
+  const curIdx =
+    state.current?.id && queue.items.some((v) => v.id === state.current?.id)
+      ? queue.items.findIndex((v) => v.id === state.current?.id)
+      : Math.max(0, Math.min(len - 1, queue.index))
+
+  const atEnd = direction === 1 && curIdx >= len - 1
+  const feedQueue = isFeedSource(queue.source)
+
+  // End-of-queue fallback for remote feeds:
+  if (atEnd && feedQueue) {
+    // 1) If queue was detached by manual refresh and fresh batch already arrived, hand off seamlessly!
+    if (!queue.boundToFeed) {
+      const freshItems = getFeedSlice(state, queue.source).items
+      if (hasNovelVideos(freshItems, queue.items)) {
+        playFromList(queue.source, freshItems, 0, { openFullscreen: state.open, boundToFeed: true })
+        return
+      }
+    }
+    // 2) In host mode, let douyin.js attempt fallback incremental fetch (4.5s) or loop back to 0 without UI flicker.
+    if (inHost) {
+      useDouyin.setState({ buffering: true, playbackError: null, userPaused: false })
+      send({ action: 'next' })
+      return
     }
   }
+
+  // Single-item queue fallback: replay from start.
+  if (len === 1) {
+    replay()
+    return
+  }
+
+  // Deterministic index transition (non-end step, or finite list loop-around, or preview feed loop-around).
+  const nextIdx = (curIdx + direction + len) % len
+  const nextVid = queue.items[nextIdx]
+  if (!inHost) {
+    playFromQueueIndex(nextIdx, state.open)
+    return
+  }
+
+  send({ action: direction === 1 ? 'next' : 'previous' })
+  useDouyin.setState({
+    queue: { ...queue, index: nextIdx },
+    current: nextVid,
+    buffering: true,
+    playbackError: null,
+    userPaused: false,
+  })
 }
 
 export function nextVideo(): void {
@@ -723,7 +1311,14 @@ export function seekBy(deltaSeconds: number): void {
 export function replay(): void {
   seek(0)
   send({ action: 'play' })
+  useDouyin.setState({ userPaused: false, playbackError: null })
   show({ position: 0, status: 'playing' })
+}
+
+/** Transient volume change used by automatic game pause/resume fade; never overwrites saved user volume. */
+export function applyFadeVolume(share: number): void {
+  const clamped = Math.max(0, Math.min(1, share))
+  send({ action: 'volume', percent: Math.round(clamped * 100) })
 }
 
 export function sendVolume(share: number): void {
@@ -767,8 +1362,8 @@ export function toggleLike(target?: DouyinVideo | string): void {
   const videoObj =
     typeof target === 'object' && target !== null
       ? target
-      : state.videos.find((v) => v.id === target) ?? state.current ?? undefined
-  const targetId = typeof target === 'string' ? target : videoObj?.id ?? state.playback?.id
+      : (findVideoMetadata(state, target) ?? state.current ?? undefined)
+  const targetId = typeof target === 'string' ? target : (videoObj?.id ?? state.playback?.id)
   if (!targetId) return
 
   const nextLiked = !state.liked[targetId]
@@ -794,8 +1389,7 @@ export function toggleLike(target?: DouyinVideo | string): void {
 
 export function toggleCollect(target?: DouyinVideo | string): void {
   const state = useDouyin.getState()
-  const targetId =
-    typeof target === 'string' ? target : (target?.id ?? state.current?.id ?? state.playback?.id)
+  const targetId = typeof target === 'string' ? target : (target?.id ?? state.current?.id ?? state.playback?.id)
   if (!targetId) return
 
   const nextCollected = !state.collected[targetId]
@@ -810,13 +1404,20 @@ export function toggleCollect(target?: DouyinVideo | string): void {
 
 export function openPlayer(instant = false): void {
   const state = useDouyin.getState()
-  if (!state.playback && !state.current && state.videos[0]) {
-    play(state.videos[0], 0, true)
-    return
-  }
-  if (!state.playback && state.current) {
-    play(state.current, state.currentVideoIndex, true)
-    return
+  if (!state.playback) {
+    if (state.queue && state.queue.items.length > 0) {
+      playFromQueueIndex(state.queue.index, true)
+      return
+    }
+    if (state.current) {
+      play(state.current, 0, true)
+      return
+    }
+    const displayed = getDisplayedList(state)
+    if (displayed[0]) {
+      play(displayed[0], 0, true)
+      return
+    }
   }
   useDouyin.setState({ open: true, returnToPlayer: false })
   if (!instant) {
@@ -867,9 +1468,16 @@ export function useDouyinSource(): { source: MediaSource; artwork: string | null
   }, [playback])
 }
 
-/** Release transient session data while keeping login, user preferences, and local library. */
+/**
+ * Release all transient session data after 30s idle reclamation:
+ * cancels pending asks/timers, clears remote tab caches, active queue, and playback state,
+ * while preserving login profile, playback preferences, and persisted local library/search history.
+ */
 export function releaseResource(): void {
+  cancelPendingRequests()
+  tabScrollTop.clear()
   const before = useDouyin.getState()
+  const inHost = inHostNow()
   const kept = {
     signedIn: before.signedIn,
     profile: before.profile,
@@ -885,12 +1493,24 @@ export function releaseResource(): void {
     recentSearches: before.recentSearches,
   }
   useDouyin.setState({
-    ...useDouyin.getInitialState(),
+    ...buildInitialState(),
     ...kept,
+    feeds: {},
+    searchQuery: '',
+    searchResults: [],
+    searchStatus: 'idle',
+    searchError: null,
+    queue: null,
+    current: null,
+    playback: null,
+    playbackError: null,
+    playing: false,
+    buffering: false,
+    hostReady: !inHost,
+    sessionStarted: false,
+    userPaused: false,
     open: false,
     returnToPlayer: false,
     hole: null,
-    playback: null,
-    playing: false,
   })
 }

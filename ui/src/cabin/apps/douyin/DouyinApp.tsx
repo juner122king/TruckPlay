@@ -8,27 +8,34 @@ import { CloseGlyph, PauseGlyph, PersonGlyph, PlayGlyph, SearchGlyph } from '../
 import { FullScreenGlyph } from '../youtube/glyphs'
 import { OverVideo, VideoHole } from '../youtube/VideoHole'
 import {
+  activeBrowseSource,
+  activeFeedKey,
   clearHistory,
   clearRecentSearches,
   clearSearch,
   DOUYIN_CHANNELS,
   DOUYIN_HOT_KEYWORDS,
   type DouyinTab,
+  enterDouyin,
   formatClock,
   formatCount,
+  getDisplayedList,
+  getFeedSlice,
+  getTabScrollTop,
   openPlayer,
-  play,
+  playFromList,
   playOrPause,
   positionOf,
   refreshFeed,
+  retryCurrent,
   search,
   seek,
   selectChannel,
   selectTab,
   sendSignIn,
   sendSignOut,
-  sendStart,
   setLibrarySection,
+  setTabScrollTop,
   skip,
   toggleAutoScroll,
   toggleCollect,
@@ -162,7 +169,6 @@ export function DouyinApp() {
   const [query, setQuery] = useState(state.searchQuery)
   const [beforeSearchTab, setBeforeSearchTab] = useState<MainTab>('recommend')
   const [accountOpen, setAccountOpen] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
 
   const typing = useKeyboard((s) => s.field?.id === SEARCH_FIELD)
   const barRef = useRef<HTMLDivElement>(null)
@@ -173,8 +179,13 @@ export function DouyinApp() {
   const leavingTypingRef = useRef(false)
   const wasTypingRef = useRef(typing)
 
+  const browseSource = activeBrowseSource(state)
+  const currentFeedKey = activeFeedKey(state.tab, state.channelId)
+  const currentFeed = getFeedSlice(state, currentFeedKey)
+  const recommendFeed = getFeedSlice(state, 'recommend')
+
   useEffect(() => {
-    sendStart()
+    enterDouyin()
   }, [])
 
   useEffect(() => {
@@ -199,9 +210,11 @@ export function DouyinApp() {
     }
   }, [typing, query])
 
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: 0 })
-  }, [state.tab, state.channelId, state.librarySection])
+  useLayoutEffect(() => {
+    const el = listRef.current
+    if (!el) return
+    el.scrollTop = getTabScrollTop(browseSource)
+  }, [browseSource])
 
   useEffect(() => {
     if (!accountOpen) return
@@ -241,11 +254,17 @@ export function DouyinApp() {
     void search(trimmed)
   }
 
+  const isRefreshing =
+    state.tab === 'search'
+      ? state.searchStatus === 'loading'
+      : state.tab === 'library'
+        ? false
+        : currentFeed.refreshing || currentFeed.status === 'loading'
+
   const triggerRefresh = () => {
-    if (refreshing) return
-    setRefreshing(true)
+    if (isRefreshing) return
+    if (listRef.current) listRef.current.scrollTop = 0
     refreshFeed()
-    setTimeout(() => setRefreshing(false), 650)
   }
 
   const searching = state.tab === 'search'
@@ -259,18 +278,24 @@ export function DouyinApp() {
     { id: 'library', label: t('记录', 'Library') },
   ]
 
-  const activeVideo = state.current ?? state.videos[state.currentVideoIndex] ?? state.videos[0] ?? null
+  // Left stage is anchored strictly to the actual playback context, decoupled from the browsed tab.
+  const queueCurrent = state.queue ? (state.queue.items[state.queue.index] ?? state.queue.items[0] ?? null) : null
+  const activeVideo = state.current ?? queueCurrent ?? recommendFeed.items[0] ?? null
   const activeId = state.playback?.id || activeVideo?.id
   const isPlayingNow = Boolean(state.playing || state.playback?.status === 'playing')
 
-  const displayedList: DouyinVideo[] =
+  const displayedList: DouyinVideo[] = getDisplayedList(state)
+  const canRefresh =
+    state.tab !== 'library' &&
+    !(state.tab === 'follow' && state.signedIn === false) &&
+    !(state.tab === 'search' && !state.searchQuery.trim())
+  const isListLoading =
     state.tab === 'search'
-      ? state.searchResults
+      ? state.searchStatus === 'loading'
       : state.tab === 'library'
-        ? state.librarySection === 'liked'
-          ? state.likedVideos
-          : state.watchedHistory
-        : state.videos
+        ? false
+        : currentFeed.status === 'loading' || currentFeed.refreshing
+  const listError = state.tab === 'search' ? state.searchError : state.tab === 'library' ? null : currentFeed.error
 
   const sideTitle =
     state.tab === 'recommend'
@@ -280,7 +305,8 @@ export function DouyinApp() {
         : state.tab === 'follow'
           ? t('关注动态', 'Following')
           : state.tab === 'channels'
-            ? (DOUYIN_CHANNELS.find((c) => c.id === state.channelId)?.[chinese ? 'zh' : 'en'] ?? t('频道精选', 'Channel'))
+            ? (DOUYIN_CHANNELS.find((c) => c.id === state.channelId)?.[chinese ? 'zh' : 'en'] ??
+              t('频道精选', 'Channel'))
             : state.tab === 'search'
               ? state.searchQuery
                 ? t(`“${state.searchQuery}”`, `"${state.searchQuery}"`)
@@ -442,7 +468,12 @@ export function DouyinApp() {
           <span className="dy-spinner" aria-hidden="true" />
           <div className="dy-signin-banner-text">
             <strong>{t('桌面扫码登录窗口已打开', 'Desktop Sign-In Window Opened')}</strong>
-            <span>{t('请使用手机抖音扫码登录，完成后自动同步推荐与关注。', 'Scan the QR code on your desktop with the Douyin app.')}</span>
+            <span>
+              {t(
+                '请使用手机抖音扫码登录，完成后自动同步推荐与关注。',
+                'Scan the QR code on your desktop with the Douyin app.',
+              )}
+            </span>
           </div>
         </div>
       )}
@@ -465,7 +496,12 @@ export function DouyinApp() {
             {!inHost && (
               <div className="dy-stage-preview" aria-hidden="true">
                 {activeVideo?.artwork && (
-                  <img className="dy-stage-preview-blur" src={activeVideo.artwork} alt="" referrerPolicy="no-referrer" />
+                  <img
+                    className="dy-stage-preview-blur"
+                    src={activeVideo.artwork}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                  />
                 )}
                 {activeVideo?.artwork ? (
                   <img
@@ -532,22 +568,27 @@ export function DouyinApp() {
                   </button>
                 )}
               </div>
-            ) : (
+            ) : canRefresh ? (
               <button
                 type="button"
-                className={`dy-refresh-pill${refreshing ? ' spinning' : ''}`}
+                className={`dy-refresh-pill${isRefreshing ? ' spinning' : ''}`}
                 aria-label={t('刷新视频流', 'Refresh feed')}
+                disabled={isRefreshing}
                 onClick={triggerRefresh}
               >
                 <RefreshGlyph size={17} />
                 <span>{t('换一批', 'Refresh')}</span>
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Horizontal swipeable channel pills when in Channels tab */}
           {state.tab === 'channels' && (
-            <div className="dy-channel-strip dy-fade-scroller" role="tablist" aria-label={t('抖音频道分类', 'Channels')}>
+            <div
+              className="dy-channel-strip dy-fade-scroller"
+              role="tablist"
+              aria-label={t('抖音频道分类', 'Channels')}
+            >
               {DOUYIN_CHANNELS.map((ch) => {
                 const selected = ch.id === state.channelId
                 return (
@@ -604,19 +645,26 @@ export function DouyinApp() {
 
           {/* Video Queue / Results List */}
           {(state.tab !== 'search' || Boolean(state.searchQuery)) && (
-            <div ref={listRef} className="dy-feed-list">
-              {state.tab === 'follow' && state.signedIn === false && (
+            <div
+              ref={listRef}
+              className="dy-feed-list"
+              onScroll={(e) => setTabScrollTop(browseSource, e.currentTarget.scrollTop)}
+            >
+              {state.tab === 'follow' && state.signedIn === false ? (
                 <div className="dy-empty-card">
                   <FollowGlyph size={34} />
                   <strong>{t('登录后查看关注动态', 'Sign in to view Following')}</strong>
-                  <p>{t('使用手机抖音扫码即可同步你关注的创作者更新。', 'Scan with Douyin mobile app to sync followed creators.')}</p>
+                  <p>
+                    {t(
+                      '使用手机抖音扫码即可同步你关注的创作者更新。',
+                      'Scan with Douyin mobile app to sync followed creators.',
+                    )}
+                  </p>
                   <button type="button" className="dy-primary-btn" onClick={sendSignIn}>
                     {t('立即扫码登录', 'Sign In with QR')}
                   </button>
                 </div>
-              )}
-
-              {(state.feedLoading || state.searchLoading) && displayedList.length === 0 ? (
+              ) : isListLoading && displayedList.length === 0 ? (
                 <div className="dy-skeleton-list" aria-busy="true">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="dy-skeleton-row" />
@@ -630,12 +678,14 @@ export function DouyinApp() {
                       ? state.librarySection === 'liked'
                         ? t('还没有点赞的视频', 'No liked videos yet')
                         : t('暂无观看记录', 'No watch history yet')
-                      : t('暂未获取到视频内容', 'No videos loaded')}
+                      : listError
+                        ? t('视频流加载失败', 'Failed to load videos')
+                        : t('暂未获取到视频内容', 'No videos loaded')}
                   </strong>
                   <p>
                     {state.tab === 'library'
                       ? t('点击舞台右侧红心或浏览推荐流即可记录。', 'Tap the heart on any video or watch from For You.')
-                      : t('点击右上角「换一批」重新拉取抖音推荐流。', 'Tap Refresh to fetch a new batch of videos.')}
+                      : t('点击右上角「换一批」重新拉取抖音视频流。', 'Tap Refresh to fetch a new batch of videos.')}
                   </p>
                 </div>
               ) : (
@@ -643,10 +693,15 @@ export function DouyinApp() {
                   const isCurrent = video.id === activeId
                   return (
                     <button
-                      key={`${video.id}-${idx}`}
+                      key={video.id}
                       type="button"
                       className={`dy-feed-card${isCurrent ? ' active' : ''}`}
-                      onClick={() => play(video, idx, false)}
+                      onClick={() =>
+                        playFromList(browseSource, displayedList, idx, {
+                          openFullscreen: false,
+                          label: browseSource === 'search' ? state.searchQuery || undefined : undefined,
+                        })
+                      }
                     >
                       <div className="dy-feed-thumb">
                         {video.artwork ? (
@@ -709,6 +764,7 @@ function StageOverlay({
   const likedMap = useDouyin((s) => s.liked)
   const collectedMap = useDouyin((s) => s.collected)
   const buffering = useDouyin((s) => s.buffering)
+  const playbackError = useDouyin((s) => s.playbackError)
 
   const { time, duration } = useStagePosition()
   const [hudVisible, setHudVisible] = useState(true)
@@ -795,7 +851,23 @@ function StageOverlay({
       <div className="dy-stage-scrim-top" aria-hidden="true" />
       <div className="dy-stage-scrim-bottom" aria-hidden="true" />
 
-      {buffering && <div className="dy-spinner large floating" role="progressbar" aria-label={t('正在缓冲', 'Buffering')} />}
+      {buffering && (
+        <div className="dy-spinner large floating" role="progressbar" aria-label={t('正在缓冲', 'Buffering')} />
+      )}
+
+      {playbackError && !buffering && (
+        <div className="dy-playback-error glass" role="alert">
+          <span>{playbackError}</span>
+          <div className="dy-playback-error-actions">
+            <button type="button" className="dy-stage-pill" onClick={retryCurrent}>
+              {t('重试', 'Retry')}
+            </button>
+            <button type="button" className="dy-stage-pill primary" onClick={() => skip(1)}>
+              {t('下一条', 'Next')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {heartBurstAt && (
         <div key={heartBurstAt} className="dy-heart-burst" aria-hidden="true">
@@ -872,12 +944,7 @@ function StageOverlay({
           {isPlayingNow ? <PauseGlyph size={22} /> : <PlayGlyph size={22} />}
         </button>
 
-        <button
-          type="button"
-          className="dy-stage-rail-btn"
-          aria-label={t('下一条', 'Next')}
-          onClick={() => skip(1)}
-        >
+        <button type="button" className="dy-stage-rail-btn" aria-label={t('下一条', 'Next')} onClick={() => skip(1)}>
           <ArrowDownGlyph size={22} />
         </button>
 
