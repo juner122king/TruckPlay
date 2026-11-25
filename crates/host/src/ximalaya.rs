@@ -89,9 +89,18 @@ pub enum Question {
         page: Option<u32>,
     },
     RadioHome,
-    RadioList { location_id: u32, location_type_id: u8, category_id: u32, page_num: u32 },
-    RadioDetail { radio_id: u32 },
-    RadioSchedule { radio_id: u32 },
+    RadioList {
+        location_id: u32,
+        location_type_id: u8,
+        category_id: u32,
+        page_num: u32,
+    },
+    RadioDetail {
+        radio_id: u32,
+    },
+    RadioSchedule {
+        radio_id: u32,
+    },
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -561,10 +570,7 @@ mod tests {
             asc: Some(false),
         })
         .unwrap();
-        assert_eq!(
-            tracks,
-            serde_json::json!({ "ask": "albumTracks", "albumId": "70299661", "page": 3, "asc": false })
-        );
+        assert_eq!(tracks, serde_json::json!({ "ask": "albumTracks", "albumId": "70299661", "page": 3, "asc": false }));
 
         let rank = serde_json::to_value(Question::Rank {
             cluster: "rise".into(),
@@ -577,11 +583,7 @@ mod tests {
             serde_json::json!({ "ask": "rank", "cluster": "rise", "categoryCode": "xiangsheng", "page": 1 })
         );
 
-        let my_sec = serde_json::to_value(Question::MySection {
-            section: "subscribed".into(),
-            page: Some(2),
-        })
-        .unwrap();
+        let my_sec = serde_json::to_value(Question::MySection { section: "subscribed".into(), page: Some(2) }).unwrap();
         assert_eq!(my_sec, serde_json::json!({ "ask": "mySection", "section": "subscribed", "page": 2 }));
     }
 }

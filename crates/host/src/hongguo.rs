@@ -584,20 +584,15 @@ mod tests {
                 .expect("category question");
         assert_eq!(
             cat,
-            Question::Category {
-                content_type: Some("real-drama".into()),
-                slug: Some("romance".into()),
-                page: Some(2),
-            }
+            Question::Category { content_type: Some("real-drama".into()), slug: Some("romance".into()), page: Some(2) }
         );
 
         let rank: Question = serde_json::from_str(r#"{"ask":"rank","kind":"hot-real-drama","page":1}"#).unwrap();
         assert_eq!(rank, Question::Rank { kind: Some("hot-real-drama".into()), page: Some(1) });
 
-        let feed: Question = serde_json::from_str(
-            r#"{"ask":"feed","cursor":"abc","sessionId":"sess1","shownEntryIds":["e1","e2"]}"#,
-        )
-        .unwrap();
+        let feed: Question =
+            serde_json::from_str(r#"{"ask":"feed","cursor":"abc","sessionId":"sess1","shownEntryIds":["e1","e2"]}"#)
+                .unwrap();
         assert_eq!(
             feed,
             Question::Feed {
@@ -620,7 +615,8 @@ mod tests {
         let auto_next: Command = serde_json::from_str(r#"{"action":"setAutoNext","on":false}"#).unwrap();
         assert_eq!(auto_next, Command::SetAutoNext { on: false });
 
-        let select_ep: Command = serde_json::from_str(r#"{"action":"selectEpisode","episode":3,"vid":"7701"}"#).unwrap();
+        let select_ep: Command =
+            serde_json::from_str(r#"{"action":"selectEpisode","episode":3,"vid":"7701"}"#).unwrap();
         assert_eq!(select_ep, Command::SelectEpisode { episode: 3, vid: Some("7701".into()) });
     }
 
@@ -781,7 +777,9 @@ mod tests {
         // Power on Cabin with truck & telemetry (game running, not paused, electrics on)
         let _ = cabin.post_json(r#"{"type":"game","running":true}"#);
         let _ = cabin.post_json(r#"{"type":"gameShown","shown":true}"#);
-        let _ = cabin.post_json(r#"{"type":"truck","data":{"id":"scania.s_2016","make":"Scania","model":"S","hasCamera":true}}"#);
+        let _ = cabin.post_json(
+            r#"{"type":"truck","data":{"id":"scania.s_2016","make":"Scania","model":"S","hasCamera":true}}"#,
+        );
         let _ = cabin.post_json(r#"{"type":"telemetry","data":{"speed":0,"rpm":600,"gear":0,"fuel":0.8,"fuelCapacity":1000,"batteryVoltage":24,"waterTemp":80,"oilTemp":80,"oilPressure":3,"brakePressure":8,"electricEnabled":true,"engineEnabled":true,"paused":false,"x":0,"y":0,"z":0,"heading":0,"pitch":0,"roll":0,"cabinX":0,"cabinY":2,"cabinZ":-1,"headX":-0.6,"headY":1.4,"headZ":-0.3,"steering":0,"throttle":0,"brake":0,"cruiseControl":0,"odometer":100,"gameTime":100,"cameraKnown":false,"cameraX":0,"cameraY":0,"cameraZ":0,"nextRestStop":0}}"#);
         // Wait for boot screen to finish (`power on`) and home screen to render
         pump_both(5.5);
@@ -936,11 +934,19 @@ Write-Output ([AudioProbe]::ReadWebViewPeaks())
                     .ok();
                 std::thread::sleep(std::time::Duration::from_millis(600));
                 let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", ps]).output().ok();
-                println!("[wasapi:{label}] {}", out.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default());
-                if let Some(ref mut c) = child { let _ = c.wait(); }
+                println!(
+                    "[wasapi:{label}] {}",
+                    out.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default()
+                );
+                if let Some(ref mut c) = child {
+                    let _ = c.wait();
+                }
             } else {
                 let out = std::process::Command::new("powershell").args(["-NoProfile", "-Command", ps]).output().ok();
-                println!("[wasapi:{label}] {}", out.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default());
+                println!(
+                    "[wasapi:{label}] {}",
+                    out.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default()
+                );
             }
         };
         wasapi_probe("playing-devwindow", false);

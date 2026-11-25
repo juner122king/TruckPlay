@@ -131,10 +131,8 @@ fn read_song(folder: &Path, file: &str, covers: &Path, kept: &mut BTreeSet<Strin
     song.title = text(tag.title());
     song.artist = text(tag.artist());
     let pictures = tag.pictures();
-    let picture = pictures
-        .iter()
-        .find(|picture| picture.pic_type() == PictureType::CoverFront)
-        .or_else(|| pictures.first());
+    let picture =
+        pictures.iter().find(|picture| picture.pic_type() == PictureType::CoverFront).or_else(|| pictures.first());
     if let Some(picture) = picture {
         let extension = match picture.mime_type() {
             Some(MimeType::Png) => Some("png"),
@@ -394,7 +392,8 @@ impl Player {
         stage.add(&view, false)?;
         view.add_startup_script(concat!(include_str!("cab_sound.js"), "\n", include_str!("music_folder.js")))?;
         let _ = std::fs::create_dir_all(page_dir);
-        let _ = std::fs::write(page_dir.join("index.html"), "<!doctype html><meta charset=\"utf-8\"><title>Player</title>");
+        let _ =
+            std::fs::write(page_dir.join("index.html"), "<!doctype html><meta charset=\"utf-8\"><title>Player</title>");
         view.map_folder(PAGE_HOST, page_dir)?;
         let player = Self { view, told: RefCell::default() };
         player.serve(music)?;
@@ -525,11 +524,10 @@ mod tests {
             play.checked(),
             Command::Play { files: Some(vec!["a.mp3".into(), "b.ogg".into()]), index: Some(1), shuffle: None }
         );
-        assert_eq!(serde_json::from_str::<Command>(r#"{"action":"play"}"#).unwrap(), Command::Play {
-            files: None,
-            index: None,
-            shuffle: None
-        });
+        assert_eq!(
+            serde_json::from_str::<Command>(r#"{"action":"play"}"#).unwrap(),
+            Command::Play { files: None, index: None, shuffle: None }
+        );
         assert_eq!(
             serde_json::from_str::<Command>(r#"{"action":"repeat","mode":"one"}"#).unwrap(),
             Command::Repeat { mode: Repeat::One }
@@ -570,7 +568,8 @@ mod tests {
         let timed = songs.iter().filter(|song| song.seconds > 0.0).count();
         let covered = songs.iter().filter(|song| song.cover.is_some()).count();
         println!("{tagged} with a title, {timed} with a length, {covered} with a cover");
-        let kinds: BTreeSet<_> = songs.iter().filter_map(|song| song.file.rsplit('.').next()).map(str::to_lowercase).collect();
+        let kinds: BTreeSet<_> =
+            songs.iter().filter_map(|song| song.file.rsplit('.').next()).map(str::to_lowercase).collect();
         println!("kinds: {kinds:?}");
         if std::env::var_os("WESTPLAY_MUSIC_FOLDER").is_some() {
             println!("{}", folder_message(Some(&folder), &songs));
@@ -586,6 +585,9 @@ mod tests {
         assert_eq!(message["type"], "musicFolder");
         assert_eq!(message["folder"], "music");
         assert_eq!(message["songs"][0], serde_json::json!({ "file": "a.mp3", "title": "A", "seconds": 12.5 }));
-        assert_eq!(serde_json::from_str::<serde_json::Value>(&folder_message(None, &[])).unwrap()["folder"], serde_json::Value::Null);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&folder_message(None, &[])).unwrap()["folder"],
+            serde_json::Value::Null
+        );
     }
 }

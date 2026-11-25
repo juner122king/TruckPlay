@@ -161,13 +161,7 @@ impl Stage {
         let page = compositor.CreateContainerVisual()?;
         page.SetSize(Vector2 { X: width as f32, Y: height as f32 })?;
         root.Children()?.InsertAtTop(&page)?;
-        Ok(Self {
-            _dispatcher: dispatcher,
-            compositor,
-            root,
-            page,
-            page_size: Rc::new(Cell::new((width, height))),
-        })
+        Ok(Self { _dispatcher: dispatcher, compositor, root, page, page_size: Rc::new(Cell::new((width, height))) })
     }
 
     /// The whole frame, for capture.

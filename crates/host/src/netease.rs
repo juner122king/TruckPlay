@@ -220,9 +220,11 @@ impl Netease {
             let _ = self.view.delete_cookies();
             self.told.borrow_mut().reset();
             let _ = self.view.navigate(HOME);
-            self.pending
-                .borrow_mut()
-                .push(Report::State(State { signed_in: false, playing: false, ..Default::default() }));
+            self.pending.borrow_mut().push(Report::State(State {
+                signed_in: false,
+                playing: false,
+                ..Default::default()
+            }));
             return;
         }
         if let Ok(json) = serde_json::to_string(command) {
@@ -434,8 +436,8 @@ mod tests {
         assert_eq!(parsed["avatarUrl"], "https://p1.music.126.net/a.jpg");
         assert_eq!(parsed["vipType"], 11);
 
-        let minimal: State = serde_json::from_str(r#"{"signedIn":false,"playing":false}"#)
-            .expect("deserialize minimal state");
+        let minimal: State =
+            serde_json::from_str(r#"{"signedIn":false,"playing":false}"#).expect("deserialize minimal state");
         assert_eq!(minimal.nickname, None);
         assert_eq!(minimal.avatar_url, None);
         assert_eq!(minimal.vip_type, None);
@@ -453,9 +455,10 @@ mod tests {
             .expect("deserialize userRadios");
         assert_eq!(radio_cmd, Command::Ask { id: 31, question: Question::UserRadios });
 
-        let prog_cmd: Command =
-            serde_json::from_str(r#"{"action":"ask","id":32,"question":{"ask":"radioPrograms","radioId":"793927849"}}"#)
-                .expect("deserialize radioPrograms");
+        let prog_cmd: Command = serde_json::from_str(
+            r#"{"action":"ask","id":32,"question":{"ask":"radioPrograms","radioId":"793927849"}}"#,
+        )
+        .expect("deserialize radioPrograms");
         assert_eq!(
             prog_cmd,
             Command::Ask { id: 32, question: Question::RadioPrograms { radio_id: "793927849".to_owned() } }

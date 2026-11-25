@@ -15,16 +15,46 @@ use crate::{bridge, hooks, log};
 /// The start of `traffic_semaphore_actor_t` update state:
 /// `push rbx; sub rsp, 20h; mov rax, [rcx+100h]; mov rbx, rcx; test rax, rax; je short; movsxd rdx, dword ptr [rax+70h]; mov [rsp+30h], rdi; movzx edi, byte ptr [rcx+108h]; cmp edx, 20h`
 const SEMAPHORE_UPDATE: [Option<u8>; 40] = [
-    Some(0x40), Some(0x53), // push rbx
-    Some(0x48), Some(0x83), Some(0xec), Some(0x20), // sub rsp, 20h
-    Some(0x48), Some(0x8b), Some(0x81), Some(0x00), Some(0x01), Some(0x00), Some(0x00), // mov rax, [rcx+100h]
-    Some(0x48), Some(0x8b), Some(0xd9), // mov rbx, rcx
-    Some(0x48), Some(0x85), Some(0xc0), // test rax, rax
-    Some(0x74), None, // je short
-    Some(0x48), Some(0x63), Some(0x50), Some(0x70), // movsxd rdx, dword ptr [rax+70h]
-    Some(0x48), Some(0x89), Some(0x7c), Some(0x24), Some(0x30), // mov [rsp+30h], rdi
-    Some(0x0f), Some(0xb6), Some(0xb9), Some(0x08), Some(0x01), Some(0x00), Some(0x00), // movzx edi, byte ptr [rcx+108h]
-    Some(0x83), Some(0xfa), Some(0x20), // cmp edx, 20h
+    Some(0x40),
+    Some(0x53), // push rbx
+    Some(0x48),
+    Some(0x83),
+    Some(0xec),
+    Some(0x20), // sub rsp, 20h
+    Some(0x48),
+    Some(0x8b),
+    Some(0x81),
+    Some(0x00),
+    Some(0x01),
+    Some(0x00),
+    Some(0x00), // mov rax, [rcx+100h]
+    Some(0x48),
+    Some(0x8b),
+    Some(0xd9), // mov rbx, rcx
+    Some(0x48),
+    Some(0x85),
+    Some(0xc0), // test rax, rax
+    Some(0x74),
+    None, // je short
+    Some(0x48),
+    Some(0x63),
+    Some(0x50),
+    Some(0x70), // movsxd rdx, dword ptr [rax+70h]
+    Some(0x48),
+    Some(0x89),
+    Some(0x7c),
+    Some(0x24),
+    Some(0x30), // mov [rsp+30h], rdi
+    Some(0x0f),
+    Some(0xb6),
+    Some(0xb9),
+    Some(0x08),
+    Some(0x01),
+    Some(0x00),
+    Some(0x00), // movzx edi, byte ptr [rcx+108h]
+    Some(0x83),
+    Some(0xfa),
+    Some(0x20), // cmp edx, 20h
 ];
 
 type UpdateFn = unsafe extern "system" fn(*mut u8);
@@ -36,8 +66,7 @@ struct TrackedSemaphore {
     last_frame: u64,
 }
 
-static TRACKED: LazyLock<Mutex<HashMap<usize, TrackedSemaphore>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+static TRACKED: LazyLock<Mutex<HashMap<usize, TrackedSemaphore>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 unsafe extern "system" fn detour_update(actor: *mut u8) {
     let original = ORIG_UPDATE.load(Ordering::Acquire);
@@ -110,11 +139,7 @@ unsafe fn record_actor(actor: *mut u8) {
             // Intersection traffic light with controller
             // In SCS Prism3D, the controller directly maintains current phase remaining seconds as f32 at +0xb8
             let cd_raw = (ctrl.add(0xb8) as *const f32).read_unaligned();
-            let cd = if cd_raw.is_finite() && cd_raw >= 0.0 && cd_raw <= 600.0 {
-                cd_raw
-            } else {
-                0.0
-            };
+            let cd = if cd_raw.is_finite() && cd_raw >= 0.0 && cd_raw <= 600.0 { cd_raw } else { 0.0 };
 
             // Read cycle durations from +0x80, +0x88, +0x90, +0x98 (microseconds as u64)
             let phase = (ctrl.add(0x70) as *const u32).read_unaligned();
@@ -155,22 +180,16 @@ unsafe fn record_actor(actor: *mut u8) {
         0.0
     };
 
-    let sem = Semaphore {
-        x: world_x,
-        y: world_y,
-        z: world_z,
-        heading,
-        state,
-        countdown,
-        duration,
-    };
+    let sem = Semaphore { x: world_x, y: world_y, z: world_z, heading, state, countdown, duration };
 
     let frame = FRAME_COUNT.load(Ordering::Relaxed);
     let mut tracked = TRACKED.lock().unwrap_or_else(|e| e.into_inner());
     let is_new = !tracked.contains_key(&(actor as usize));
     tracked.insert(actor as usize, TrackedSemaphore { semaphore: sem, last_frame: frame });
     if is_new && state <= 3 {
-        log!("semaphores: tracked active actor {actor:p} state={state} dur={duration:.1} cd={countdown:.1} pos=({world_x:.0}, {world_z:.0})");
+        log!(
+            "semaphores: tracked active actor {actor:p} state={state} dur={duration:.1} cd={countdown:.1} pos=({world_x:.0}, {world_z:.0})"
+        );
     }
 }
 
@@ -209,11 +228,7 @@ pub fn publish(truck_x: f64, truck_z: f64) {
         log!("semaphores: publishing {count} traffic lights around truck ({truck_x:.0}, {truck_z:.0})");
     }
 
-    let mut block = SemaphoresBlock {
-        frame,
-        count: count as u32,
-        semaphores: [Semaphore::default(); SEMAPHORES_MAX],
-    };
+    let mut block = SemaphoresBlock { frame, count: count as u32, semaphores: [Semaphore::default(); SEMAPHORES_MAX] };
 
     for (i, (_, sem)) in nearby.into_iter().take(SEMAPHORES_MAX).enumerate() {
         block.semaphores[i] = sem;
@@ -228,13 +243,12 @@ pub fn publish(truck_x: f64, truck_z: f64) {
 /// Called in the game's process during plugin initialization.
 pub unsafe fn install() -> Result<(), String> {
     // SAFETY: executable module handle
-    let base = unsafe { GetModuleHandleW(None) }.ok()
-        .ok_or_else(|| "GetModuleHandleW failed".to_string())?.0 as usize;
+    let base = unsafe { GetModuleHandleW(None) }.ok().ok_or_else(|| "GetModuleHandleW failed".to_string())?.0 as usize;
     // SAFETY: base is the game executable image
-    let image = unsafe { Image::of(base) }
-        .ok_or_else(|| "Image::of failed".to_string())?;
+    let image = unsafe { Image::of(base) }.ok_or_else(|| "Image::of failed".to_string())?;
 
-    let target = image.unique_masked(&SEMAPHORE_UPDATE)
+    let target = image
+        .unique_masked(&SEMAPHORE_UPDATE)
         .ok_or_else(|| "semaphores: update function pattern not found or not unique".to_string())?;
 
     // SAFETY: target is valid function, detour matches signature
