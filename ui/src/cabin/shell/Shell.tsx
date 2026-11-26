@@ -10,10 +10,12 @@ import { Player } from '../apps/youtube/Player'
 import { BilibiliPlayer } from '../apps/bilibili/Player'
 import { DouyinPlayer } from '../apps/douyin/Player'
 import { HongguoPlayer } from '../apps/hongguo/Player'
+import { PlayerVideo } from '../apps/player/VideoPlayer'
 import { useYouTube } from '../apps/youtube/youtube'
 import { useDouyin } from '../apps/douyin/douyin'
 import { useHongguo } from '../apps/hongguo/hongguo'
 import { useBilibili } from '../apps/bilibili/bilibili'
+import { usePlayer } from '../apps/player/player'
 import { holeMask, onlyHole, usePageHole } from '../apps/safari/hole'
 import { Keyboard } from '../keyboard/Keyboard'
 import { useCabin, useLive } from '../state/store'
@@ -85,15 +87,17 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
   const biliWatching = useBilibili((state) => state.open)
   const dyWatching = useDouyin((state) => state.open)
   const hgWatching = useHongguo((state) => state.open)
-  const watching = ytWatching || biliWatching || dyWatching || hgWatching
+  const playerWatching = usePlayer((state) => state.videoOpen)
+  const watching = ytWatching || biliWatching || dyWatching || hgWatching || playerWatching
   const holdSidebar = useYouTube((state) => state.holdSidebar)
   const ytHole = useYouTube((state) => state.hole)
   const dyHole = useDouyin((state) => state.hole)
   const hgHole = useHongguo((state) => state.hole)
   const biliHole = useBilibili((state) => state.hole)
+  const playerHole = usePlayer((state) => state.hole)
   const pageHole = usePageHole((state) => state.hole)
   const pageCovers = usePageHole((state) => state.covers)
-  const hole = ytHole ?? dyHole ?? hgHole ?? biliHole ?? pageHole
+  const hole = ytHole ?? dyHole ?? hgHole ?? biliHole ?? playerHole ?? pageHole
   const covers = useMemo(() => (pageHole ? Object.values(pageCovers) : []), [pageHole, pageCovers])
   // Over a video full screen, pointing at the left edge brings the sidebar back (shell/sidebarPeek.ts).
   const carplay = useRef<HTMLDivElement>(null)
@@ -153,6 +157,7 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
           <BilibiliPlayer />
           <DouyinPlayer />
           <HongguoPlayer />
+          <PlayerVideo />
           <Keyboard />
           <NotificationBanner />
           <IncomingCallBanner />

@@ -1,43 +1,149 @@
-import { describe, expect, it } from 'vitest'
-import { coverOf, currentSong, nameOf, positionOf } from './player'
+import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  closeVideoPlayer,
+  coverOf,
+  currentSong,
+  isVideoPlayback,
+  leaveVideoPlayer,
+  nameOf,
+  openVideoPlayer,
+  play,
+  playVideo,
+  positionOf,
+  receiveFolder,
+  receivePlayback,
+  releaseResource,
+  usePlayer,
+} from './player'
 
 describe('Player', () => {
-  it('names a song by its title, else by its file without its extension', () => {
+  beforeEach(() => {
+    usePlayer.setState(usePlayer.getInitialState(), true)
+  })
+
+  it('names a song or video by its title, else by its file without its extension', () => {
     expect(nameOf({ file: 'a.mp3', title: 'Night Drive', seconds: 1 })).toBe('Night Drive')
     expect(nameOf({ file: 'weigh station (live).mp3', seconds: 1 })).toBe('weigh station (live)')
+    expect(nameOf({ file: 'Alpine Pass.mp4', kind: 'video', seconds: 100 })).toBe('Alpine Pass')
     expect(nameOf({ file: 'no extension', seconds: 1 })).toBe('no extension')
   })
 
-  it('shows a cover only when the song has one', () => {
+  it('shows embedded cover first, else captured video poster, else null', () => {
     expect(coverOf({ file: 'a.mp3', seconds: 1, cover: '0011.jpg' })).toBe('https://westplay.music-covers/0011.jpg')
+    expect(coverOf({ file: 'clip.mp4', kind: 'video', seconds: 10 }, { 'clip.mp4': 'data:image/jpeg;base64,abc' })).toBe(
+      'data:image/jpeg;base64,abc',
+    )
+    expect(
+      coverOf(
+        { file: 'clip.mp4', kind: 'video', seconds: 10, cover: 'embedded.jpg' },
+        { 'clip.mp4': 'data:image/jpeg;base64,abc' },
+      ),
+    ).toBe('https://westplay.music-covers/embedded.jpg')
     expect(coverOf({ file: 'a.mp3', seconds: 1 })).toBeNull()
     expect(coverOf(null)).toBeNull()
   })
 
-  it('finds the song playing in the folder, or the file alone when the folder no longer lists it', () => {
-    const songs = [{ file: 'a.mp3', title: 'A', seconds: 10 }]
-    const playing = (file: string) => ({ file, at: 0 }) as Parameters<typeof positionOf>[0]
-    expect(currentSong({ songs, playback: playing('a.mp3') })).toBe(songs[0])
-    expect(currentSong({ songs, playback: playing('gone.mp3') })).toEqual({ file: 'gone.mp3', seconds: 0 })
-    expect(currentSong({ songs, playback: null })).toBeNull()
+  it('finds the item playing in songs or videos by playback kind', () => {
+    const songs = [{ file: 'a.mp3', kind: 'audio' as const, title: 'A', seconds: 10 }]
+    const videos = [{ file: 'v.mp4', kind: 'video' as const, title: 'V', seconds: 60 }]
+    const playing = (file: string, kind: 'audio' | 'video' = 'audio') =>
+      ({ file, kind, at: 0 }) as Parameters<typeof positionOf>[0]
+
+    expect(currentSong({ songs, videos, playback: playing('a.mp3', 'audio') })).toBe(songs[0])
+    expect(currentSong({ songs, videos, playback: playing('v.mp4', 'video') })).toBe(videos[0])
+    expect(currentSong({ songs, videos, playback: playing('gone.mp3', 'audio') })).toEqual({
+      file: 'gone.mp3',
+      kind: 'audio',
+      seconds: 0,
+    })
+    expect(currentSong({ songs, videos, playback: playing('gone.mp4', 'video') })).toEqual({
+      file: 'gone.mp4',
+      kind: 'video',
+      seconds: 0,
+    })
+    expect(currentSong({ songs, videos, playback: null })).toBeNull()
   })
 
-  it('runs the time on while it plays, never past the song’s end, and holds it paused or loading', () => {
+  it('runs time on with playback rate while playing, holds when paused/loading/ended', () => {
     const base = {
-      file: 'a.mp3',
+      file: 'a.mp4',
+      kind: 'video' as const,
       position: 10,
-      duration: 12,
+      duration: 20,
       shuffle: false,
       repeat: 'off' as const,
       volume: 1,
+      rate: 1,
       index: 0,
       count: 1,
       at: 1000,
     }
     expect(positionOf({ ...base, playing: true, loading: false }, 2500)).toBe(11.5)
-    expect(positionOf({ ...base, playing: true, loading: false }, 9000)).toBe(12)
+    expect(positionOf({ ...base, playing: true, loading: false, rate: 2 }, 2500)).toBe(13)
+    expect(positionOf({ ...base, playing: true, loading: false }, 15000)).toBe(20)
     expect(positionOf({ ...base, playing: false, loading: false }, 9000)).toBe(10)
     expect(positionOf({ ...base, playing: true, loading: true }, 9000)).toBe(10)
+    expect(positionOf({ ...base, playing: true, loading: false, ended: true }, 9000)).toBe(10)
     expect(positionOf(null, 9000)).toBe(0)
+  })
+
+  it('tracks separate music and videos folders, poster caching, and video theater transitions', () => {
+    receiveFolder(
+      'C:\\Docs\\ETS2\\music',
+      [{ file: 'song.mp3', kind: 'audio', seconds: 120 }],
+      'C:\\Docs\\ETS2\\videos',
+      [{ file: 'road.mp4', kind: 'video', seconds: 240 }],
+    )
+    expect(usePlayer.getState().folder).toBe('C:\\Docs\\ETS2\\music')
+    expect(usePlayer.getState().videosFolder).toBe('C:\\Docs\\ETS2\\videos')
+    expect(usePlayer.getState().videos).toHaveLength(1)
+
+    playVideo(0, false)
+    expect(usePlayer.getState().videoOpen).toBe(true)
+    expect(usePlayer.getState().tab).toBe('videos')
+    expect(isVideoPlayback(usePlayer.getState().playback)).toBe(true)
+
+    receivePlayback({
+      file: 'road.mp4',
+      kind: 'video',
+      playing: true,
+      loading: false,
+      ended: false,
+      position: 5,
+      duration: 240,
+      shuffle: false,
+      repeat: 'off',
+      volume: 1,
+      rate: 1.25,
+      index: 0,
+      count: 1,
+      poster: 'data:image/jpeg;base64,frame1',
+    })
+    expect(usePlayer.getState().posters['road.mp4']).toBe('data:image/jpeg;base64,frame1')
+    expect(usePlayer.getState().rate).toBe(1.25)
+
+    leaveVideoPlayer()
+    expect(usePlayer.getState().videoOpen).toBe(false)
+    expect(usePlayer.getState().returnToVideo).toBe(true)
+
+    openVideoPlayer()
+    expect(usePlayer.getState().videoOpen).toBe(true)
+    expect(usePlayer.getState().returnToVideo).toBe(false)
+
+    closeVideoPlayer()
+    expect(usePlayer.getState().videoOpen).toBe(false)
+    expect(usePlayer.getState().returnToVideo).toBe(false)
+
+    // Switching to audio closes video player state.
+    play(0, false)
+    expect(isVideoPlayback(usePlayer.getState().playback)).toBe(false)
+    expect(usePlayer.getState().videoOpen).toBe(false)
+
+    // Releasing session resources keeps folder listings and preferences.
+    releaseResource()
+    expect(usePlayer.getState().playback).toBeNull()
+    expect(usePlayer.getState().songs).toHaveLength(1)
+    expect(usePlayer.getState().videos).toHaveLength(1)
+    expect(usePlayer.getState().videosFolder).toBe('C:\\Docs\\ETS2\\videos')
   })
 })

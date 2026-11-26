@@ -350,8 +350,8 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let safari_pictures = config.data_dir.join("safari-tabs");
     let _ = std::fs::create_dir_all(&safari_pictures);
     webview.map_folder_to_any_page(safari::TABS_HOST, &safari_pictures)?;
-    // The folder and its songs as last listed (sent again when the page reloads).
-    let mut music_dir: Option<PathBuf> = None;
+    // The folders and their media as last listed (sent again when the page reloads).
+    let mut music_folders = music_folder::Folders::default();
     let mut music_listing: Option<String> = None;
     let (customize_list, customize_listed) = std::sync::mpsc::channel::<String>();
     let mut customize_posted: Option<u64> = None;
@@ -1101,12 +1101,12 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
         while let Ok(found) = player_watch.speakers.try_recv() {
             part_speakers = Some(found);
         }
-        if let Some((folder, listing)) = music_watch.take() {
-            if folder != music_dir {
+        if let Some((folders, listing)) = music_watch.take() {
+            if folders != music_folders {
                 if let Some(player) = &music_player {
-                    let _ = player.serve(folder.as_deref());
+                    player.serve(&folders);
                 }
-                music_dir = folder;
+                music_folders = folders;
             }
             let _ = webview.post_json(&listing);
             music_listing = Some(listing);
@@ -1358,10 +1358,15 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     }
                 }
                 Some(PageMessage::Player { command }) => {
-                    if music_player.is_none() && matches!(command, music_folder::Command::Pause) {
-                        // Nothing to pause: Player's player isn't running.
+                    if music_player.is_none()
+                        && matches!(
+                            command,
+                            music_folder::Command::Pause | music_folder::Command::Hide | music_folder::Command::Stop
+                        )
+                    {
+                        // Nothing to pause, hide or stop: Player's player isn't running.
                     } else if let Some(player) =
-                        start_music_player(&mut music_player, &stage, &config, music_dir.as_deref())
+                        start_music_player(&mut music_player, &stage, &config, &music_folders)
                     {
                         let _ = player.command(&command);
                     }
@@ -3028,17 +3033,16 @@ fn start_apple_music<'a>(
 }
 
 /// Player's own player, started as the page first plays (on the cabin page's profile, as YouTube Music's), the
-/// songs of `music` served to it; or `None` if it couldn't start.
+/// songs and videos of `folders` streamed to it; or `None` if it couldn't start.
 fn start_music_player<'a>(
     music_player: &'a mut Option<music_folder::Player>,
     stage: &Stage,
     config: &Config,
-    music: Option<&std::path::Path>,
+    folders: &music_folder::Folders,
 ) -> Option<&'a music_folder::Player> {
     if music_player.is_none() {
         let user_data = config.data_dir.join("webview2");
-        let page = config.data_dir.join("player-page");
-        match music_folder::Player::start(stage, config.width, config.height, &user_data, &page, music) {
+        match music_folder::Player::start(stage, config.width, config.height, &user_data, folders) {
             Ok(started) => {
                 log!("[player] opened");
                 *music_player = Some(started)

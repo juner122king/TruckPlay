@@ -928,7 +928,7 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
         receiveAppleMusicPlayback(message.playback)
         break
       case 'musicFolder':
-        receiveFolder(message.folder, message.songs)
+        receiveFolder(message.folder, message.songs, message.videosFolder ?? null, message.videos ?? [])
         break
       case 'playerPlayback':
         receivePlayerPlayback(message.playback)

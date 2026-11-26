@@ -6,12 +6,13 @@ import { useCabin } from '../../state/store'
 import { useDouyin } from '../douyin/douyin'
 import { useHongguo } from '../hongguo/hongguo'
 import { send as sendBilibili, useBilibili } from '../bilibili/bilibili'
+import { coverOf, currentSong, sendCommand as sendPlayer, usePlayer } from '../player/player'
 import { command, followArea, useYouTube } from './youtube'
 
 /** How long the CarPlay area takes at most to grow back from the truck's screen, ms (its spring). */
 const GROW_MS = 900
 
-export type VideoApp = 'youtube' | 'douyin' | 'hongguo' | 'bilibili'
+export type VideoApp = 'youtube' | 'douyin' | 'hongguo' | 'bilibili' | 'player'
 
 /**
  * Where the video playing shows outside the full-screen player (YouTube's Now playing, Douyin card, Hongguo player, the Dashboard's): its
@@ -40,6 +41,7 @@ export function VideoHole({
   const dyThumbnail = useDouyin((store) => store.playback?.artwork ?? null)
   const hgThumbnail = useHongguo((store) => store.playback?.artwork ?? null)
   const biliThumbnail = useBilibili((store) => store.playback?.artwork ?? null)
+  const playerThumbnail = usePlayer((store) => coverOf(currentSong(store), store.posters))
   const thumbnail =
     thumbnailSrc ??
     (app === 'douyin'
@@ -48,7 +50,9 @@ export function VideoHole({
         ? hgThumbnail
         : app === 'bilibili'
           ? biliThumbnail
-          : ytThumbnail)
+          : app === 'player'
+            ? playerThumbnail
+            : ytThumbnail)
 
   // The screen handed to the truck (Alt+W): the CarPlay area shrinks away, and the picture goes at once.
   const handedOver = useCabin((state) => state.truckScreen)
@@ -83,6 +87,8 @@ export function VideoHole({
         useHongguo.setState({ hole })
       } else if (app === 'bilibili') {
         useBilibili.setState({ hole })
+      } else if (app === 'player') {
+        usePlayer.setState({ hole })
       } else {
         useYouTube.setState({ hole })
       }
@@ -103,6 +109,8 @@ export function VideoHole({
         postToHost({ type: 'hongguo', command: showCmd })
       } else if (app === 'bilibili') {
         sendBilibili(showCmd)
+      } else if (app === 'player') {
+        sendPlayer(showCmd)
       } else {
         command(showCmd)
       }
@@ -135,6 +143,11 @@ export function VideoHole({
       } else if (app === 'bilibili') {
         useBilibili.setState({ hole: null })
         sendBilibili({ action: 'hide' })
+      } else if (app === 'player') {
+        usePlayer.setState({ hole: null })
+        if (!usePlayer.getState().videoOpen) {
+          sendPlayer({ action: 'hide' })
+        }
       } else {
         useYouTube.setState({ hole: null })
         command({ action: 'hide' })
@@ -194,6 +207,11 @@ export function VideoHole({
         if (!useBilibili.getState().open) {
           sendBilibili({ action: 'hide' })
         }
+      } else if (app === 'player') {
+        usePlayer.setState({ hole: null })
+        if (!usePlayer.getState().videoOpen) {
+          sendPlayer({ action: 'hide' })
+        }
       } else {
         useYouTube.setState({ hole: null })
         // Gone (whatever shows it next places it again).
@@ -218,7 +236,17 @@ export function OverVideo({ app = 'youtube', children }: { app?: VideoApp; child
   const dyHole = useDouyin((store) => store.hole)
   const hgHole = useHongguo((store) => store.hole)
   const biliHole = useBilibili((store) => store.hole)
-  const hole = app === 'douyin' ? dyHole : app === 'hongguo' ? hgHole : app === 'bilibili' ? biliHole : ytHole
+  const playerHole = usePlayer((store) => store.hole)
+  const hole =
+    app === 'douyin'
+      ? dyHole
+      : app === 'hongguo'
+        ? hgHole
+        : app === 'bilibili'
+          ? biliHole
+          : app === 'player'
+            ? playerHole
+            : ytHole
   // The layer is the shell's (Shell.tsx): there by the time a hole is (a VideoHole placed after it).
   const layer = hole ? document.getElementById('video-over') : null
   if (!layer || !hole) return null

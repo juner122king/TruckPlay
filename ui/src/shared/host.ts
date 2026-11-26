@@ -413,8 +413,14 @@ export type HostMessage =
   | ({ type: 'appleMusicAnswer'; id: number; failed?: boolean } & Partial<AppleMusicAnswers>)
   /** What Apple Music plays; `null`: nothing. */
   | { type: 'appleMusicPlayback'; playback: AppleMusicPlayback | null }
-  /** The game's music folder (Player): where it is (`null`: the game's folder isn't known) and its songs. */
-  | { type: 'musicFolder'; folder: string | null; songs: PlayerSong[] }
+  /** The game's music and videos folders (Player): where they are (`null`: not known) and their items. */
+  | {
+      type: 'musicFolder'
+      folder: string | null
+      videosFolder?: string | null
+      songs: PlayerSong[]
+      videos?: PlayerSong[]
+    }
   /** What Player plays; `null`: nothing. */
   | { type: 'playerPlayback'; playback: PlayerPlayback | null }
   /** A Safari tab's page as it is now (`westplay_host::safari::TabState`). */
@@ -622,11 +628,14 @@ export type SafariCommand =
   /** The websites' data from `since` on (ms since 1970; 0: all of it). */
   | { action: 'forgetWebsites'; since?: number }
 
-/** A song of the game's music folder (`westplay_host::music_folder::Song`): its file's name, and what its tags
- * say (none on a file without them): title, artist, length (seconds; 0: not known), cover (a file at
- * `https://westplay.music-covers/`). */
+export type PlayerMediaKind = 'audio' | 'video'
+
+/** A media item of the game's music or videos folder (`westplay_host::music_folder::Song`): its file's name,
+ * media kind, and what its tags say (none on a file without them): title, artist, length (seconds; 0: not known),
+ * cover (a file at `https://westplay.music-covers/`). */
 export interface PlayerSong {
   file: string
+  kind?: PlayerMediaKind
   title?: string
   artist?: string
   seconds: number
@@ -635,33 +644,45 @@ export interface PlayerSong {
 
 export type PlayerRepeat = 'off' | 'all' | 'one'
 
-/** What Player plays (`westplay_host::music_folder::Playback`): the song (its file), playing or not (loading:
- * asked to, its sound not come yet), where and how long (seconds), the options, the volume (0 to 1), and where
- * it is in the songs playing. */
+/** What Player plays (`westplay_host::music_folder::Playback`): the file, media kind, playing/loading/ended
+ * state, where and how long (seconds), options, volume (0 to 1), speed, queue index/count, optional video
+ * dimensions, error code, and captured video poster. */
 export interface PlayerPlayback {
   file: string
+  kind?: PlayerMediaKind
   playing: boolean
   loading: boolean
+  ended?: boolean
   position: number
   duration: number
   shuffle: boolean
   repeat: PlayerRepeat
   volume: number | null
+  rate?: number
   index: number
   count: number
+  videoWidth?: number
+  videoHeight?: number
+  error?: string | null
+  poster?: string | null
 }
 
-/** What Player asks of its player: the folder's songs (by file name, in its order) from the one at `index`
- * (shuffled: from any when there's no index), or play on (`play` alone); its controls. */
+/** What Player asks of its player: the folder's songs or videos (by file name, in its order) from `index`
+ * (shuffled: from any when there's no index), or play on (`play` alone); playback & video surface controls. */
 export type PlayerCommand =
-  | { action: 'play'; files?: string[]; index?: number; shuffle?: boolean }
+  | { action: 'play'; files?: string[]; index?: number; shuffle?: boolean; kind?: PlayerMediaKind }
   | { action: 'pause' }
+  | { action: 'stop' }
   | { action: 'next' }
   | { action: 'previous' }
   | { action: 'seek'; seconds: number }
   | { action: 'volume'; percent: number }
+  | { action: 'rate'; rate: number }
   | { action: 'shuffle'; on: boolean }
   | { action: 'repeat'; mode: PlayerRepeat }
+  | { action: 'show'; x: number; y: number; width: number; height: number; crop?: boolean }
+  | { action: 'crop'; on: boolean }
+  | { action: 'hide' }
 
 /** What the Bilibili app asks of Bilibili's web player (`westplay_host::bilibili::Command`). */
 export type BilibiliCommand =

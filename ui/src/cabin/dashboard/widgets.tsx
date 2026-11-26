@@ -5,6 +5,7 @@ import { VideoWidget } from '../apps/youtube/VideoWidget'
 import { BilibiliVideoWidget } from '../apps/bilibili/VideoWidget'
 import { DouyinVideoWidget } from '../apps/douyin/VideoWidget'
 import { HongguoVideoWidget } from '../apps/hongguo/VideoWidget'
+import { PlayerVideoWidget } from '../apps/player/VideoWidget'
 import { NextGlyph, NoteGlyph, PauseGlyph, PlayGlyph, PreviousGlyph } from '../apps/music/glyphs'
 import { TrackSlide } from '../apps/music/TrackSlide'
 import { useTrackTransition } from '../apps/music/useTrackTransition'
@@ -153,8 +154,11 @@ function QqmusicWidget({ qqmusic }: { qqmusic: NonNullable<ReturnType<typeof use
   )
 }
 
-/** Player's music (the game's music folder): what plays, its controls, opening Player on Now Playing. */
+/** Player's music or local video: shows live video widget for video playback, else MusicWidget. */
 function PlayerWidget({ player }: { player: NonNullable<ReturnType<typeof usePlayerSource>> }) {
+  if (player.isVideo) {
+    return <PlayerVideoWidget />
+  }
   return (
     <MusicWidget
       source={player.source}

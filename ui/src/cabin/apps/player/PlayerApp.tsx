@@ -4,9 +4,12 @@ import { useText } from '../../state/text'
 import {
   coverOf,
   cycleRepeat,
+  isVideoPlayback,
   nameOf,
+  openVideoPlayer,
   play,
   playOrPause,
+  playVideo,
   positionOf,
   seek,
   setShuffle,
@@ -18,53 +21,101 @@ import {
 import './player.css'
 
 /**
- * Player (owner 2026-11-04): WestPlay's own player for the game's music folder, the song files the player put
- * there (one folder for all the game's profiles). The folder's songs in one list, Play and Shuffle over it; a song
- * without tags shows its file's name. At the foot the mini player; pressed, Now Playing rises over all. The host
- * lists and plays them (player.ts), through the truck's own speakers.
+ * Player (owner 2026-11-04): WestPlay's own player for the game's music folder and separate videos folder
+ * (one set of folders for all the game's profiles). Songs and videos in separate tabs with Play and Shuffle;
+ * files without tags show their file name. At the foot the mini player; pressed, Now Playing (for audio) or
+ * the full-screen theater (for video) opens. The host lists and streams them (player.ts), through the truck's
+ * own speakers.
  */
 export function PlayerApp() {
   const text = useText()
   const songs = usePlayer((state) => state.songs)
+  const videos = usePlayer((state) => state.videos)
   const folder = usePlayer((state) => state.folder)
+  const videosFolder = usePlayer((state) => state.videosFolder)
+  const tab = usePlayer((state) => state.tab)
   const open = usePlayer((state) => state.nowPlaying)
   const has = usePlayer((state) => state.playback !== null)
+  const returnToVideo = usePlayer((state) => state.returnToVideo)
+  const playingVideo = usePlayer((state) => isVideoPlayback(state.playback))
+
+  // Returning to Player after leaving full-screen video (e.g. from Dashboard or Home): reopen the video.
+  useEffect(() => {
+    if (returnToVideo && playingVideo) {
+      openVideoPlayer()
+    }
+  }, [returnToVideo, playingVideo])
+
+  const items = tab === 'videos' ? videos : songs
+  const isVideos = tab === 'videos'
+  const activeFolder = isVideos ? videosFolder : folder
 
   return (
     <section className="app-panel player-app" aria-label={text.apps.player}>
       <header className="pl-bar">
         <h1 className="pl-title">{text.apps.player}</h1>
+        <div className="pl-tabs" role="tablist" aria-label={text.apps.player}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'music'}
+            className={tab === 'music' ? 'pl-tab active' : 'pl-tab'}
+            onClick={() => usePlayer.setState({ tab: 'music' })}
+          >
+            <NoteGlyph />
+            <span>{text.player.music}</span>
+            {songs && songs.length > 0 && <span className="pl-tab-count">{songs.length}</span>}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'videos'}
+            className={tab === 'videos' ? 'pl-tab active' : 'pl-tab'}
+            onClick={() => usePlayer.setState({ tab: 'videos' })}
+          >
+            <FilmGlyph />
+            <span>{text.player.videos}</span>
+            {videos && videos.length > 0 && <span className="pl-tab-count">{videos.length}</span>}
+          </button>
+        </div>
         <span className="pl-gap" />
-        {songs && songs.length > 0 && (
+        {items && items.length > 0 && (
           <>
-            <button type="button" className="pl-capsule" onClick={() => play(0, false)}>
+            <button
+              type="button"
+              className="pl-capsule"
+              onClick={() => (isVideos ? playVideo(0, false) : play(0, false))}
+            >
               <PlayGlyph /> {text.play}
             </button>
-            <button type="button" className="pl-capsule key" onClick={() => play(undefined, true)}>
+            <button
+              type="button"
+              className="pl-capsule key"
+              onClick={() => (isVideos ? playVideo(undefined, true) : play(undefined, true))}
+            >
               <ShuffleGlyph /> {text.shuffle}
             </button>
           </>
         )}
       </header>
 
-      {songs && songs.length === 0 && (
+      {items && items.length === 0 && (
         <div className="pl-empty">
-          <div className="pl-empty-icon">
-            <NoteGlyph />
-          </div>
-          <div className="pl-empty-title">{text.player.noSongs}</div>
-          <p className="pl-empty-body">{text.player.addSongs}</p>
-          {folder && <p className="pl-empty-folder">{folder}</p>}
+          <div className="pl-empty-icon">{isVideos ? <FilmGlyph /> : <NoteGlyph />}</div>
+          <div className="pl-empty-title">{isVideos ? text.player.noVideos : text.player.noSongs}</div>
+          <p className="pl-empty-body">{isVideos ? text.player.addVideos : text.player.addSongs}</p>
+          {isVideos && <p className="pl-empty-formats">{text.player.videoFormats}</p>}
+          {activeFolder && <p className="pl-empty-folder">{activeFolder}</p>}
         </div>
       )}
-      {songs && songs.length > 0 && (
+      {items && items.length > 0 && (
         <div className="pl-scroll">
-          <SongList songs={songs} />
+          <MediaList items={items} isVideos={isVideos} />
         </div>
       )}
 
       {has && <MiniPlayer />}
-      {has && open && <NowPlaying />}
+      {has && open && !playingVideo && <NowPlaying />}
     </section>
   )
 }
@@ -77,7 +128,12 @@ function duration(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`
 }
 
-/** Where the song is, kept running while it plays (a few times a second). */
+function extensionOf(file: string): string {
+  const dot = file.lastIndexOf('.')
+  return dot > 0 ? file.slice(dot + 1).toUpperCase() : ''
+}
+
+/** Where playback is, kept running while it plays (a few times a second). */
 function usePosition(): number {
   const playback = usePlayer((state) => state.playback)
   const [now, setNow] = useState(() => performance.now())
@@ -91,23 +147,30 @@ function usePosition(): number {
 
 // ---------- The list ----------
 
-function SongList({ songs }: { songs: PlayerSong[] }) {
-  const playing = usePlayer((state) => state.playback?.file ?? null)
+function MediaList({ items, isVideos }: { items: PlayerSong[]; isVideos: boolean }) {
+  const playingFile = usePlayer((state) => state.playback?.file ?? null)
+  const playingIsVideo = usePlayer((state) => isVideoPlayback(state.playback))
   const sounding = usePlayer((state) => Boolean(state.playback?.playing))
   return (
     <ul className="pl-list">
-      {songs.map((song, i) => {
-        const current = playing === song.file
+      {items.map((item, i) => {
+        const current = playingFile === item.file && playingIsVideo === isVideos
+        const ext = isVideos ? extensionOf(item.file) : ''
+        const detail = item.artist ?? (isVideos && ext ? `${ext} · ${item.file}` : item.file)
         return (
-          <li key={song.file}>
-            <button type="button" className={current ? 'pl-row playing' : 'pl-row'} onClick={() => play(i, false)}>
-              <Cover song={song} size="row" />
+          <li key={item.file}>
+            <button
+              type="button"
+              className={current ? 'pl-row playing' : 'pl-row'}
+              onClick={() => (isVideos ? playVideo(i, false) : play(i, false))}
+            >
+              <Cover song={item} size={isVideos ? 'video-row' : 'row'} isVideo={isVideos} />
               <span className="pl-row-words">
-                <span className="pl-row-name">{nameOf(song)}</span>
-                <span className="pl-row-detail">{song.artist ?? song.file}</span>
+                <span className="pl-row-name">{nameOf(item)}</span>
+                <span className="pl-row-detail">{detail}</span>
               </span>
               <span className="pl-row-end">
-                {current ? <Bars playing={sounding} /> : song.seconds > 0 ? duration(song.seconds) : ''}
+                {current ? <Bars playing={sounding} /> : item.seconds > 0 ? duration(item.seconds) : ''}
               </span>
             </button>
           </li>
@@ -123,14 +186,22 @@ function MiniPlayer() {
   const text = useText()
   const song = useCurrentSong()
   const playback = usePlayer((state) => state.playback)
-  const open = usePlayer((state) => state.nowPlaying)
+  const open = usePlayer((state) => state.nowPlaying || state.videoOpen)
   const position = usePosition()
   if (!song || !playback) return null
+  const isVideo = isVideoPlayback(playback)
   const length = playback.duration || song.seconds
   return (
     <div className={open ? 'pl-mini away' : 'pl-mini'}>
-      <button type="button" className="pl-mini-open" onClick={() => usePlayer.setState({ nowPlaying: true })}>
-        <Cover song={song} size="mini" />
+      <button
+        type="button"
+        className="pl-mini-open"
+        onClick={() => {
+          if (isVideo) openVideoPlayer()
+          else usePlayer.setState({ nowPlaying: true })
+        }}
+      >
+        <Cover song={song} size="mini" isVideo={isVideo} />
         <span className="pl-row-words">
           <span className="pl-row-name">{nameOf(song)}</span>
           <span className="pl-row-detail">{song.artist ?? song.file}</span>
@@ -169,7 +240,7 @@ function NowPlaying() {
       >
         <DownGlyph />
       </button>
-      <Cover song={song} size="now" />
+      <Cover song={song} size="now" isVideo={false} />
       <div className="pl-now-side">
         <div className="pl-now-words">
           <div className="pl-now-title">{nameOf(song)}</div>
@@ -291,12 +362,13 @@ function Volume() {
   )
 }
 
-/** A song's cover, from its tags, or the note on grey without one. */
-function Cover({ song, size }: { song: PlayerSong; size: 'row' | 'mini' | 'now' }) {
-  const cover = coverOf(song)
+/** A song's or video's cover, from its tags / captured poster, or a note/film glyph without one. */
+function Cover({ song, size, isVideo }: { song: PlayerSong; size: 'row' | 'video-row' | 'mini' | 'now'; isVideo: boolean }) {
+  const posters = usePlayer((state) => state.posters)
+  const cover = coverOf(song, posters)
   return (
     <span className={cover ? `pl-cover ${size}` : `pl-cover ${size} none`}>
-      {cover ? <img src={cover} alt="" draggable={false} /> : <NoteGlyph />}
+      {cover ? <img src={cover} alt="" draggable={false} /> : isVideo ? <FilmGlyph /> : <NoteGlyph />}
     </span>
   )
 }
@@ -388,5 +460,11 @@ const DownGlyph = () => (
 const NoteGlyph = () => (
   <Glyph fill>
     <path d="M19 3.6v11.9a3 3 0 1 1-2-2.83V7.4l-7 1.7v8.4a3 3 0 1 1-2-2.83V6.3a1 1 0 0 1 .76-.97l9-2.2A1 1 0 0 1 19 3.6Z" />
+  </Glyph>
+)
+const FilmGlyph = () => (
+  <Glyph>
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <path d="M10 9.2 15.2 12 10 14.8Z" fill="currentColor" stroke="none" />
   </Glyph>
 )

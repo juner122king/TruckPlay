@@ -664,8 +664,21 @@ export interface Strings {
   noEvents: string
   /** Player's words: the game's music folder without songs, and what to do. */
   player: {
+    music: string
+    videos: string
     noSongs: string
     addSongs: string
+    noVideos: string
+    addVideos: string
+    videoFormats: string
+    videoError: string
+    videoErrorHint: string
+    speed: string
+    fillScreen: string
+    fitScreen: string
+    back: string
+    fullScreen: string
+    replay: string
     /** Now Playing's volume bar, and its speaker button (Apple Music's words). */
     volume: string
     mute: string
