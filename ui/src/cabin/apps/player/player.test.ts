@@ -13,6 +13,7 @@ import {
   receiveFolder,
   receivePlayback,
   releaseResource,
+  stopPlayback,
   usePlayer,
 } from './player'
 
@@ -145,5 +146,89 @@ describe('Player', () => {
     expect(usePlayer.getState().songs).toHaveLength(1)
     expect(usePlayer.getState().videos).toHaveLength(1)
     expect(usePlayer.getState().videosFolder).toBe('C:\\Docs\\ETS2\\videos')
+  })
+
+  it('stops video playback completely and ignores stale host reports until confirmed or restarted', () => {
+    receiveFolder(
+      'C:\\Docs\\ETS2\\music',
+      [],
+      'C:\\Docs\\ETS2\\videos',
+      [
+        { file: 'clip1.mp4', kind: 'video', seconds: 180 },
+        { file: 'clip2.mp4', kind: 'video', seconds: 90 },
+      ],
+    )
+
+    playVideo(0, false)
+    usePlayer.setState({ hole: { x: 10, y: 10, width: 320, height: 180, radius: 12 } })
+    expect(usePlayer.getState().videoOpen).toBe(true)
+    expect(usePlayer.getState().playback?.file).toBe('clip1.mp4')
+
+    stopPlayback()
+    expect(usePlayer.getState().playback).toBeNull()
+    expect(usePlayer.getState().videoOpen).toBe(false)
+    expect(usePlayer.getState().returnToVideo).toBe(false)
+    expect(usePlayer.getState().nowPlaying).toBe(false)
+    expect(usePlayer.getState().hole).toBeNull()
+
+    // Stale in-flight report from host before stop took effect must not resurrect playback.
+    receivePlayback({
+      file: 'clip1.mp4',
+      kind: 'video',
+      playing: true,
+      loading: false,
+      ended: false,
+      position: 12,
+      duration: 180,
+      shuffle: false,
+      repeat: 'off',
+      volume: 1,
+      rate: 1,
+      index: 0,
+      count: 2,
+    })
+    expect(usePlayer.getState().playback).toBeNull()
+
+    // Host null confirmation clears stopping guard, and starting a new video works cleanly.
+    receivePlayback(null)
+    playVideo(1, false)
+    expect(usePlayer.getState().videoOpen).toBe(true)
+    expect(usePlayer.getState().playback?.file).toBe('clip2.mp4')
+  })
+
+  it('keeps full-screen video open when a stale null report arrives during cold start or quick restart', () => {
+    receiveFolder('C:\\Docs\\ETS2\\music', [], 'C:\\Docs\\ETS2\\videos', [
+      { file: 'cold.mp4', kind: 'video', seconds: 120 },
+    ])
+
+    playVideo(0, false)
+    expect(usePlayer.getState().videoOpen).toBe(true)
+
+    // Cold-start WebView2 or prior stop ack reporting null before first video report must not minimize full-screen.
+    receivePlayback(null)
+    expect(usePlayer.getState().videoOpen).toBe(true)
+    expect(usePlayer.getState().playback?.file).toBe('cold.mp4')
+
+    // Once host confirms playback, subsequent null reports close playback normally.
+    receivePlayback({
+      file: 'cold.mp4',
+      kind: 'video',
+      playing: true,
+      loading: false,
+      ended: false,
+      position: 0.5,
+      duration: 120,
+      shuffle: false,
+      repeat: 'off',
+      volume: 1,
+      rate: 1,
+      index: 0,
+      count: 1,
+    })
+    expect(usePlayer.getState().videoOpen).toBe(true)
+
+    receivePlayback(null)
+    expect(usePlayer.getState().videoOpen).toBe(false)
+    expect(usePlayer.getState().playback).toBeNull()
   })
 })

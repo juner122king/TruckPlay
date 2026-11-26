@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
 import { go } from '../../state/store'
 import { useText } from '../../state/text'
-import { FullScreenGlyph, NextGlyph, PauseGlyph, PlayGlyph, PreviousGlyph, ReplayGlyph } from '../youtube/glyphs'
+import {
+  CloseGlyph,
+  FullScreenGlyph,
+  NextGlyph,
+  PauseGlyph,
+  PlayGlyph,
+  PreviousGlyph,
+  ReplayGlyph,
+} from '../youtube/glyphs'
 import { OverVideo, VideoHole } from '../youtube/VideoHole'
-import { nameOf, playOrPause, replay, skip, useCurrentSong, usePlayer } from './player'
+import { nameOf, playOrPause, replay, skip, stopPlayback, useCurrentSong, usePlayer } from './player'
 
 const CONTROLS_MS = 3000
 
 /**
  * Dashboard Now Playing widget while Player plays a local video: shows the live video through VideoHole
- * (cropped to fill the card) with touch HUD controls to skip, play/pause, or expand to full screen.
+ * (cropped to fill the card) with touch HUD controls to skip, play/pause, expand to full screen, or close.
  */
 export function PlayerVideoWidget() {
   const text = useText()
@@ -48,7 +56,7 @@ export function PlayerVideoWidget() {
         >
           {controls && (
             <>
-              <span className="yt-widget-title">{title}</span>
+              <span className="yt-widget-title pl-widget-title">{title}</span>
               <div className="yt-widget-controls">
                 <button
                   type="button"
@@ -83,17 +91,27 @@ export function PlayerVideoWidget() {
                   <NextGlyph />
                 </button>
               </div>
-              <button
-                type="button"
-                className="yt-widget-full"
-                aria-label={text.player.fullScreen}
-                onClick={() => {
-                  usePlayer.setState({ returnToVideo: true })
-                  go({ type: 'openApp', app: 'player' })
-                }}
-              >
-                <FullScreenGlyph />
-              </button>
+              <div className="pl-widget-actions">
+                <button
+                  type="button"
+                  className="pl-widget-action"
+                  aria-label={text.player.fullScreen}
+                  onClick={() => {
+                    usePlayer.setState({ returnToVideo: true })
+                    go({ type: 'openApp', app: 'player' })
+                  }}
+                >
+                  <FullScreenGlyph />
+                </button>
+                <button
+                  type="button"
+                  className="pl-widget-action close"
+                  aria-label={text.player.closeVideo}
+                  onClick={stopPlayback}
+                >
+                  <CloseGlyph />
+                </button>
+              </div>
             </>
           )}
         </div>

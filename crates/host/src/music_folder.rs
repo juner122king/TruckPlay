@@ -10,7 +10,7 @@
 //! loopback HTTP server with byte-range (`206 Partial Content`) support so large videos seek cleanly without
 //! copying, moving or writing anything in the game's folders.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -46,7 +46,7 @@ const LOOK_EVERY: Duration = Duration::from_secs(3);
 const STREAM_CHUNK: usize = 64 * 1024;
 
 /// Maximum simultaneous loopback HTTP connections serving media chunks.
-const MAX_CLIENTS: usize = 16;
+const MAX_CLIENTS: usize = 32;
 
 /// Media type: audio (from `music/`) or video (from `videos/`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -852,6 +852,8 @@ pub struct Player {
     frame: PageSize,
     server: MediaServer,
     told: RefCell<Told>,
+    ready: Cell<bool>,
+    pending: RefCell<Vec<String>>,
 }
 
 impl Player {
@@ -872,7 +874,14 @@ impl Player {
         view.add_startup_script(concat!(include_str!("cab_sound.js"), "\n", include_str!("music_folder.js")))?;
         let page_url = server.page_url();
         let frame = stage.page_size();
-        let player = Self { view, frame, server, told: RefCell::default() };
+        let player = Self {
+            view,
+            frame,
+            server,
+            told: RefCell::default(),
+            ready: Cell::new(false),
+            pending: RefCell::new(Vec::new()),
+        };
         player.view.navigate(&page_url)?;
         Ok(player)
     }
@@ -946,6 +955,10 @@ impl Player {
             Command::Hide => self.view.show(false),
             Command::Stop => {
                 let _ = self.view.show(false);
+                if !self.ready.get() {
+                    self.pending.borrow_mut().clear();
+                    return Ok(());
+                }
                 self.pass(command)
             }
             Command::Play { kind: Some(MediaKind::Audio), .. } => {
@@ -957,12 +970,19 @@ impl Player {
     }
 
     fn pass(&self, command: &Command) -> windows::core::Result<()> {
-        self.view.post_json(&serde_json::to_string(command).unwrap_or_default())
+        let json = serde_json::to_string(command).unwrap_or_default();
+        if self.ready.get() {
+            self.view.post_json(&json)
+        } else {
+            self.pending.borrow_mut().push(json);
+            Ok(())
+        }
     }
 
     /// What the page said since the last call.
     pub fn take_reports(&self) -> Vec<Report> {
         let mut reports = Vec::new();
+        let mut flushed_pending = false;
         for message in self.view.take_page_messages() {
             if let Some(bars) = speakers::read_spectrum(&message) {
                 reports.push(Report::Spectrum(bars));
@@ -970,12 +990,23 @@ impl Player {
             }
             let Ok(value) = serde_json::from_str::<serde_json::Value>(&message) else { continue };
             if value.get("ready").and_then(serde_json::Value::as_bool) == Some(true) {
-                // A page loaded anew: the cab as it is.
+                self.ready.set(true);
+                // A page loaded anew: the cab as it is, then any commands queued before it finished loading.
                 for told in self.told.borrow().messages.iter().flatten() {
                     let _ = self.view.post_json(told);
                 }
+                let mut pending = self.pending.borrow_mut();
+                if !pending.is_empty() {
+                    flushed_pending = true;
+                    for queued in pending.drain(..) {
+                        let _ = self.view.post_json(&queued);
+                    }
+                }
             } else if let Some(playback) = value.get("playback") {
                 let playback = serde_json::from_value::<Playback>(playback.clone()).ok().map(Box::new);
+                if playback.is_none() && flushed_pending {
+                    continue;
+                }
                 reports.push(Report::Playback(playback));
             }
         }

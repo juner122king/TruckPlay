@@ -1,6 +1,7 @@
 import { type CSSProperties, type PointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import type { PlayerSong } from '../../../shared/host'
 import { useText } from '../../state/text'
+import { CloseGlyph } from '../youtube/glyphs'
 import {
   coverOf,
   cycleRepeat,
@@ -15,6 +16,7 @@ import {
   setShuffle,
   setVolume,
   skip,
+  stopPlayback,
   useCurrentSong,
   usePlayer,
 } from './player'
@@ -217,6 +219,9 @@ function MiniPlayer() {
       </button>
       <button type="button" className="pl-icon" aria-label={text.next} onClick={() => skip(1)}>
         <NextGlyph />
+      </button>
+      <button type="button" className="pl-icon pl-mini-close" aria-label={text.close} onClick={stopPlayback}>
+        <CloseGlyph />
       </button>
       {length > 0 && <span className="pl-mini-progress" style={{ width: `${(position / length) * 100}%` }} />}
     </div>

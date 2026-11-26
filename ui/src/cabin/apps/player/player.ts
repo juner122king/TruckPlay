@@ -79,6 +79,12 @@ const COVERS = 'https://westplay.music-covers/'
 /** Incremented whenever the video surface is placed (`show`), so deferred `hide` doesn't race with a new placement. */
 let shows = 0
 
+/** True after `stopPlayback()` until the host confirms `null` (or new playback starts), ignoring stale in-flight reports. */
+let stopping = false
+
+/** True after `playVideo()` until the host sends the first playback report, ignoring stale pre-start `null` reports. */
+let startingVideo = false
+
 /** Whether playback is a video item. */
 export function isVideoPlayback(playback: Pick<PlayerPlayback, 'kind'> | null | undefined): boolean {
   return playback?.kind === 'video'
@@ -123,6 +129,13 @@ export function receiveFolder(
 
 /** What the host says plays. */
 export function receivePlayback(playback: PlayerPlayback | null): void {
+  if (playback === null) {
+    stopping = false
+    if (startingVideo) return
+  } else {
+    if (stopping) return
+    startingVideo = false
+  }
   usePlayer.setState((state) => {
     const isVideo = isVideoPlayback(playback)
     const nextPosters =
@@ -193,11 +206,13 @@ function show(change: Partial<PlayerPlayback>): void {
 export function play(index: number | undefined, shuffle: boolean): void {
   const songs = usePlayer.getState().songs ?? []
   if (songs.length === 0) return
+  stopping = false
+  startingVideo = false
   usePlayer.setState({ videoOpen: false, returnToVideo: false })
   sendCommand({ action: 'hide' })
-  // At the volume chosen (a player started anew plays at full).
-  sendVolume(usePlayer.getState().volume)
+  // Send play before volume so the host creates the Player WebView on cold start before applying volume.
   sendCommand({ action: 'play', files: songs.map((song) => song.file), index, shuffle, kind: 'audio' })
+  sendVolume(usePlayer.getState().volume)
   if (!IN_HOST) {
     const picked = songs[index ?? 0]
     if (picked) {
@@ -224,31 +239,41 @@ export function play(index: number | undefined, shuffle: boolean): void {
 export function playVideo(index: number | undefined, shuffle: boolean): void {
   const videos = usePlayer.getState().videos ?? []
   if (videos.length === 0) return
-  const rate = usePlayer.getState().rate
-  usePlayer.setState({ nowPlaying: false, videoOpen: true, returnToVideo: false, tab: 'videos' })
-  sendVolume(usePlayer.getState().volume)
-  sendCommand({ action: 'play', files: videos.map((video) => video.file), index, shuffle, kind: 'video' })
+  stopping = false
+  startingVideo = true
+  const startIndex =
+    shuffle && index === undefined
+      ? Math.floor(Math.random() * videos.length)
+      : Math.max(0, Math.min(videos.length - 1, index ?? 0))
+  const picked = videos[startIndex]
+  const { rate, volume, playback: current } = usePlayer.getState()
+  const repeat = current?.repeat ?? 'off'
+  usePlayer.setState({
+    nowPlaying: false,
+    videoOpen: true,
+    returnToVideo: false,
+    tab: 'videos',
+    playback: {
+      file: picked.file,
+      kind: 'video',
+      playing: true,
+      loading: IN_HOST,
+      ended: false,
+      position: 0,
+      duration: picked.seconds,
+      shuffle,
+      repeat,
+      volume,
+      rate,
+      index: startIndex,
+      count: videos.length,
+      error: null,
+      at: performance.now(),
+    },
+  })
+  sendCommand({ action: 'play', files: videos.map((video) => video.file), index: startIndex, shuffle, kind: 'video' })
+  sendVolume(volume)
   if (rate !== 1) sendCommand({ action: 'rate', rate })
-  if (!IN_HOST) {
-    const picked = videos[index ?? 0]
-    if (picked) {
-      receivePlayback({
-        file: picked.file,
-        kind: 'video',
-        playing: true,
-        loading: false,
-        ended: false,
-        position: 0,
-        duration: picked.seconds,
-        shuffle,
-        repeat: 'off',
-        volume: usePlayer.getState().volume,
-        rate,
-        index: index ?? 0,
-        count: videos.length,
-      })
-    }
-  }
 }
 
 /** Opens the full-screen video player if a video is currently loaded. */
@@ -264,13 +289,28 @@ export function closeVideoPlayer(): void {
   sendCommand({ action: 'hide' })
 }
 
+/** Stops playback completely, hides the video surface, and clears mini player / Dashboard widget state. */
+export function stopPlayback(): void {
+  stopping = true
+  startingVideo = false
+  sendCommand({ action: 'stop' })
+  usePlayer.setState({
+    playback: null,
+    nowPlaying: false,
+    videoOpen: false,
+    returnToVideo: false,
+    hole: null,
+  })
+}
+
 /** Leaves the full-screen video player when navigating to another screen; returns to it when reopening Player. */
 export function leaveVideoPlayer(): void {
   const hasVideo = isVideoPlayback(usePlayer.getState().playback)
   usePlayer.setState({ videoOpen: false, returnToVideo: hasVideo })
   const placed = shows
   whenTransitionEnds(() => {
-    if (shows === placed && !usePlayer.getState().videoOpen) sendCommand({ action: 'hide' })
+    const state = usePlayer.getState()
+    if (shows === placed && !state.videoOpen && !state.hole) sendCommand({ action: 'hide' })
   })
 }
 
@@ -407,6 +447,8 @@ export function usePlayerSource(): { source: MediaSource; artwork: string | null
 
 /** Release session data while keeping folders, library listings and the player's preferences. */
 export function releaseResource(): void {
+  stopping = false
+  startingVideo = false
   const before = usePlayer.getState()
   const kept = {
     songs: before.songs,

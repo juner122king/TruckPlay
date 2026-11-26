@@ -677,6 +677,12 @@ export interface Strings {
     fillScreen: string
     fitScreen: string
     back: string
+    closeVideo: string
+    minimize: string
+    playlist: string
+    rewind10: string
+    forward10: string
+    loading: string
     fullScreen: string
     replay: string
     /** Now Playing's volume bar, and its speaker button (Apple Music's words). */

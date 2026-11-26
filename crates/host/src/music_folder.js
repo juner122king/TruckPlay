@@ -73,7 +73,7 @@
   }
 
   // What plays: file, kind, playing/loading/ended, position, duration, options, volume, speed, dimensions, error.
-  let told = ''
+  let told = 'null'
   const tell = () => {
     const file = current()
     const playback = file && {
@@ -158,6 +158,10 @@
         return
       }
       asked = files.filter((file) => typeof file === 'string')
+      if (asked.length === 0) {
+        CONTROLS.stop()
+        return
+      }
       mediaKind = kind === 'video' ? 'video' : 'audio'
       consecutiveAudioErrors = 0
       if (mediaKind === 'audio') {
@@ -184,7 +188,8 @@
       media.pause()
       media.removeAttribute('src')
       media.load()
-      tell()
+      told = 'null'
+      post({ playback: null })
     },
     next: () => {
       consecutiveAudioErrors = 0
@@ -249,6 +254,7 @@
   })
 
   media.addEventListener('error', () => {
+    if (!current()) return
     const code = media.error?.code
     const reason =
       code === 4
@@ -280,7 +286,7 @@
     tell()
   })
 
-  for (const name of ['play', 'pause', 'waiting', 'loadedmetadata', 'durationchange', 'seeked', 'volumechange', 'ratechange']) {
+  for (const name of ['play', 'pause', 'waiting', 'canplay', 'loadedmetadata', 'durationchange', 'seeked', 'volumechange', 'ratechange']) {
     media.addEventListener(name, tell)
   }
 
@@ -300,7 +306,6 @@
     else CONTROLS[data?.action]?.(data)
   })
 
-  // Ready (a page loaded anew: the host tells it the cab again).
+  // Ready (a page loaded anew: the host replays cab sound and any commands queued during startup).
   post({ ready: true })
-  tell()
 })()
