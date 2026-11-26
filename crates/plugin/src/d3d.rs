@@ -152,12 +152,17 @@ pub unsafe fn install() -> Result<(), String> {
             }
         };
 
-        hook(
-            functions.create_texture2d,
-            create_texture2d_hook as *mut c_void,
-            &ORIG_CREATE_TEXTURE2D,
-            "CreateTexture2D",
-        )?;
+        // Texture creation inventory is purely diagnostic (`WESTPLAY_DUMP_TEXTURES=1`): skipping it in normal
+        // gameplay avoids locking `TEXTURES` on every streaming asset ETS2/ATS creates and avoids writing
+        // `textures.txt` every 5 seconds.
+        if std::env::var_os("WESTPLAY_DUMP_TEXTURES").is_some_and(|v| v != "0" && !v.is_empty()) {
+            hook(
+                functions.create_texture2d,
+                create_texture2d_hook as *mut c_void,
+                &ORIG_CREATE_TEXTURE2D,
+                "CreateTexture2D",
+            )?;
+        }
         hook(
             functions.create_shader_resource_view,
             create_shader_resource_view_hook as *mut c_void,

@@ -77,9 +77,17 @@ unsafe extern "system" fn detour_update(actor: *mut u8) {
             orig_fn(actor);
         }
     }
+    // Skip actor reads and mutex locking when the host bridge is not attached or between sample ticks.
+    if bridge::get().is_none() {
+        return;
+    }
+    let frame = FRAME_COUNT.load(Ordering::Relaxed);
+    if frame > 0 && !frame.is_multiple_of(4) {
+        return;
+    }
     hooks::guarded(|| {
         // SAFETY: actor pointer was passed directly by the game engine
-        unsafe { record_actor(actor) };
+        unsafe { record_actor(actor, frame) };
     });
 }
 
@@ -92,7 +100,7 @@ fn is_valid_ptr(ptr: usize) -> bool {
 ///
 /// # Safety
 /// `actor` must point to a live `traffic_semaphore_actor_t` instance.
-unsafe fn record_actor(actor: *mut u8) {
+unsafe fn record_actor(actor: *mut u8, frame: u64) {
     if actor.is_null() {
         return;
     }
@@ -182,10 +190,12 @@ unsafe fn record_actor(actor: *mut u8) {
 
     let sem = Semaphore { x: world_x, y: world_y, z: world_z, heading, state, countdown, duration };
 
-    let frame = FRAME_COUNT.load(Ordering::Relaxed);
-    let mut tracked = TRACKED.lock().unwrap_or_else(|e| e.into_inner());
-    let is_new = !tracked.contains_key(&(actor as usize));
-    tracked.insert(actor as usize, TrackedSemaphore { semaphore: sem, last_frame: frame });
+    let is_new = {
+        let mut tracked = TRACKED.lock().unwrap_or_else(|e| e.into_inner());
+        let is_new = !tracked.contains_key(&(actor as usize));
+        tracked.insert(actor as usize, TrackedSemaphore { semaphore: sem, last_frame: frame });
+        is_new
+    };
     if is_new && state <= 3 {
         log!(
             "semaphores: tracked active actor {actor:p} state={state} dur={duration:.1} cd={countdown:.1} pos=({world_x:.0}, {world_z:.0})"
@@ -197,31 +207,50 @@ unsafe fn record_actor(actor: *mut u8) {
 pub fn publish(truck_x: f64, truck_z: f64) {
     let Some(bridge) = bridge::get() else { return };
     let frame = FRAME_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
-    let mut tracked = TRACKED.lock().unwrap_or_else(|e| e.into_inner());
 
-    // Prune stale actors (not updated for > 180 frames, ~3 seconds)
-    tracked.retain(|_, item| frame.saturating_sub(item.last_frame) <= 180);
-
-    // Keep active semaphores within 600m
+    // Keep the top `SEMAPHORES_MAX` nearest active semaphores within 600m using a fixed stack buffer
+    // (zero per-frame heap allocations).
     const MAX_DISTANCE_SQ: f64 = 600.0 * 600.0;
-    let mut nearby: Vec<(f64, Semaphore)> = tracked
-        .values()
-        .filter_map(|item| {
+    let mut nearest = [(f64::INFINITY, Semaphore::default()); SEMAPHORES_MAX];
+    let mut count = 0usize;
+    {
+        let mut tracked = TRACKED.lock().unwrap_or_else(|e| e.into_inner());
+
+        // Prune stale actors (not updated for > 180 frames, ~3 seconds)
+        tracked.retain(|_, item| frame.saturating_sub(item.last_frame) <= 180);
+
+        for item in tracked.values() {
             // Only publish valid operational signals (0..3: green, yellow, red, red+amber)
             if item.semaphore.state > 3 {
-                return None;
+                continue;
             }
             let dx = item.semaphore.x - truck_x;
             let dz = item.semaphore.z - truck_z;
             let dist_sq = dx * dx + dz * dz;
-            (dist_sq <= MAX_DISTANCE_SQ).then_some((dist_sq, item.semaphore))
-        })
-        .collect();
+            if dist_sq > MAX_DISTANCE_SQ {
+                continue;
+            }
+            // Insert into the sorted top-K stack array.
+            let limit = count.min(SEMAPHORES_MAX);
+            if limit == SEMAPHORES_MAX && dist_sq >= nearest[SEMAPHORES_MAX - 1].0 {
+                continue;
+            }
+            let mut pos = limit;
+            while pos > 0 && dist_sq < nearest[pos - 1].0 {
+                if pos < SEMAPHORES_MAX {
+                    nearest[pos] = nearest[pos - 1];
+                }
+                pos -= 1;
+            }
+            if pos < SEMAPHORES_MAX {
+                nearest[pos] = (dist_sq, item.semaphore);
+                if count < SEMAPHORES_MAX {
+                    count += 1;
+                }
+            }
+        }
+    }
 
-    // Sort ascending by distance so nearest traffic lights come first
-    nearby.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-    let count = nearby.len().min(SEMAPHORES_MAX);
     static LAST_LOGGED_COUNT: AtomicUsize = AtomicUsize::new(usize::MAX);
     let prev = LAST_LOGGED_COUNT.swap(count, Ordering::Relaxed);
     if prev != count {
@@ -229,9 +258,8 @@ pub fn publish(truck_x: f64, truck_z: f64) {
     }
 
     let mut block = SemaphoresBlock { frame, count: count as u32, semaphores: [Semaphore::default(); SEMAPHORES_MAX] };
-
-    for (i, (_, sem)) in nearby.into_iter().take(SEMAPHORES_MAX).enumerate() {
-        block.semaphores[i] = sem;
+    for (i, (_, sem)) in nearest.iter().take(count).enumerate() {
+        block.semaphores[i] = *sem;
     }
 
     bridge.plugin.semaphores.write(&block);
