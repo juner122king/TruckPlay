@@ -22,6 +22,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use webview2_com::GetProcessExtendedInfosCompletedHandler;
@@ -55,8 +56,9 @@ use windows::core::{BOOL, Interface, PCWSTR, PWSTR, w};
 
 use crate::webview::OffscreenWebView;
 
-/// How often the line is written.
-const WINDOW: Duration = Duration::from_secs(10);
+/// How often the line is written. Sampling runs on a background thread so neither WebView2's STA message
+/// pump nor frame capture ever blocks on ToolHelp, `GetProcessMemoryInfo`, or PDH GPU counters.
+const WINDOW: Duration = Duration::from_secs(30);
 /// Where the page's frames go in the line, once the page has said them.
 const PAGE: &str = "\u{1}page\u{1}";
 
@@ -88,6 +90,47 @@ pub struct Sample {
     pub waited: u64,
 }
 
+/// Latest off-thread performance telemetry for adaptive performance mode decisions.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PerformanceSnapshot {
+    pub game_fps: f64,
+    pub gpu_busy_percent: Option<f64>,
+    pub low_end_gpu: bool,
+}
+
+enum WorkerCommand {
+    Begin {
+        ours: u32,
+    },
+    Finish {
+        seconds: f64,
+        game: f64,
+        sent: f64,
+        captured: f64,
+        waited: f64,
+        in_view: u32,
+        ours: u32,
+        parts: HashMap<u32, &'static str>,
+        browsers: Vec<u32>,
+        renderer: String,
+        resource_summary: String,
+    },
+    Reset,
+}
+
+struct CompletedLine {
+    line: String,
+    seconds: f64,
+    game_fps: f64,
+    gpu_busy_percent: Option<f64>,
+}
+
+struct WorkerBaseline {
+    cpu: HashMap<u32, u64>,
+    system: Option<(u64, u64)>,
+    game_cpu: HashMap<u32, u64>,
+}
+
 pub struct Meter {
     /// The cab page's host (`westplay.cabin`; a development server's), to know its renderer by.
     cab_host: String,
@@ -97,12 +140,16 @@ pub struct Meter {
     /// What Chromium draws the cab with (WebGL's renderer), once the page has said.
     renderer: Rc<RefCell<Option<String>>>,
     renderer_asked: bool,
-    /// The graphics card's engines' use, as Windows counts it (`None`: it can't be read here).
-    gpu: Option<GpuUse>,
-    gpu_tried: bool,
+    /// Background thread channel for all blocking OS sampling (ToolHelp, memory info, PDH GPU counters).
+    worker_tx: Sender<WorkerCommand>,
+    worker_rx: Receiver<CompletedLine>,
+    /// True while a `Finish` request is in flight on the background worker.
+    finishing: bool,
+    /// Latest measured metrics from the last completed window.
+    latest: Option<PerformanceSnapshot>,
 }
 
-/// A minute being measured: where each count stood at its start.
+/// A window being measured on the STA thread (counters only; OS snapshots live on the worker thread).
 struct Window {
     started: Instant,
     game_frames: u64,
@@ -111,24 +158,36 @@ struct Window {
     waited: u64,
     seconds: u32,
     in_view: u32,
-    cpu: HashMap<u32, u64>,
-    /// The whole processor's times at its start (idle, busy: Windows' own count, every program's).
-    system: Option<(u64, u64)>,
-    /// The game's processes' processor times at its start.
-    game_cpu: HashMap<u32, u64>,
 }
 
 impl Meter {
     pub fn new(cab_host: String) -> Self {
+        let (worker_tx, cmd_rx) = mpsc::channel();
+        let (done_tx, worker_rx) = mpsc::channel();
+        let _ = std::thread::Builder::new().name("westplay-perf".into()).spawn(move || {
+            run_worker(cmd_rx, done_tx);
+        });
         Self {
             cab_host,
             window: None,
             parts: Rc::default(),
             renderer: Rc::default(),
             renderer_asked: false,
-            gpu: None,
-            gpu_tried: false,
+            worker_tx,
+            worker_rx,
+            finishing: false,
+            latest: None,
         }
+    }
+
+    /// Returns whether the detected WebGL renderer looks like an integrated / software / low-end GPU.
+    pub fn low_end_renderer(&self) -> bool {
+        self.renderer.borrow().as_deref().is_some_and(is_low_end_renderer)
+    }
+
+    /// Takes the latest completed window metrics once, if a new window finished since last checked.
+    pub fn take_latest_snapshot(&mut self) -> Option<PerformanceSnapshot> {
+        self.latest.take()
     }
 
     /// Called each second: `sample` while the game runs (`None`: it doesn't, and nothing is measured).
@@ -140,26 +199,16 @@ impl Meter {
         cab: &OffscreenWebView,
         profiles: &[(Profile, &ICoreWebView2Environment)],
     ) {
-        let Some(sample) = sample else {
-            self.window = None;
-            return;
-        };
-        if !self.renderer_asked {
-            self.renderer_asked = true;
-            self.ask_renderer(cab);
-            crate::log!("this PC: Windows {}; displays {}", windows_build(), displays());
-        }
-        let Some(window) = self.window.as_mut() else {
-            self.begin(now, &sample, profiles);
-            return;
-        };
-        window.seconds += 1;
-        window.in_view += u32::from(sample.in_view);
-        if now.duration_since(window.started) >= WINDOW {
-            let seconds = now.duration_since(window.started).as_secs_f64();
-            let line = format!("{}; resources: {}", self.line(now, &sample), cab.resource_summary(now));
-            // The page's frames since the last line, its late ones and the screens it showed (its counts start again
-            // as they're taken: state/frameMeter.ts).
+        // Drain any completed off-thread performance lines and pair them with the page's frame report.
+        while let Ok(done) = self.worker_rx.try_recv() {
+            self.finishing = false;
+            self.latest = Some(PerformanceSnapshot {
+                game_fps: done.game_fps,
+                gpu_busy_percent: done.gpu_busy_percent,
+                low_end_gpu: self.low_end_renderer(),
+            });
+            let seconds = done.seconds;
+            let line = done.line;
             let asked = cab.run_script("window.westplayReport?.() ?? null", {
                 let line = line.clone();
                 move |json| {
@@ -170,21 +219,65 @@ impl Meter {
             if asked.is_err() {
                 crate::log!("{}", with_page(&line, None, seconds));
             }
-            self.begin(now, &sample, profiles);
+        }
+
+        let Some(sample) = sample else {
+            if self.window.take().is_some() {
+                self.finishing = false;
+                let _ = self.worker_tx.send(WorkerCommand::Reset);
+            }
+            return;
+        };
+        if !self.renderer_asked {
+            self.renderer_asked = true;
+            self.ask_renderer(cab);
+            crate::log!("this PC: Windows {}; displays {}", windows_build(), displays());
+        }
+        let Some(window) = self.window.as_mut() else {
+            self.begin(now, &sample, profiles, true);
+            return;
+        };
+        window.seconds += 1;
+        window.in_view += u32::from(sample.in_view);
+        if now.duration_since(window.started) >= WINDOW && !self.finishing {
+            let seconds = now.duration_since(window.started).as_secs_f64().max(1e-3);
+            let game = sample.game_frames.saturating_sub(window.game_frames) as f64 / seconds;
+            let sent = sample.sent.saturating_sub(window.sent) as f64 / seconds;
+            let captured = sample.captured.saturating_sub(window.captured) as f64 / seconds;
+            let waited = sample.waited.saturating_sub(window.waited) as f64 / seconds;
+            let in_view = 100 * window.in_view / window.seconds.max(1);
+            let parts = self.parts.borrow().clone();
+            let browsers = crate::webview::host_browsers();
+            let renderer = self.renderer.borrow().clone().unwrap_or_else(|| "not known yet".into());
+            let resource_summary = cab.resource_summary(now);
+            self.finishing = true;
+            let _ = self.worker_tx.send(WorkerCommand::Finish {
+                seconds,
+                game,
+                sent,
+                captured,
+                waited,
+                in_view,
+                ours: std::process::id(),
+                parts,
+                browsers,
+                renderer,
+                resource_summary,
+            });
+            // Worker rolls its fresh snapshot directly into the next baseline, so no separate `Begin` command.
+            self.begin(now, &sample, profiles, false);
         }
     }
 
-    fn begin(&mut self, now: Instant, sample: &Sample, profiles: &[(Profile, &ICoreWebView2Environment)]) {
-        if !self.gpu_tried {
-            self.gpu_tried = true;
-            self.gpu = GpuUse::open();
-            if self.gpu.is_none() {
-                crate::log!("the graphics card's use can't be read here (Windows' GPU counters)");
-            }
-        }
-        // Its counts from now: the next line's are over the window.
-        if let Some(gpu) = &self.gpu {
-            gpu.collect();
+    fn begin(
+        &mut self,
+        now: Instant,
+        sample: &Sample,
+        profiles: &[(Profile, &ICoreWebView2Environment)],
+        notify_worker: bool,
+    ) {
+        if notify_worker {
+            let _ = self.worker_tx.send(WorkerCommand::Begin { ours: std::process::id() });
         }
         self.window = Some(Window {
             started: now,
@@ -194,77 +287,11 @@ impl Meter {
             waited: sample.waited,
             seconds: 0,
             in_view: 0,
-            cpu: processor_times(&processes()),
-            system: system_times(),
-            game_cpu: processor_times(&game_processes()),
         });
         self.parts.borrow_mut().clear();
         for &(profile, environment) in profiles {
             self.ask_parts(profile, environment);
         }
-    }
-
-    /// The minute's line.
-    fn line(&self, now: Instant, sample: &Sample) -> String {
-        let Some(window) = &self.window else { return String::new() };
-        let seconds = now.duration_since(window.started).as_secs_f64();
-        let game = sample.game_frames.saturating_sub(window.game_frames) as f64 / seconds;
-        let sent = sample.sent.saturating_sub(window.sent) as f64 / seconds;
-        let captured = sample.captured.saturating_sub(window.captured) as f64 / seconds;
-        let waited = sample.waited.saturating_sub(window.waited) as f64 / seconds;
-        let in_view = 100 * window.in_view / window.seconds.max(1);
-        let ours = std::process::id();
-        let parts = self.parts.borrow();
-        let tree = process_tree();
-        let browsers = crate::webview::host_browsers();
-        let pids = descendants(ours, &tree);
-        let memory = memory_usage(&pids);
-        let used = cores_by_part(&window.cpu, &processor_times(&pids), seconds, |pid| {
-            part_of(pid, ours, &tree, &parts, &browsers)
-        });
-        let total: f64 = used.iter().map(|(_, cores)| cores).sum();
-        let threads = std::thread::available_parallelism().map_or(0, |n| n.get());
-        let each = used
-            .iter()
-            .filter(|(_, cores)| *cores >= 0.005)
-            .map(|(part, cores)| format!("{part} {cores:.2}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let renderer = self.renderer.borrow().clone().unwrap_or_else(|| "not known yet".into());
-        // How busy the whole processor was, every program's: a page waiting for a free core shows as such (a
-        // player's processor busy, the graphics card at 96%, 2026-11-09).
-        let system = window
-            .system
-            .zip(system_times())
-            .and_then(|((idle0, busy0), (idle1, busy1))| {
-                let (idle, busy) = (idle1.saturating_sub(idle0), busy1.saturating_sub(busy0));
-                (busy > 0).then(|| 100.0 * busy.saturating_sub(idle) as f64 / busy as f64)
-            })
-            .map_or(String::new(), |percent| format!("; the processor {percent:.0}% busy (every program)"));
-        // The game's own share, in threads: one of its threads busy all the time (ETS2's own, held up by its mods)
-        // is a limit the whole processor's figure hides.
-        let game_now = processor_times(&game_processes());
-        let game_cpu: u64 = game_now
-            .iter()
-            .filter_map(|(pid, now)| window.game_cpu.get(pid).map(|then| now.saturating_sub(*then)))
-            .sum();
-        let system = if game_now.is_empty() {
-            system
-        } else {
-            format!("{system}, the game {:.2} threads", game_cpu as f64 / 1e7 / seconds)
-        };
-        let gpu = self.gpu.as_ref().and_then(|gpu| gpu.read()).map_or(String::new(), |used| {
-            let ours: Vec<u32> = descendants(ours, &tree);
-            let games = game_processes();
-            gpu_said(&used, &games, &ours)
-        });
-        format!(
-            "performance, the last {seconds:.0} s: the game {game:.0} fps; WestPlay's screen in view {in_view}% of \
-             the time, {PAGE}{sent:.0} frames a second sent ({captured:.0} captured, {waited:.0} waited for the game); \
-             WestPlay used {total:.2} of {threads} processor threads ({each}){system}{gpu}, {:.0} ms CPU time; {memory}; the cab is drawn with \
-             {renderer}",
-            total * seconds * 1000.0
-        )
     }
 
     /// Asks the cab page what Chromium draws with: the GPU WebGL runs on, or its software renderer.
@@ -302,6 +329,140 @@ impl Meter {
         // SAFETY: the handler is a local for the call; WebView2 keeps its own reference to it.
         let _ = unsafe { environment.GetProcessExtendedInfos(&handler) };
     }
+}
+
+/// Background worker owning the PDH query and running all blocking OS process/memory/GPU queries off the STA thread.
+fn run_worker(commands: Receiver<WorkerCommand>, results: Sender<CompletedLine>) {
+    let mut gpu: Option<GpuUse> = None;
+    let mut gpu_tried = false;
+    let mut baseline: Option<WorkerBaseline> = None;
+
+    while let Ok(command) = commands.recv() {
+        match command {
+            WorkerCommand::Reset => {
+                baseline = None;
+            }
+            WorkerCommand::Begin { ours } => {
+                if !gpu_tried {
+                    gpu_tried = true;
+                    gpu = GpuUse::open();
+                    if gpu.is_none() {
+                        crate::log!("the graphics card's use can't be read here (Windows' GPU counters)");
+                    }
+                } else if let Some(gpu) = &gpu {
+                    gpu.collect();
+                }
+                let snap = snapshot_processes(ours);
+                baseline = Some(WorkerBaseline {
+                    cpu: snap.our_cpu,
+                    system: system_times(),
+                    game_cpu: processor_times(&snap.game_pids),
+                });
+            }
+            WorkerCommand::Finish {
+                seconds,
+                game,
+                sent,
+                captured,
+                waited,
+                in_view,
+                ours,
+                parts,
+                browsers,
+                renderer,
+                resource_summary,
+            } => {
+                let snap = snapshot_processes(ours);
+                let system_now = system_times();
+                let game_now = processor_times(&snap.game_pids);
+                let memory = memory_usage(&snap.our_pids);
+                let prev = baseline.as_ref();
+
+                let empty = HashMap::new();
+                let prev_cpu = prev.map_or(&empty, |b| &b.cpu);
+                let used = cores_by_part(prev_cpu, &snap.our_cpu, seconds, |pid| {
+                    part_of(pid, ours, &snap.tree, &parts, &browsers)
+                });
+                let total: f64 = used.iter().map(|(_, cores)| cores).sum();
+                let threads = std::thread::available_parallelism().map_or(0, |n| n.get());
+                let each = used
+                    .iter()
+                    .filter(|(_, cores)| *cores >= 0.005)
+                    .map(|(part, cores)| format!("{part} {cores:.2}"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                let system = prev
+                    .and_then(|b| b.system)
+                    .zip(system_now)
+                    .and_then(|((idle0, busy0), (idle1, busy1))| {
+                        let (idle, busy) = (idle1.saturating_sub(idle0), busy1.saturating_sub(busy0));
+                        (busy > 0).then(|| 100.0 * busy.saturating_sub(idle) as f64 / busy as f64)
+                    })
+                    .map_or(String::new(), |percent| format!("; the processor {percent:.0}% busy (every program)"));
+
+                let prev_game_cpu = prev.map_or(&empty, |b| &b.game_cpu);
+                let game_cpu: u64 = game_now
+                    .iter()
+                    .filter_map(|(pid, now)| prev_game_cpu.get(pid).map(|then| now.saturating_sub(*then)))
+                    .sum();
+                let system = if game_now.is_empty() {
+                    system
+                } else {
+                    format!("{system}, the game {:.2} threads", game_cpu as f64 / 1e7 / seconds)
+                };
+
+                let mut gpu_busy_percent = None;
+                let gpu_text = gpu.as_ref().and_then(|gpu| gpu.read()).map_or(String::new(), |used| {
+                    gpu_busy_percent = Some(used.values().sum::<f64>().min(100.0));
+                    gpu_said(&used, &snap.game_pids, &snap.our_pids)
+                });
+
+                let line = format!(
+                    "performance, the last {seconds:.0} s: the game {game:.0} fps; WestPlay's screen in view {in_view}% of \
+                     the time, {PAGE}{sent:.0} frames a second sent ({captured:.0} captured, {waited:.0} waited for the game); \
+                     WestPlay used {total:.2} of {threads} processor threads ({each}){system}{gpu_text}, {:.0} ms CPU time; {memory}; the cab is drawn with \
+                     {renderer}; resources: {resource_summary}",
+                    total * seconds * 1000.0
+                );
+
+                // Roll this snapshot forward as the next window's baseline (zero duplicate syscalls).
+                baseline = Some(WorkerBaseline { cpu: snap.our_cpu, system: system_now, game_cpu: game_now });
+
+                if results.send(CompletedLine { line, seconds, game_fps: game, gpu_busy_percent }).is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/// Heuristic for integrated, software, or entry-level GPUs that benefit from Auto Lite mode.
+fn is_low_end_renderer(renderer: &str) -> bool {
+    let lower = renderer.to_ascii_lowercase();
+    const LOW_END: &[&str] = &[
+        "swiftshader",
+        "microsoft basic render",
+        "llvmpipe",
+        "intel(r) uhd",
+        "intel(r) hd graphics",
+        "intel(r) iris",
+        "intel(r) graphics",
+        "radeon(tm) graphics",
+        "radeon vega",
+        "mx150",
+        "mx250",
+        "mx350",
+        "mx450",
+        "gt 1030",
+        "gtx 1050",
+        "gtx 950",
+        "gtx 960",
+        "gtx 750",
+        "rx 550",
+        "rx 560",
+    ];
+    LOW_END.iter().any(|needle| lower.contains(needle))
 }
 
 /// The Windows build: capture delivers frames differently from one to another (on Windows 10 at full rate over a
@@ -525,25 +686,58 @@ fn system_times() -> Option<(u64, u64)> {
     Some((ticks(idle), ticks(kernel) + ticks(user)))
 }
 
-/// The game's processes (Euro Truck Simulator 2's, American Truck Simulator's), as Windows lists them now.
-fn game_processes() -> Vec<u32> {
-    let mut found = Vec::new();
+/// A single-pass ToolHelp snapshot of the system process table, resolving WestPlay's own process tree
+/// (with reused-parent-PID filtering applied only to candidate descendants) and game PIDs together.
+struct ProcessSnapshot {
+    tree: Vec<(u32, u32)>,
+    our_pids: Vec<u32>,
+    our_cpu: HashMap<u32, u64>,
+    game_pids: Vec<u32>,
+}
+
+fn snapshot_processes(ours: u32) -> ProcessSnapshot {
+    let mut parents: Vec<(u32, u32)> = Vec::new();
+    let mut game_pids: Vec<u32> = Vec::new();
     // SAFETY: a snapshot of the process list, walked with an entry sized as the calls require, then closed.
     unsafe {
-        let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else { return found };
+        let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
+            return ProcessSnapshot { tree: parents, our_pids: vec![ours], our_cpu: HashMap::new(), game_pids };
+        };
         let mut entry = PROCESSENTRY32W { dwSize: size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
         let mut more = Process32FirstW(snapshot, &mut entry).is_ok();
         while more {
+            parents.push((entry.th32ProcessID, entry.th32ParentProcessID));
             let length = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
             let name = String::from_utf16_lossy(&entry.szExeFile[..length]).to_ascii_lowercase();
             if name == "eurotrucks2.exe" || name == "amtrucks.exe" {
-                found.push(entry.th32ProcessID);
+                game_pids.push(entry.th32ProcessID);
             }
             more = Process32NextW(snapshot, &mut entry).is_ok();
         }
         let _ = CloseHandle(snapshot);
     }
-    found
+
+    // Only query `GetProcessTimes` on candidate descendants of `ours` instead of all ~400 OS processes.
+    // This gives us both creation timestamps (to reject reused parent PIDs) and CPU times in one pass.
+    let candidates = descendants(ours, &parents);
+    let mut created: HashMap<u32, u64> = HashMap::with_capacity(candidates.len());
+    let mut cpu_all: HashMap<u32, u64> = HashMap::with_capacity(candidates.len());
+    for &pid in &candidates {
+        if let Some((born, cpu)) = process_times(pid) {
+            created.insert(pid, born);
+            cpu_all.insert(pid, cpu);
+        }
+    }
+    parents.retain(|&(pid, parent)| parent_precedes_child(pid, parent, &created));
+    let our_pids = descendants(ours, &parents);
+    let our_cpu = our_pids.iter().filter_map(|pid| cpu_all.get(pid).map(|&cpu| (*pid, cpu))).collect();
+    ProcessSnapshot { tree: parents, our_pids, our_cpu, game_pids }
+}
+
+/// The game's processes (Euro Truck Simulator 2's, American Truck Simulator's), as Windows lists them now.
+#[cfg(test)]
+fn game_processes() -> Vec<u32> {
+    snapshot_processes(std::process::id()).game_pids
 }
 
 /// The graphics card's 3D engines' use per process, as Windows counts it (`\GPU Engine(*)\Utilization Percentage`,
@@ -667,28 +861,6 @@ fn part_of(
     "other"
 }
 
-/// Every process's id and its parent's, as Windows lists them now.
-fn process_tree() -> Vec<(u32, u32)> {
-    let mut parents: Vec<(u32, u32)> = Vec::new();
-    // SAFETY: a snapshot of the process list, walked with an entry sized as the calls require, then closed.
-    unsafe {
-        let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else { return parents };
-        let mut entry = PROCESSENTRY32W { dwSize: size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
-        let mut more = Process32FirstW(snapshot, &mut entry).is_ok();
-        while more {
-            parents.push((entry.th32ProcessID, entry.th32ParentProcessID));
-            more = Process32NextW(snapshot, &mut entry).is_ok();
-        }
-        let _ = CloseHandle(snapshot);
-    }
-    // Windows retains a departed parent's PID in its children. A reused PID must not adopt older,
-    // unrelated processes (especially during before/after memory measurements).
-    let created: HashMap<u32, u64> =
-        parents.iter().filter_map(|&(pid, _)| process_times(pid).map(|(created, _)| (pid, created))).collect();
-    parents.retain(|&(pid, parent)| parent_precedes_child(pid, parent, &created));
-    parents
-}
-
 fn parent_precedes_child(pid: u32, parent: u32, created: &HashMap<u32, u64>) -> bool {
     match (created.get(&pid), created.get(&parent)) {
         (Some(child), Some(parent)) => child >= parent,
@@ -697,8 +869,9 @@ fn parent_precedes_child(pid: u32, parent: u32, created: &HashMap<u32, u64>) -> 
 }
 
 /// WestPlay's processes: its own and every one started from it (WebView2's), at any depth.
+#[cfg(test)]
 fn processes() -> Vec<u32> {
-    descendants(std::process::id(), &process_tree())
+    snapshot_processes(std::process::id()).our_pids
 }
 
 /// `root` and every process below it in `parents` (each process's id and its parent's).
@@ -905,5 +1078,15 @@ mod tests {
     fn a_software_renderer_says_so() {
         assert!(described("ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))".into()).contains("no GPU"));
         assert!(!described("ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 SUPER)".into()).contains("no GPU"));
+    }
+
+    #[test]
+    fn identifies_integrated_and_software_renderers_as_low_end() {
+        assert!(is_low_end_renderer("ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11)"));
+        assert!(is_low_end_renderer("ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11)"));
+        assert!(is_low_end_renderer("ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))"));
+        assert!(is_low_end_renderer("ANGLE (NVIDIA, NVIDIA GeForce GTX 1050 Ti Direct3D11)"));
+        assert!(!is_low_end_renderer("ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Direct3D11)"));
+        assert!(!is_low_end_renderer("ANGLE (AMD, AMD Radeon RX 7800 XT Direct3D11)"));
     }
 }

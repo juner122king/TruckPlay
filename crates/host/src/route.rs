@@ -455,6 +455,10 @@ fn read_nodes(memory: &impl Memory, header: &Header) -> Option<(Vec<RouteNode>, 
     Some((nodes, after))
 }
 
+/// How long the `.scs` junction archives and definitions stay loaded after the last route resolution
+/// before releasing their memory back to the OS.
+const JUNCTIONS_IDLE_RELEASE: std::time::Duration = std::time::Duration::from_secs(60);
+
 /// Resolves the ways through each route's junctions as routes come (only the latest of each kind, when several wait,
 /// the game's route first), opening the game's files once (again when the profile played has other map mods). Anything
 /// new leaves the routes offered still to read.
@@ -464,7 +468,21 @@ fn resolve_junctions(pending: Receiver<Job>, sender: Sender<RouteUpdate>, played
     let mut install: Option<PathBuf> = None;
     let mut newer: Vec<Job> = Vec::new();
     loop {
-        let first = if newer.is_empty() { pending.recv().ok() } else { Some(newer.remove(0)) };
+        let first = if !newer.is_empty() {
+            Some(newer.remove(0))
+        } else if opened.is_some() {
+            match pending.recv_timeout(JUNCTIONS_IDLE_RELEASE) {
+                Ok(job) => Some(job),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    opened = None;
+                    log!("route: junction archives released after idle");
+                    continue;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return,
+            }
+        } else {
+            pending.recv().ok()
+        };
         let Some(first) = first else { return };
         let (mut route, mut offered) = (None, None);
         for job in std::iter::once(first).chain(newer.drain(..)).chain(pending.try_iter()) {

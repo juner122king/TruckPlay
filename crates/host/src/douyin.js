@@ -724,7 +724,9 @@
       if (loaderFrame) {
         try {
           loaderFrame.src = 'about:blank'
+          loaderFrame.parentNode?.removeChild(loaderFrame)
         } catch {}
+        loaderFrame = null
       }
     }, 9000)
   }

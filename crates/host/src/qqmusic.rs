@@ -206,6 +206,7 @@ impl Qqmusic {
         view.show(false)?;
         stage.add(&view, false)?;
         view.add_startup_script(concat!(include_str!("cab_sound.js"), "\n", include_str!("qqmusic.js")))?;
+        view.serve_blank_document(HOME)?;
         view.navigate(HOME)?;
         Ok(Self {
             view,

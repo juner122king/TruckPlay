@@ -53,6 +53,9 @@ pub struct Planned {
     pub message: String,
 }
 
+/// How long a loaded road graph stays resident after the last route planning request before freeing its memory.
+const IDLE_RELEASE: std::time::Duration = std::time::Duration::from_secs(60);
+
 pub struct Planner {
     asks: Sender<Ask>,
     planned: Receiver<Planned>,
@@ -69,7 +72,23 @@ impl Planner {
         let (detour_answer, detoured) = mpsc::channel();
         std::thread::spawn(move || {
             let mut loaded: Option<(PathBuf, Arc<Graph>)> = None;
-            while let Ok(first) = asked.recv() {
+            loop {
+                let first = if loaded.is_some() {
+                    match asked.recv_timeout(IDLE_RELEASE) {
+                        Ok(ask) => ask,
+                        Err(mpsc::RecvTimeoutError::Timeout) => {
+                            loaded = None;
+                            crate::log!("routes: road graph released after idle");
+                            continue;
+                        }
+                        Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                    }
+                } else {
+                    match asked.recv() {
+                        Ok(ask) => ask,
+                        Err(_) => return,
+                    }
+                };
                 // Only the newest of each kind: the page asks again as the player picks another place.
                 let (mut routes, mut stops) = (None, None);
                 for ask in std::iter::once(first).chain(asked.try_iter()) {

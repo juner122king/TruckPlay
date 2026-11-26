@@ -538,6 +538,9 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut safari_playing = false;
     // The settings generation last applied (`None`: apply them once at startup).
     let mut applied_settings = None;
+    let mut effective_lite = config.settings.get().graphics.performance == settings::PerformanceMode::Lite;
+    let mut low_fps_windows: u8 = 0;
+    let mut last_cab_update = Instant::now();
     // Each keybind's presses the page was told of (`PluginBlock::keybind_presses`).
     let mut keybind_presses =
         bridge.bridge().plugin.keybind_presses.each_ref().map(|count| count.load(Ordering::Acquire));
@@ -783,6 +786,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         status.adapter = Some(built.gpu.adapter_name.clone());
                         status.error = None;
                         built.capture.set_light(screen_light);
+                        built.capture.set_max_fps(if effective_lite { capture::LITE_FPS } else { capture::MAX_FPS });
                         pipeline = Some(built);
                     }
                     Err(e) => status.error = Some(format!("capture pipeline failed: {e}")),
@@ -858,6 +862,34 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     waited: status.dropped_total,
                 });
                 meter.second(Instant::now(), sample, &webview, &profiles);
+                if let Some(snap) = meter.take_latest_snapshot() {
+                    if snap.game_fps > 1.0 && snap.game_fps < 40.0 && snap.gpu_busy_percent.is_none_or(|pct| pct >= 85.0)
+                    {
+                        low_fps_windows = low_fps_windows.saturating_add(1);
+                    } else if snap.game_fps >= 52.0 {
+                        low_fps_windows = 0;
+                    }
+                }
+                let perf_mode = config.settings.get().graphics.performance;
+                let desired_lite = match perf_mode {
+                    settings::PerformanceMode::Lite => true,
+                    settings::PerformanceMode::Quality => false,
+                    settings::PerformanceMode::Auto => meter.low_end_renderer() || low_fps_windows >= 2,
+                };
+                if desired_lite != effective_lite {
+                    effective_lite = desired_lite;
+                    log!(
+                        "performance mode: switched to {} (configured: {:?})",
+                        if effective_lite { "lite (30 fps)" } else { "quality (60 fps)" },
+                        perf_mode
+                    );
+                    if let Some(pipeline) = &pipeline {
+                        pipeline
+                            .capture
+                            .set_max_fps(if effective_lite { capture::LITE_FPS } else { capture::MAX_FPS });
+                    }
+                    let _ = webview.post_json(&settings_message(&config.settings.get(), effective_lite));
+                }
                 (config.on_status)(&status);
                 last_frames = frames;
             }
@@ -904,6 +936,14 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 adapters = graphics::adapters();
                 status.adapters = adapters.clone();
             }
+            effective_lite = match graphics.performance {
+                settings::PerformanceMode::Lite => true,
+                settings::PerformanceMode::Quality => false,
+                settings::PerformanceMode::Auto => meter.low_end_renderer() || low_fps_windows >= 2,
+            };
+            if let Some(pipeline) = &pipeline {
+                pipeline.capture.set_max_fps(if effective_lite { capture::LITE_FPS } else { capture::MAX_FPS });
+            }
             let interaction = config.settings.get().interaction;
             pointer.set_sensitivity(interaction.sensitivity.get());
             host.interaction_key.store(interaction.key.virtual_key(), Ordering::Release);
@@ -912,7 +952,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             for (slot, value) in host.keybinds.iter().zip(config.settings.get().keybinds.bridge_values()) {
                 slot.store(value, Ordering::Release);
             }
-            let _ = webview.post_json(&settings_message(&config.settings.get()));
+            let _ = webview.post_json(&settings_message(&config.settings.get(), effective_lite));
         }
         if let Some(server) = &lan {
             let error = if !server.running() {
@@ -1172,7 +1212,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         let message = safari::Report::Playing(safari_playing).message();
                         let _ = webview.post_json(&message);
                     }
-                    let _ = webview.post_json(&settings_message(&config.settings.get()));
+                    let _ = webview.post_json(&settings_message(&config.settings.get(), effective_lite));
                     if let Some(message) = &customize_message {
                         let _ = webview.post_json(message);
                     }
@@ -1198,6 +1238,14 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     let mut settings = config.settings.get();
                     if settings.screen.truck_strip != strip {
                         settings.screen.truck_strip = strip;
+                        config.settings.set(settings.clone());
+                        (config.on_settings)(&settings);
+                    }
+                }
+                Some(PageMessage::Performance { mode }) => {
+                    let mut settings = config.settings.get();
+                    if settings.graphics.performance != mode {
+                        settings.graphics.performance = mode;
                         config.settings.set(settings.clone());
                         (config.on_settings)(&settings);
                     }
@@ -1625,261 +1673,372 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             }
         }
 
-        // What Bilibili says.
+        // What Bilibili says, and its WebView failing or game exit closing it.
         if let Some(player) = &bilibili {
-            let mut state_changed = false;
-            for report in player.take_reports() {
-                match report {
-                    bilibili::Report::Spectrum(bars) => {
-                        let _ = webview.post_json(&speakers::spectrum_message(&bars));
-                    }
-                    bilibili::Report::State(state) => {
-                        if status.bilibili_signed_in != Some(state.signed_in) {
-                            status.bilibili_signed_in = Some(state.signed_in);
-                            (config.on_status)(&status);
-                        }
-                        bilibili_state = Some(state);
-                        state_changed = true;
-                    }
-                    bilibili::Report::SignInWindow(open) => {
-                        bilibili_window_open = open;
-                        status.bilibili_signing_in = bilibili_window_open || bilibili_confirming;
-                        (config.on_status)(&status);
-                        state_changed = true;
-                    }
-                    bilibili::Report::Answer(answer) => {
-                        let _ = webview.post_json(&bilibili::answer_message(&answer));
-                    }
-                    bilibili::Report::Playback(playback) => {
-                        let heard = playback.as_ref().map(|pb| play_log::Heard {
-                            doing: if pb.status == "playing" {
-                                play_log::Doing::Playing
-                            } else {
-                                play_log::Doing::Paused
-                            },
-                            track: Some(pb.title.as_str()),
-                            position: pb.position,
-                        });
-                        if let Some(line) = bilibili_log.heard(heard) {
-                            log!("{line}");
-                        }
-                        let message = bilibili::playback_message(playback.as_ref());
-                        let _ = webview.post_json(&message);
-                        bilibili_playback = playback.as_ref().map(|_| message);
-                    }
+            if player.failed() || players_closing {
+                if players_closing {
+                    log!("[bilibili] closed with the game");
+                } else {
+                    log!("[bilibili] its browser failed: closed, the page opens it again");
                 }
-            }
-            if state_changed {
-                let signing_in = bilibili_window_open || bilibili_confirming;
-                let _ = webview.post_json(&bilibili::state_message(bilibili_state.as_ref(), signing_in));
-            }
-        }
-
-        // What Ximalaya says.
-        if let Some(player) = &ximalaya {
-            let mut state_changed = false;
-            for report in player.take_reports() {
-                match report {
-                    ximalaya::Report::Spectrum(bars) => {
-                        let _ = webview.post_json(&speakers::spectrum_message(&bars));
-                    }
-                    ximalaya::Report::State(state) => {
-                        if status.ximalaya_signed_in != Some(state.signed_in) {
-                            status.ximalaya_signed_in = Some(state.signed_in);
-                            (config.on_status)(&status);
+                if let Some(line) = bilibili_log.heard(None) {
+                    log!("{line}");
+                }
+                if let Some(failed) = bilibili.take() {
+                    failed.close(&stage);
+                }
+                bilibili_state = None;
+                bilibili_playback = None;
+                bilibili_window_open = false;
+                status.bilibili_signed_in = None;
+                status.bilibili_signing_in = false;
+                (config.on_status)(&status);
+                let _ = webview.post_json(&bilibili::state_message(None, false));
+                let _ = webview.post_json(&bilibili::playback_message(None));
+            } else {
+                let mut state_changed = false;
+                for report in player.take_reports() {
+                    match report {
+                        bilibili::Report::Spectrum(bars) => {
+                            let _ = webview.post_json(&speakers::spectrum_message(&bars));
                         }
-                        ximalaya_state = Some(state);
-                        state_changed = true;
-                    }
-                    ximalaya::Report::SignInWindow(open) => {
-                        ximalaya_window_open = open;
-                        status.ximalaya_signing_in = ximalaya_window_open || ximalaya_confirming;
-                        (config.on_status)(&status);
-                        state_changed = true;
-                    }
-                    ximalaya::Report::Answer(answer) => {
-                        let _ = webview.post_json(&ximalaya::answer_message(&answer));
-                    }
-                    ximalaya::Report::Playback(playback) => {
-                        let heard = playback.as_ref().map(|pb| play_log::Heard {
-                            doing: match pb.status.as_str() {
-                                "playing" => play_log::Doing::Playing,
-                                "loading" => play_log::Doing::Loading,
-                                _ => play_log::Doing::Paused,
-                            },
-                            track: Some(pb.title.as_str()),
-                            position: pb.position,
-                        });
-                        if let Some(line) = ximalaya_log.heard(heard) {
-                            log!("{line}");
-                        }
-                        let next_error = playback.as_ref().and_then(|pb| pb.error.as_deref()).map(str::to_owned);
-                        if next_error != ximalaya_last_error {
-                            if let Some(err) = &next_error {
-                                let state = playback.as_ref().map_or("unknown", |pb| pb.status.as_str());
-                                log!("[ximalaya] {state}: {err}");
+                        bilibili::Report::State(state) => {
+                            if status.bilibili_signed_in != Some(state.signed_in) {
+                                status.bilibili_signed_in = Some(state.signed_in);
+                                (config.on_status)(&status);
                             }
-                            ximalaya_last_error = next_error;
+                            bilibili_state = Some(state);
+                            state_changed = true;
                         }
-                        let message = ximalaya::playback_message(playback.as_ref());
-                        let _ = webview.post_json(&message);
-                        ximalaya_playback = Some(message);
+                        bilibili::Report::SignInWindow(open) => {
+                            bilibili_window_open = open;
+                            status.bilibili_signing_in = bilibili_window_open || bilibili_confirming;
+                            (config.on_status)(&status);
+                            state_changed = true;
+                        }
+                        bilibili::Report::Answer(answer) => {
+                            let _ = webview.post_json(&bilibili::answer_message(&answer));
+                        }
+                        bilibili::Report::Playback(playback) => {
+                            let heard = playback.as_ref().map(|pb| play_log::Heard {
+                                doing: if pb.status == "playing" {
+                                    play_log::Doing::Playing
+                                } else {
+                                    play_log::Doing::Paused
+                                },
+                                track: Some(pb.title.as_str()),
+                                position: pb.position,
+                            });
+                            if let Some(line) = bilibili_log.heard(heard) {
+                                log!("{line}");
+                            }
+                            let message = bilibili::playback_message(playback.as_ref());
+                            let _ = webview.post_json(&message);
+                            bilibili_playback = playback.as_ref().map(|_| message);
+                        }
                     }
                 }
-            }
-            if state_changed {
-                let signing_in = ximalaya_window_open || ximalaya_confirming;
-                let _ = webview.post_json(&ximalaya::state_message(ximalaya_state.as_ref(), signing_in));
+                if state_changed {
+                    let signing_in = bilibili_window_open || bilibili_confirming;
+                    let _ = webview.post_json(&bilibili::state_message(bilibili_state.as_ref(), signing_in));
+                }
             }
         }
 
-        // What Douyin says.
+        // What Ximalaya says, and its WebView failing or game exit closing it.
+        if let Some(player) = &ximalaya {
+            if player.failed() || players_closing {
+                if players_closing {
+                    log!("[ximalaya] closed with the game");
+                } else {
+                    log!("[ximalaya] its browser failed: closed, the page opens it again");
+                }
+                if let Some(line) = ximalaya_log.heard(None) {
+                    log!("{line}");
+                }
+                if let Some(failed) = ximalaya.take() {
+                    failed.close(&stage);
+                }
+                ximalaya_state = None;
+                ximalaya_playback = None;
+                ximalaya_last_error = None;
+                ximalaya_window_open = false;
+                status.ximalaya_signed_in = None;
+                status.ximalaya_signing_in = false;
+                (config.on_status)(&status);
+                let _ = webview.post_json(&ximalaya::state_message(None, false));
+                let _ = webview.post_json(&ximalaya::playback_message(None));
+            } else {
+                let mut state_changed = false;
+                for report in player.take_reports() {
+                    match report {
+                        ximalaya::Report::Spectrum(bars) => {
+                            let _ = webview.post_json(&speakers::spectrum_message(&bars));
+                        }
+                        ximalaya::Report::State(state) => {
+                            if status.ximalaya_signed_in != Some(state.signed_in) {
+                                status.ximalaya_signed_in = Some(state.signed_in);
+                                (config.on_status)(&status);
+                            }
+                            ximalaya_state = Some(state);
+                            state_changed = true;
+                        }
+                        ximalaya::Report::SignInWindow(open) => {
+                            ximalaya_window_open = open;
+                            status.ximalaya_signing_in = ximalaya_window_open || ximalaya_confirming;
+                            (config.on_status)(&status);
+                            state_changed = true;
+                        }
+                        ximalaya::Report::Answer(answer) => {
+                            let _ = webview.post_json(&ximalaya::answer_message(&answer));
+                        }
+                        ximalaya::Report::Playback(playback) => {
+                            let heard = playback.as_ref().map(|pb| play_log::Heard {
+                                doing: match pb.status.as_str() {
+                                    "playing" => play_log::Doing::Playing,
+                                    "loading" => play_log::Doing::Loading,
+                                    _ => play_log::Doing::Paused,
+                                },
+                                track: Some(pb.title.as_str()),
+                                position: pb.position,
+                            });
+                            if let Some(line) = ximalaya_log.heard(heard) {
+                                log!("{line}");
+                            }
+                            let next_error = playback.as_ref().and_then(|pb| pb.error.as_deref()).map(str::to_owned);
+                            if next_error != ximalaya_last_error {
+                                if let Some(err) = &next_error {
+                                    let state = playback.as_ref().map_or("unknown", |pb| pb.status.as_str());
+                                    log!("[ximalaya] {state}: {err}");
+                                }
+                                ximalaya_last_error = next_error;
+                            }
+                            let message = ximalaya::playback_message(playback.as_ref());
+                            let _ = webview.post_json(&message);
+                            ximalaya_playback = Some(message);
+                        }
+                    }
+                }
+                if state_changed {
+                    let signing_in = ximalaya_window_open || ximalaya_confirming;
+                    let _ = webview.post_json(&ximalaya::state_message(ximalaya_state.as_ref(), signing_in));
+                }
+            }
+        }
+
+        // What Douyin says, and its WebView failing or game exit closing it.
         if let Some(player) = &douyin {
-            let mut state_changed = false;
-            for report in player.take_reports() {
-                match report {
-                    douyin::Report::Spectrum(bars) => {
-                        let _ = webview.post_json(&speakers::spectrum_message(&bars));
-                    }
-                    douyin::Report::State(state) => {
-                        if status.douyin_signed_in != Some(state.signed_in) {
-                            status.douyin_signed_in = Some(state.signed_in);
+            if player.failed() || players_closing {
+                if players_closing {
+                    log!("[douyin] closed with the game");
+                } else {
+                    log!("[douyin] its browser failed: closed, the page opens it again");
+                }
+                if let Some(line) = douyin_log.heard(None) {
+                    log!("{line}");
+                }
+                if let Some(failed) = douyin.take() {
+                    failed.close(&stage);
+                }
+                douyin_state = None;
+                douyin_playback = None;
+                douyin_window_open = false;
+                status.douyin_signed_in = None;
+                status.douyin_signing_in = false;
+                (config.on_status)(&status);
+                let _ = webview.post_json(&douyin::state_message(None, false));
+                let _ = webview.post_json(&douyin::playback_message(None));
+            } else {
+                let mut state_changed = false;
+                for report in player.take_reports() {
+                    match report {
+                        douyin::Report::Spectrum(bars) => {
+                            let _ = webview.post_json(&speakers::spectrum_message(&bars));
+                        }
+                        douyin::Report::State(state) => {
+                            if status.douyin_signed_in != Some(state.signed_in) {
+                                status.douyin_signed_in = Some(state.signed_in);
+                                (config.on_status)(&status);
+                            }
+                            douyin_state = Some(state);
+                            state_changed = true;
+                        }
+                        douyin::Report::SignInWindow(open) => {
+                            douyin_window_open = open;
+                            status.douyin_signing_in = douyin_window_open || douyin_confirming;
                             (config.on_status)(&status);
+                            state_changed = true;
                         }
-                        douyin_state = Some(state);
-                        state_changed = true;
-                    }
-                    douyin::Report::SignInWindow(open) => {
-                        douyin_window_open = open;
-                        status.douyin_signing_in = douyin_window_open || douyin_confirming;
-                        (config.on_status)(&status);
-                        state_changed = true;
-                    }
-                    douyin::Report::Answer(answer) => {
-                        let _ = webview.post_json(&douyin::answer_message(&answer));
-                    }
-                    douyin::Report::Playback(playback) => {
-                        let heard = playback.as_ref().map(|pb| play_log::Heard {
-                            doing: if pb.status == "playing" {
-                                play_log::Doing::Playing
-                            } else {
-                                play_log::Doing::Paused
-                            },
-                            track: Some(pb.title.as_str()),
-                            position: pb.position,
-                        });
-                        if let Some(line) = douyin_log.heard(heard) {
-                            log!("{line}");
+                        douyin::Report::Answer(answer) => {
+                            let _ = webview.post_json(&douyin::answer_message(&answer));
                         }
-                        let message = douyin::playback_message(playback.as_ref());
-                        let _ = webview.post_json(&message);
-                        douyin_playback = Some(message);
+                        douyin::Report::Playback(playback) => {
+                            let heard = playback.as_ref().map(|pb| play_log::Heard {
+                                doing: if pb.status == "playing" {
+                                    play_log::Doing::Playing
+                                } else {
+                                    play_log::Doing::Paused
+                                },
+                                track: Some(pb.title.as_str()),
+                                position: pb.position,
+                            });
+                            if let Some(line) = douyin_log.heard(heard) {
+                                log!("{line}");
+                            }
+                            let message = douyin::playback_message(playback.as_ref());
+                            let _ = webview.post_json(&message);
+                            douyin_playback = Some(message);
+                        }
                     }
                 }
-            }
-            if state_changed {
-                let signing_in = douyin_window_open || douyin_confirming;
-                let _ = webview.post_json(&douyin::state_message(douyin_state.as_ref(), signing_in));
+                if state_changed {
+                    let signing_in = douyin_window_open || douyin_confirming;
+                    let _ = webview.post_json(&douyin::state_message(douyin_state.as_ref(), signing_in));
+                }
             }
         }
 
-        // What Hongguo says.
+        // What Hongguo says, and its WebView failing or game exit closing it.
         if let Some(player) = &hongguo {
-            let mut state_changed = false;
-            for report in player.take_reports() {
-                match report {
-                    hongguo::Report::Spectrum(bars) => {
-                        let _ = webview.post_json(&speakers::spectrum_message(&bars));
-                    }
-                    hongguo::Report::State(state) => {
-                        if status.hongguo_signed_in != Some(state.signed_in) {
-                            status.hongguo_signed_in = Some(state.signed_in);
+            if player.failed() || players_closing {
+                if players_closing {
+                    log!("[hongguo] closed with the game");
+                } else {
+                    log!("[hongguo] its browser failed: closed, the page opens it again");
+                }
+                if let Some(line) = hongguo_log.heard(None) {
+                    log!("{line}");
+                }
+                if let Some(failed) = hongguo.take() {
+                    failed.close(&stage);
+                }
+                hongguo_state = None;
+                hongguo_playback = None;
+                hongguo_window_open = false;
+                status.hongguo_signed_in = None;
+                status.hongguo_signing_in = false;
+                (config.on_status)(&status);
+                let _ = webview.post_json(&hongguo::state_message(None, false));
+                let _ = webview.post_json(&hongguo::playback_message(None));
+            } else {
+                let mut state_changed = false;
+                for report in player.take_reports() {
+                    match report {
+                        hongguo::Report::Spectrum(bars) => {
+                            let _ = webview.post_json(&speakers::spectrum_message(&bars));
+                        }
+                        hongguo::Report::State(state) => {
+                            if status.hongguo_signed_in != Some(state.signed_in) {
+                                status.hongguo_signed_in = Some(state.signed_in);
+                                (config.on_status)(&status);
+                            }
+                            hongguo_state = Some(state);
+                            state_changed = true;
+                        }
+                        hongguo::Report::SignInWindow(open) => {
+                            hongguo_window_open = open;
+                            status.hongguo_signing_in = hongguo_window_open || hongguo_confirming;
                             (config.on_status)(&status);
+                            state_changed = true;
                         }
-                        hongguo_state = Some(state);
-                        state_changed = true;
-                    }
-                    hongguo::Report::SignInWindow(open) => {
-                        hongguo_window_open = open;
-                        status.hongguo_signing_in = hongguo_window_open || hongguo_confirming;
-                        (config.on_status)(&status);
-                        state_changed = true;
-                    }
-                    hongguo::Report::Answer(answer) => {
-                        let _ = webview.post_json(&hongguo::answer_message(&answer));
-                    }
-                    hongguo::Report::Playback(playback) => {
-                        let heard = playback.as_ref().map(|pb| play_log::Heard {
-                            doing: if pb.status == "playing" {
-                                play_log::Doing::Playing
-                            } else {
-                                play_log::Doing::Paused
-                            },
-                            track: Some(pb.title.as_str()),
-                            position: pb.position,
-                        });
-                        if let Some(line) = hongguo_log.heard(heard) {
-                            log!("{line}");
+                        hongguo::Report::Answer(answer) => {
+                            let _ = webview.post_json(&hongguo::answer_message(&answer));
                         }
-                        let message = hongguo::playback_message(playback.as_ref());
-                        let _ = webview.post_json(&message);
-                        hongguo_playback = playback.as_ref().map(|_| message);
+                        hongguo::Report::Playback(playback) => {
+                            let heard = playback.as_ref().map(|pb| play_log::Heard {
+                                doing: if pb.status == "playing" {
+                                    play_log::Doing::Playing
+                                } else {
+                                    play_log::Doing::Paused
+                                },
+                                track: Some(pb.title.as_str()),
+                                position: pb.position,
+                            });
+                            if let Some(line) = hongguo_log.heard(heard) {
+                                log!("{line}");
+                            }
+                            let message = hongguo::playback_message(playback.as_ref());
+                            let _ = webview.post_json(&message);
+                            hongguo_playback = playback.as_ref().map(|_| message);
+                        }
                     }
                 }
-            }
-            if state_changed {
-                let signing_in = hongguo_window_open || hongguo_confirming;
-                let _ = webview.post_json(&hongguo::state_message(hongguo_state.as_ref(), signing_in));
+                if state_changed {
+                    let signing_in = hongguo_window_open || hongguo_confirming;
+                    let _ = webview.post_json(&hongguo::state_message(hongguo_state.as_ref(), signing_in));
+                }
             }
         }
 
-        // What NetEase Cloud Music says.
+        // What NetEase Cloud Music says, and its WebView failing or game exit closing it.
         if let Some(player) = &netease {
-            let mut state_changed = false;
-            for report in player.take_reports() {
-                match report {
-                    netease::Report::Spectrum(bars) => {
-                        let _ = webview.post_json(&speakers::spectrum_message(&bars));
-                    }
-                    netease::Report::State(state) => {
-                        if status.netease_signed_in != Some(state.signed_in) {
-                            status.netease_signed_in = Some(state.signed_in);
+            if player.failed() || players_closing {
+                if players_closing {
+                    log!("[netease] closed with the game");
+                } else {
+                    log!("[netease] its browser failed: closed, the page opens it again");
+                }
+                if let Some(line) = netease_log.heard(None) {
+                    log!("{line}");
+                }
+                if let Some(failed) = netease.take() {
+                    failed.close(&stage);
+                }
+                netease_state = None;
+                netease_playback = None;
+                netease_window_open = false;
+                status.netease_signed_in = None;
+                status.netease_signing_in = false;
+                (config.on_status)(&status);
+                let _ = webview.post_json(&netease::state_message(None, false));
+                let _ = webview.post_json(&netease::playback_message(None));
+            } else {
+                let mut state_changed = false;
+                for report in player.take_reports() {
+                    match report {
+                        netease::Report::Spectrum(bars) => {
+                            let _ = webview.post_json(&speakers::spectrum_message(&bars));
+                        }
+                        netease::Report::State(state) => {
+                            if status.netease_signed_in != Some(state.signed_in) {
+                                status.netease_signed_in = Some(state.signed_in);
+                                (config.on_status)(&status);
+                            }
+                            netease_state = Some(state);
+                            state_changed = true;
+                        }
+                        netease::Report::SignInWindow(open) => {
+                            netease_window_open = open;
+                            status.netease_signing_in = netease_window_open || netease_confirming;
                             (config.on_status)(&status);
+                            state_changed = true;
                         }
-                        netease_state = Some(state);
-                        state_changed = true;
-                    }
-                    netease::Report::SignInWindow(open) => {
-                        netease_window_open = open;
-                        status.netease_signing_in = netease_window_open || netease_confirming;
-                        (config.on_status)(&status);
-                        state_changed = true;
-                    }
-                    netease::Report::Answer(answer) => {
-                        let _ = webview.post_json(&netease::answer_message(&answer));
-                    }
-                    netease::Report::Playback(playback) => {
-                        let heard = playback.as_ref().map(|pb| play_log::Heard {
-                            doing: if pb.status == "playing" {
-                                play_log::Doing::Playing
-                            } else {
-                                play_log::Doing::Paused
-                            },
-                            track: Some(pb.title.as_str()),
-                            position: pb.position,
-                        });
-                        if let Some(line) = netease_log.heard(heard) {
-                            log!("{line}");
+                        netease::Report::Answer(answer) => {
+                            let _ = webview.post_json(&netease::answer_message(&answer));
                         }
-                        let message = netease::playback_message(playback.as_ref());
-                        let _ = webview.post_json(&message);
-                        netease_playback = Some(message);
+                        netease::Report::Playback(playback) => {
+                            let heard = playback.as_ref().map(|pb| play_log::Heard {
+                                doing: if pb.status == "playing" {
+                                    play_log::Doing::Playing
+                                } else {
+                                    play_log::Doing::Paused
+                                },
+                                track: Some(pb.title.as_str()),
+                                position: pb.position,
+                            });
+                            if let Some(line) = netease_log.heard(heard) {
+                                log!("{line}");
+                            }
+                            let message = netease::playback_message(playback.as_ref());
+                            let _ = webview.post_json(&message);
+                            netease_playback = Some(message);
+                        }
                     }
                 }
-            }
-            if state_changed {
-                let signing_in = netease_window_open || netease_confirming;
-                let _ = webview.post_json(&netease::state_message(netease_state.as_ref(), signing_in));
+                if state_changed {
+                    let signing_in = netease_window_open || netease_confirming;
+                    let _ = webview.post_json(&netease::state_message(netease_state.as_ref(), signing_in));
+                }
             }
         }
 
@@ -2226,62 +2385,69 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             let game_frame = plugin.heartbeat.load(Ordering::Acquire);
             let (electrics, paused) = (telemetry.electric_enabled, telemetry.paused);
             let outside = camera.outside(truck.id.as_str(), cab_drawn, game_frame, electrics, paused);
-            if outside != was_outside {
+            let outside_changed = outside != was_outside;
+            if outside_changed {
                 was_outside = outside;
                 log!("camera: {} the cab", if outside { "outside" } else { "in" });
             }
             // The game's menu gone while it's still paused: the music back as its still picture shows.
             let gone = menu.update(paused, camera::drawn(cab_drawn, game_frame), outside);
-            if gone != menu_gone {
+            let menu_changed = gone != menu_gone;
+            if menu_changed {
                 menu_gone = gone;
                 if gone {
                     log!("the game's menu has gone, the game about to run again");
                 }
                 let _ = webview.post_json(&serde_json::json!({ "type": "menuGone", "gone": gone }).to_string());
             }
-            let distance = camera::Camera::distance(telemetry, outside).unwrap_or(0.0) as f32;
-            let turn = game_settings.camera().steering_turn(telemetry.steering);
-            let head = speakers::Head::of(telemetry).turned(turn);
-            // The truck's speakers: a coach's driver's or its passengers' as the companion's setting chooses; its
-            // parts' for a truck whose speakers come with them (none until they're found), else its own.
-            let truck_speakers = match (&coach_sets, &part_speakers) {
-                (Some((driver, passengers)), _) => Some(match config.settings.get().sound.coach {
-                    settings::CoachSpeakers::Driver => driver.as_slice(),
-                    settings::CoachSpeakers::Passengers => passengers.as_slice(),
-                }),
-                (None, Some(found)) if found.truck == *truck => found.speakers.as_deref(),
-                _ if speakers::by_parts(truck.id.as_str()) => None,
-                _ => speakers::in_truck(truck.id.as_str()),
-            };
-            if let Some(player) = &youtube {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &apple_music {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &bilibili {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &ximalaya {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &douyin {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &hongguo {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &netease {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &qqmusic {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(player) = &music_player {
-                let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
-            }
-            if let Some(browser) = &mut safari {
-                browser.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+            // Camera cuts apply immediately; continuous head/speaker updates run at the 20 Hz telemetry cadence
+            // instead of every 1 ms host loop iteration.
+            if outside_changed || menu_changed || last_cab_update.elapsed() >= Duration::from_millis(50) {
+                last_cab_update = Instant::now();
+                let distance = camera::Camera::distance(telemetry, outside).unwrap_or(0.0) as f32;
+                let turn = game_settings.camera().steering_turn(telemetry.steering);
+                let head = speakers::Head::of(telemetry).turned(turn);
+                // The truck's speakers: a coach's driver's or its passengers' as the companion's setting chooses; its
+                // parts' for a truck whose speakers come with them (none until they're found), else its own.
+                let truck_speakers = match (&coach_sets, &part_speakers) {
+                    (Some((driver, passengers)), _) => Some(match config.settings.get().sound.coach {
+                        settings::CoachSpeakers::Driver => driver.as_slice(),
+                        settings::CoachSpeakers::Passengers => passengers.as_slice(),
+                    }),
+                    (None, Some(found)) if found.truck == *truck => found.speakers.as_deref(),
+                    _ if speakers::by_parts(truck.id.as_str()) => None,
+                    _ => speakers::in_truck(truck.id.as_str()),
+                };
+                if let Some(player) = &youtube {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &apple_music {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &bilibili {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &ximalaya {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &douyin {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &hongguo {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &netease {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &qqmusic {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(player) = &music_player {
+                    let _ = player.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
+                if let Some(browser) = &mut safari {
+                    browser.cab(truck_speakers, head, outside, distance, equalizer, spectrum);
+                }
             }
         }
 
@@ -2377,7 +2543,12 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             }
         }
 
-        std::thread::sleep(Duration::from_millis(1));
+        let idle_sleep = if !game_running && !status.screen_drawing {
+            Duration::from_millis(10)
+        } else {
+            Duration::from_millis(1)
+        };
+        std::thread::sleep(idle_sleep);
     }
 
     host.frame_generation.store(0, Ordering::Release);
@@ -3067,8 +3238,8 @@ fn screen_message(layout: u32) -> String {
 }
 
 /// `{"type":"settings","truckStrip":"auto","wallpaper":"plain","iconSet":null,"iconStyle":"auto","equalizer":…}`: the
-/// settings the cabin page applies itself (its language among them: one chosen, or `null`, the game's).
-fn settings_message(settings: &settings::Settings) -> String {
+/// settings the cabin page applies itself (its language and performance mode among them).
+fn settings_message(settings: &settings::Settings, lite: bool) -> String {
     serde_json::json!({
         "type": "settings",
         "truckStrip": settings.screen.truck_strip,
@@ -3080,6 +3251,8 @@ fn settings_message(settings: &settings::Settings) -> String {
         "buildings": settings.map.buildings,
         "roads": settings.map.roads,
         "language": settings.language.as_ref().map(|code| code.as_str()),
+        "performance": settings.graphics.performance,
+        "lite": lite,
     })
     .to_string()
 }
@@ -3171,6 +3344,10 @@ enum PageMessage {
     /// The truck's information bar beside WestPlay, kept or not, chosen in the cab's Settings (Appearance).
     TruckStrip {
         strip: settings::TruckStrip,
+    },
+    /// Performance mode chosen in the cab's Settings (Appearance).
+    Performance {
+        mode: settings::PerformanceMode,
     },
     /// The players' tone, set in the cab's Settings (Equalizer): the player's curve (bass, mid and treble, dB
     /// each), and whether it plays (Custom) or the speakers as tuned (Recommended).
@@ -3600,6 +3777,11 @@ mod tests {
         );
         assert_eq!(parse_page_message(r#"{"type":"truckStrip","strip":"sideways"}"#), None);
         assert_eq!(
+            parse_page_message(r#"{"type":"performance","mode":"lite"}"#),
+            Some(PageMessage::Performance { mode: crate::settings::PerformanceMode::Lite })
+        );
+        assert_eq!(parse_page_message(r#"{"type":"performance","mode":"turbo"}"#), None);
+        assert_eq!(
             parse_page_message(r#"{"type":"equalizer","bass":-3,"mid":0,"treble":2,"custom":true}"#),
             Some(PageMessage::Equalizer {
                 equalizer: crate::speakers::Equalizer { bass: -3, mid: 0, treble: 2 },
@@ -3843,7 +4025,7 @@ mod tests {
     #[test]
     fn tells_the_page_the_truck_strip_wallpaper_and_icons() {
         let mut settings = crate::settings::Settings::default();
-        let message: serde_json::Value = serde_json::from_str(&settings_message(&settings)).unwrap();
+        let message: serde_json::Value = serde_json::from_str(&settings_message(&settings, false)).unwrap();
         assert_eq!(
             message,
             serde_json::json!({
@@ -3857,6 +4039,8 @@ mod tests {
                 "buildings": true,
                 "roads": true,
                 "language": null,
+                "performance": "auto",
+                "lite": false,
             })
         );
         settings.screen.truck_strip = crate::settings::TruckStrip::Off;
@@ -3864,11 +4048,14 @@ mod tests {
         settings.look.wallpaper = Some("custom:Dusk".into());
         settings.look.icon_set = Some("Retro".into());
         settings.language = crate::settings::LanguageCode::new("de_de");
-        let message: serde_json::Value = serde_json::from_str(&settings_message(&settings)).unwrap();
+        settings.graphics.performance = crate::settings::PerformanceMode::Lite;
+        let message: serde_json::Value = serde_json::from_str(&settings_message(&settings, true)).unwrap();
         assert_eq!(message["truckStrip"], "off");
         assert_eq!(message["language"], "de_de");
         assert_eq!(message["wallpaper"], "custom:Dusk");
         assert_eq!(message["iconSet"], "Retro");
+        assert_eq!(message["performance"], "lite");
+        assert_eq!(message["lite"], true);
         // Within the range, whatever the file says.
         assert_eq!(message["equalizer"], serde_json::json!({ "bass": -6, "mid": 2, "treble": 6 }));
         // The curve is kept whichever is chosen; what plays is it, with Custom only.

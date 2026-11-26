@@ -11,8 +11,8 @@ use std::time::{Duration, Instant, SystemTime};
 /// doesn't say: as it looked in the game (45 each way).
 pub const STEERING_LOOK_DEGREES: f32 = 45.0;
 
-/// How often the settings are read again.
-const EVERY: Duration = Duration::from_secs(5);
+/// How often the settings are checked for modifications.
+const EVERY: Duration = Duration::from_secs(15);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CameraSettings {
@@ -64,22 +64,30 @@ impl CameraSettings {
     }
 }
 
-/// The settings, read again every [`EVERY`].
+/// The settings, checked every [`EVERY`] and re-read only when `config_local.cfg` changed on disk.
 pub struct GameSettings {
     settings: CameraSettings,
     read_at: Option<Instant>,
+    source: Option<(PathBuf, SystemTime)>,
 }
 
 impl GameSettings {
     pub fn new() -> Self {
-        Self { settings: CameraSettings::default(), read_at: None }
+        Self { settings: CameraSettings::default(), read_at: None, source: None }
     }
 
     pub fn camera(&mut self) -> CameraSettings {
         if self.read_at.is_none_or(|at| at.elapsed() >= EVERY) {
             self.read_at = Some(Instant::now());
-            if let Some(text) = latest_profile_config().and_then(|path| std::fs::read_to_string(path).ok()) {
-                self.settings = CameraSettings::read(&text);
+            if let Some((modified, path)) = latest_profile_config() {
+                let unchanged = self
+                    .source
+                    .as_ref()
+                    .is_some_and(|(prev_path, prev_mod)| *prev_path == path && *prev_mod == modified);
+                if !unchanged && let Ok(text) = std::fs::read_to_string(&path) {
+                    self.settings = CameraSettings::read(&text);
+                    self.source = Some((path, modified));
+                }
             }
         }
         self.settings
@@ -87,7 +95,7 @@ impl GameSettings {
 }
 
 /// The `config_local.cfg` written last, of every profile of either game (ETS2's, ATS's; Steam's and local).
-fn latest_profile_config() -> Option<PathBuf> {
+fn latest_profile_config() -> Option<(SystemTime, PathBuf)> {
     // Wherever Documents is: Windows' and OneDrive's may both hold a game's folder.
     let mut latest: Option<(SystemTime, PathBuf)> = None;
     for game in westplay_setup::game::Kind::ALL {
@@ -104,7 +112,7 @@ fn latest_profile_config() -> Option<PathBuf> {
             }
         }
     }
-    latest.map(|(_, path)| path)
+    latest
 }
 
 #[cfg(test)]

@@ -187,6 +187,7 @@ impl Netease {
         view.show(false)?;
         stage.add(&view, false)?;
         view.add_startup_script(concat!(include_str!("cab_sound.js"), "\n", include_str!("netease.js")))?;
+        view.serve_blank_document(HOME)?;
         view.navigate(HOME)?;
         Ok(Self {
             view,
@@ -201,12 +202,10 @@ impl Netease {
         &self.view
     }
 
-    #[allow(dead_code)]
     pub fn failed(&self) -> bool {
         self.view.take_failure().is_some()
     }
 
-    #[allow(dead_code)]
     pub fn close(self, stage: &Stage) {
         let _ = stage.remove(&self.view);
     }

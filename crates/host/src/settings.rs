@@ -152,6 +152,18 @@ impl SoundSettings {
     }
 }
 
+/// Performance profile for the in-cab UI and map renderer: `Auto` adapts to integrated/software GPUs or
+/// sustained GPU contention, `Lite` caps capture and map rendering at 30 FPS with reduced glass/WebGL load,
+/// and `Quality` keeps full 60 FPS capture and full visual effects.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PerformanceMode {
+    #[default]
+    Auto,
+    Lite,
+    Quality,
+}
+
 /// Which GPU the cab is drawn on (the companion's Truck Screen): one the player chose, by its id
 /// (`graphics::Adapter::id`), or (`None`) the one WestPlay picks. A chosen GPU that's gone (an external one
 /// unplugged) leaves WestPlay picking.
@@ -160,6 +172,8 @@ impl SoundSettings {
 pub struct GraphicsSettings {
     #[serde(deserialize_with = "lenient")]
     pub gpu: Option<String>,
+    #[serde(deserialize_with = "lenient")]
+    pub performance: PerformanceMode,
 }
 
 /// How the screen looks: its wallpaper (chosen in the cab's Settings or the companion's Customize) and its
@@ -589,7 +603,10 @@ mod tests {
                 icon_set: Some("Retro".into()),
                 icon_style: IconStyle::Dark,
             },
-            graphics: GraphicsSettings { gpu: Some("10de:2702:00000000:161".into()) },
+            graphics: GraphicsSettings {
+                gpu: Some("10de:2702:00000000:161".into()),
+                performance: PerformanceMode::Lite,
+            },
             sound: SoundSettings {
                 equalizer: crate::speakers::Equalizer { bass: -3, mid: 1, treble: 2 },
                 custom: true,

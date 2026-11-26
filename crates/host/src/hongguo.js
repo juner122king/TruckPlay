@@ -682,6 +682,10 @@
       recommendations,
     }
     detailCache.set(dramaId, detail)
+    if (detailCache.size > 30) {
+      const oldestKey = detailCache.keys().next().value
+      if (oldestKey !== undefined) detailCache.delete(oldestKey)
+    }
     return detail
   }
 

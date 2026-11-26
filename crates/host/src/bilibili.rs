@@ -453,12 +453,10 @@ impl Bilibili {
         &self.view
     }
 
-    #[allow(dead_code)]
     pub fn failed(&self) -> bool {
         self.view.take_failure().is_some()
     }
 
-    #[allow(dead_code)]
     pub fn close(self, stage: &Stage) {
         let _ = stage.remove(&self.view);
     }

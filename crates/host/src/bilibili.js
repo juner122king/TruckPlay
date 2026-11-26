@@ -4,8 +4,10 @@
   if (!location.hostname.includes('bilibili.com') || window.top !== window) return
 
   const post = (msg) => window.chrome?.webview?.postMessage(msg)
-  let sound = null
+  const hookedMedia = new WeakSet()
   let currentMedia = null
+  const sound = window.westplayCabSound?.(() => currentMedia, post)
+  if (sound) setInterval(() => sound.tick(), 250)
   let currentVideo = null
   let wantedPlaying =
     location.pathname.includes('/video/') ||
@@ -277,11 +279,7 @@
     if (!el || el === currentMedia) return
     currentMedia = el
     isBuffering = el.readyState < 2
-    if (window.westplayCabSound) {
-      sound = window.westplayCabSound(el, (bars) => {
-        post({ type: 'spectrum', bars })
-      })
-    }
+    sound?.tick()
     if (currentRate && currentRate !== 1.0) {
       try { el.playbackRate = currentRate } catch {}
     }
@@ -291,6 +289,8 @@
       if (el.readyState >= 2) isBuffering = false
       sendPlayback()
     }
+    if (hookedMedia.has(el)) return
+    hookedMedia.add(el)
     el.addEventListener('play', () => {
       isPlaying = true
       isEnded = false
@@ -794,12 +794,17 @@
     checkStatus()
   }, 1000)
 
+  let mutationTimer = null
   const observer = new MutationObserver(() => {
-    const videos = document.querySelectorAll('video, audio')
-    videos.forEach(hookMedia)
-    syncMediaPlayingState()
-    extractActiveInfo()
-    if (wantedPlaying) ensurePlaying()
+    if (mutationTimer !== null) return
+    mutationTimer = setTimeout(() => {
+      mutationTimer = null
+      const videos = document.querySelectorAll('video, audio')
+      videos.forEach(hookMedia)
+      syncMediaPlayingState()
+      extractActiveInfo()
+      if (wantedPlaying) ensurePlaying()
+    }, 500)
   })
   if (document.body) {
     observer.observe(document.body, { childList: true, subtree: true })

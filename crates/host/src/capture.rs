@@ -40,6 +40,8 @@ use crate::gpu::{Gpu, Lock, SharedFrame};
 
 /// Frames per second published to the game. Chromium renders at the monitor's refresh rate.
 pub const MAX_FPS: u32 = 60;
+/// Reduced capture rate for Lite / low-spec performance mode: halves shared-texture copy bandwidth.
+pub const LITE_FPS: u32 = 30;
 const FRAME_INTERVAL: Duration = Duration::from_micros(1_000_000 / MAX_FPS as u64);
 /// Tolerance for capture timing jitter.
 const FRAME_JITTER: Duration = Duration::from_micros(1_500);
@@ -149,6 +151,12 @@ impl Capture {
             drawn_light: Cell::new(1.0),
             dim_failed: Cell::new(false),
         })
+    }
+
+    /// Adjusts the maximum capture publish rate (e.g., `MAX_FPS` in full quality, `LITE_FPS` in lite mode).
+    pub fn set_max_fps(&self, fps: u32) {
+        let clamped = fps.clamp(15, MAX_FPS);
+        self.mailbox.set_interval(Duration::from_micros(1_000_000 / u64::from(clamped)));
     }
 
     /// The screen's light from now on (0 to 1 of full: `brightness::light`); the last frame goes out again with it.
@@ -453,15 +461,20 @@ struct Mailbox<F> {
 struct Slot<F> {
     frame: Option<F>,
     due: Instant,
+    interval: Duration,
 }
 
 impl<F> Mailbox<F> {
     fn new(now: Instant) -> Self {
-        Self { slot: Mutex::new(Slot { frame: None, due: now }) }
+        Self { slot: Mutex::new(Slot { frame: None, due: now, interval: FRAME_INTERVAL }) }
     }
 
     fn slot(&self) -> std::sync::MutexGuard<'_, Slot<F>> {
         self.slot.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn set_interval(&self, interval: Duration) {
+        self.slot().interval = interval;
     }
 
     /// Leaves a new frame, returning the one it replaces (to let go of after the mailbox).
@@ -483,7 +496,8 @@ impl<F> Mailbox<F> {
     /// over from it rather than letting frames catch up.
     fn published(&self, now: Instant) {
         let mut slot = self.slot();
-        slot.due = if now >= slot.due + FRAME_INTERVAL { now + FRAME_INTERVAL } else { slot.due + FRAME_INTERVAL };
+        let interval = slot.interval;
+        slot.due = if now >= slot.due + interval { now + interval } else { slot.due + interval };
     }
 
     /// The frame taken couldn't go out: it waits again, unless a newer one came meanwhile (then it's

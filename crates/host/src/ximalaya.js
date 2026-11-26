@@ -694,7 +694,9 @@
             manifestLoadingMaxRetry: 4,
             levelLoadingMaxRetry: 4,
             fragLoadingMaxRetry: 4,
-            backBufferLength: 30,
+            backBufferLength: 20,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
           })
           stopHls()
           hls = instance
