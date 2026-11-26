@@ -14,6 +14,8 @@ import {
   type KeybindAction,
   type LaneHint,
   isInHost,
+  isPerformanceMode,
+  type PerformanceMode,
   postToHost,
   type SemaphoreInfo,
   subscribeHostMessages,
@@ -134,6 +136,10 @@ interface CabinState {
   mapBuildings: boolean
   /** Whether its roads rise to their real heights, as set there too. */
   mapRoads: boolean
+  /** Performance profile (`auto`, `lite`, `quality`), persisted in WestPlay's settings. */
+  performanceMode: PerformanceMode
+  /** Effective low-spec / lite rendering state (true in `lite`, or in `auto` on integrated GPUs / sustained GPU contention). */
+  liteMode: boolean
   /** The player's own tone curve (Settings › Equalizer), and whether it plays (Custom) or the speakers as tuned
    * (Recommended, flat): kept with WestPlay's settings, the host sends them. */
   equalizer: Equalizer
@@ -170,6 +176,8 @@ interface CabinState {
   setOemMode(mode: OemMode): void
   /** The player's choice, in Settings: applied, and kept with WestPlay's settings. */
   chooseOemMode(mode: OemMode): void
+  /** The player's performance mode choice (`auto`, `lite`, `quality`), synced to the host and Companion. */
+  choosePerformanceMode(mode: PerformanceMode): void
   powerEvent(event: PowerEvent): void
   setTruckScreen(shown: boolean): void
 }
@@ -210,6 +218,8 @@ export const useCabin = create<CabinState>()(
       oemMode: 'auto',
       mapBuildings: true,
       mapRoads: true,
+      performanceMode: 'auto',
+      liteMode: false,
       equalizer: FLAT,
       equalizerCustom: false,
       brightness: 1,
@@ -248,6 +258,13 @@ export const useCabin = create<CabinState>()(
       chooseOemMode: (oemMode) => {
         set({ oemMode })
         if (isInHost()) postToHost({ type: 'truckStrip', strip: oemMode })
+      },
+      choosePerformanceMode: (performanceMode) => {
+        set((state) => ({
+          performanceMode,
+          liteMode: performanceMode === 'lite' ? true : performanceMode === 'quality' ? false : state.liteMode,
+        }))
+        if (isInHost()) postToHost({ type: 'performance', mode: performanceMode })
       },
       powerEvent: (event) =>
         set((state) => {
@@ -707,6 +724,12 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
           equalizerCustom: message.equalizerCustom === true,
           mapBuildings: message.buildings !== false,
           mapRoads: message.roads !== false,
+          ...(isPerformanceMode(message.performance) ? { performanceMode: message.performance } : {}),
+          ...(typeof message.lite === 'boolean'
+            ? { liteMode: message.lite }
+            : isPerformanceMode(message.performance)
+              ? { liteMode: message.performance === 'lite' }
+              : {}),
         })
         useLive.setState({ chosenLanguage: typeof message.language === 'string' ? message.language : null })
         setIcons({

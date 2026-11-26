@@ -5,7 +5,7 @@ import { Group, Note, Panel, Row, Status, Switch, Tick } from '../room/parts'
 import { banner } from '../room/room'
 import { GLOW, useScreenAt } from '../room/screen'
 import { type PageProps, screenState } from './page'
-import type { CoachSpeakers } from '../useSettings'
+import type { CoachSpeakers, PerformanceMode } from '../useSettings'
 
 /**
  * The truck's screen: where WestPlay is now (its headline), WestPlay on it or the truck's own, and the
@@ -97,6 +97,7 @@ export function ScreenPage({ status, settings, setup, cw }: PageProps) {
           <b>{w.elevated.title}</b> {w.elevated.text}
         </Note>
       )}
+      <PerformanceChooser settings={settings} cw={cw} />
       <GpuChooser status={status} settings={settings} cw={cw} />
       <CoachChooser status={status} settings={settings} cw={cw} />
       {status?.error && <Note tone="bad">{status.error}</Note>}
@@ -110,6 +111,43 @@ export function ScreenPage({ status, settings, setup, cw }: PageProps) {
  * one drawing it now says so; a choice starts WestPlay's screen again on that card. Only with more than one
  * card to choose from.
  */
+function PerformanceChooser({ settings: state, cw }: Pick<PageProps, 'settings' | 'cw'>) {
+  const w = cw.screen
+  const { settings, update } = state
+  if (!settings) return null
+  const chosen: PerformanceMode = settings.graphics.performance ?? 'auto'
+  const choose = (performance: PerformanceMode) => {
+    if (performance !== chosen) {
+      void update({ ...settings, graphics: { ...settings.graphics, performance } })
+    }
+  }
+  return (
+    <>
+      <Group title={w.performance} place={6}>
+        <Row
+          title={w.performanceAuto}
+          detail={w.performanceAutoDetail}
+          accessory={chosen === 'auto' ? <Tick key="auto" /> : undefined}
+          onClick={() => choose('auto')}
+        />
+        <Row
+          title={w.performanceLite}
+          detail={w.performanceLiteDetail}
+          accessory={chosen === 'lite' ? <Tick key="lite" /> : undefined}
+          onClick={() => choose('lite')}
+        />
+        <Row
+          title={w.performanceQuality}
+          detail={w.performanceQualityDetail}
+          accessory={chosen === 'quality' ? <Tick key="quality" /> : undefined}
+          onClick={() => choose('quality')}
+        />
+      </Group>
+      <Note tone="calm">{w.performanceNote}</Note>
+    </>
+  )
+}
+
 function GpuChooser({ status, settings: state, cw }: Pick<PageProps, 'status' | 'settings' | 'cw'>) {
   const w = cw.screen
   const { settings, update } = state
@@ -117,7 +155,7 @@ function GpuChooser({ status, settings: state, cw }: Pick<PageProps, 'status' | 
   if (!settings || adapters.length < 2) return null
   const chosen = adapters.some((adapter) => adapter.id === settings.graphics.gpu) ? settings.graphics.gpu : null
   const choose = (gpu: string | null) => {
-    if (gpu !== settings.graphics.gpu) void update({ ...settings, graphics: { gpu } })
+    if (gpu !== settings.graphics.gpu) void update({ ...settings, graphics: { ...settings.graphics, gpu } })
   }
   return (
     <>

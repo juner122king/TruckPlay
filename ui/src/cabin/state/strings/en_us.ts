@@ -461,6 +461,10 @@ export const strings: Strings = {
     automaticFooter: 'Dark at night and whenever the headlights are on, the way the truck’s light sensor does it.',
     vehicleBar: 'Vehicle Bar',
     vehicleBarFooter: 'The truck’s information bar beside TruckPlay. Turned off, TruckPlay fills the whole screen.',
+    performanceMode: 'Performance Mode',
+    performanceModes: { auto: 'Automatic', lite: 'Smooth (Low-Spec)', quality: 'High Quality' },
+    performanceModeFooter:
+      'Smooth caps capture and map rendering at 30 fps and disables heavy glass blurs to keep the game fluid on weaker PCs. Automatic enables it on integrated GPUs or when the game slows down.',
     textSize: 'Text Size',
     brightness: 'Brightness',
     textSizeAbout: 'TruckPlay’s apps will adjust to your preferred reading size below.',

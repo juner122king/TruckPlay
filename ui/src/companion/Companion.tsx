@@ -393,15 +393,17 @@ function Room({
       style={{ '--section-glow': SECTION_GLOW[section] } as CSSProperties}
       onPointerMove={tilt}
     >
-      <TruckScreen frame={demo.frame} ready={demo.ready} pose={pose} glow={glow} banner={banner} scanning={scanning}>
-        <GlassCursor
-          x={cursor?.x ?? 640}
-          y={cursor?.y ?? 420}
-          pressing={cursor?.pressing ?? false}
-          visible={cursor !== null}
-        />
-        {phase === 'lesson' && <TouchLayer active={held} press={(at) => send({ type: 'press', ...at })} />}
-      </TruckScreen>
+      {!(demo.hibernating && phase === 'room') && (
+        <TruckScreen frame={demo.frame} ready={demo.ready} pose={pose} glow={glow} banner={banner} scanning={scanning}>
+          <GlassCursor
+            x={cursor?.x ?? 640}
+            y={cursor?.y ?? 420}
+            pressing={cursor?.pressing ?? false}
+            visible={cursor !== null}
+          />
+          {phase === 'lesson' && <TouchLayer active={held} press={(at) => send({ type: 'press', ...at })} />}
+        </TruckScreen>
+      )}
       <WordsContext.Provider value={{ words, code }}>
         <RoomText.Provider value={{ locale: words.locale, back: words.back }}>
           <ScreenContext.Provider value={screen}>

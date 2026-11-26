@@ -23,7 +23,18 @@ const syncAdvice = () => {
   if (hint !== useAdvice.getState().hint) useAdvice.setState({ hint })
 }
 syncAdvice()
-const stop = useLive.subscribe(syncAdvice)
+const stop = useLive.subscribe((state, previous) => {
+  // Only recompute lane guidance when route or truck telemetry actually changes,
+  // ignoring high-frequency unrelated updates (semaphores, spectrum, TruckersMP nearby).
+  if (
+    state.route === previous.route &&
+    state.routeNext === previous.routeNext &&
+    state.telemetry === previous.telemetry
+  ) {
+    return
+  }
+  syncAdvice()
+})
 import.meta.hot?.dispose(stop)
 
 export function useLaneHint() {

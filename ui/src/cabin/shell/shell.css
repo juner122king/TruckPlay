@@ -177,6 +177,35 @@ body,
     var(--shadow-raised-large);
 }
 
+/* Lite / low-spec performance mode: eliminate expensive multi-pass Gaussian backdrop blurs over live WebGL. */
+.shell[data-lite] .glass,
+.shell[data-lite] .guidance,
+.shell[data-lite] .map-controls .glass {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.shell[data-lite].appearance-dark .glass {
+  background: rgb(22 25 31 / 0.92);
+}
+
+.shell[data-lite].appearance-light .glass {
+  background: rgb(246 247 250 / 0.94);
+}
+
+.shell[data-lite].appearance-dark .map-controls .glass {
+  background: rgb(22 25 31 / 0.92);
+}
+
+.shell[data-lite].appearance-light .map-controls .glass {
+  background: rgb(250 251 253 / 0.95);
+}
+
+.shell[data-lite] .now-playing .np-tint img {
+  filter: none;
+  opacity: 0.24;
+}
+
 /* Buttons carry no browser styling; each control styles itself. */
 .shell button {
   appearance: none;

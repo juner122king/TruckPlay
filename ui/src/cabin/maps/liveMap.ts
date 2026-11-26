@@ -2,10 +2,11 @@ import { idleDisposal } from '../../shared/idleResources'
 import maplibregl, { type GeoJSONSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-csp-worker.js?url'
-import { displayClock, mapFrameDue } from './frameCap'
+import { displayClock, LEAST_PACE, LITE_PACE, mapFrameDue } from './frameCap'
 import { create as createStore } from 'zustand'
 import { postToHost, type Telemetry } from '../../shared/host'
 import type { Appearance } from '../state/appearance'
+import { recordRenderedFrame } from '../state/frameMeter'
 import { type LiveState, useCabin, useLive } from '../state/store'
 import { textScale } from '../state/textSize'
 import {
@@ -33,6 +34,7 @@ import { physicalGuidanceFor } from './guidanceDistance'
 import { buildingFilter, type Canopy, canopiesOver } from './buildings'
 import { labelLines, placeLabels } from './labels'
 import { NO_ENTRY_ICON, drawNoEntry, drawPlaceIcon, parsePlaceIcon } from './placeIcons'
+import { PlaceIconCache } from './placeIconCache'
 import { type BuildingMeshes, buildingMeshes } from './buildingMeshes'
 import { type RaisedRoads, raisedRoads } from './raisedRoads'
 import {
@@ -164,8 +166,18 @@ interface LiveMap {
   /** The canopies the truck is under, left out of the raised buildings (their ids, joined), and when they
    * were last looked for. */
   canopies: { hidden: string; at: number }
-  /** Place names, most important first, with their size on screen. */
-  labels: { marker: maplibregl.Marker; at: [number, number]; width: number; height: number }[]
+  /** Place names, most important first, with their size on screen; DOM markers are created lazily when visible. */
+  labels: {
+    kind: string
+    first: string
+    second: string | null
+    marker: maplibregl.Marker | null
+    at: [number, number]
+    width: number
+    height: number
+  }[]
+  /** Bounded tracker for dynamically generated `place-*` icons so MapLibre's sprite atlas stays bounded. */
+  placeIcons: PlaceIconCache
   /** Traffic light markers with real-time countdown timers. */
   trafficLights: TrafficLightPool
   /** Fixed speed camera markers ahead in the driving corridor. */
@@ -210,8 +222,9 @@ interface LiveMap {
   /** Following north up, from above (the compass tapped), rather than behind the truck; the arrow brings the
    * chase view back. */
   northUp: boolean
-  /** The view the place names were last placed for (`null`: place them again). */
+  /** The view the place names were last placed for (`null`: place them again), and when (ms). */
   labelsPlacedFor: string | null
+  labelsPlacedAt: number
   /** The view as last kept (mapView.ts), and when it was last looked at. */
   kept: string
   keptAt: number
@@ -296,6 +309,7 @@ function create(data: MapData, appearance: Appearance): LiveMap {
   const element = document.createElement('div')
   element.className = 'road-map'
   addSeaProtocol(maplibregl)
+  const initialLite = useCabin.getState().liteMode
   const map = new maplibregl.Map({
     container: element,
     style: mapStyle(appearance, data),
@@ -306,18 +320,22 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
     maxBounds: cameraBounds(data),
+    maxTileCacheSize: initialLite ? 24 : 64,
+    maxTileCacheZoomLevels: 2,
     // Gestures are switched on only where the map can be moved (setInteractive).
     interactive: false,
     // Turning (right-drag) keeps the tilt.
     pitchWithRotate: false,
     attributionControl: false,
     fadeDuration: 0,
-    canvasContextAttributes: { antialias: true },
+    canvasContextAttributes: { antialias: !initialLite },
   })
+  map.on('render', () => recordRenderedFrame())
 
   // Added to the map when in range and clear of more important names (showLabels). Each says what
   // labelLines gives: the name in the player's language, under the place's own where that's in another
-  // script.
+  // script. DOM elements and MapLibre markers are created lazily on first visibility to avoid pre-creating
+  // thousands of DOM nodes on large map mods.
   const measure = document.createElement('canvas').getContext('2d')
   const fontFamily = getComputedStyle(document.body).fontFamily
   const font = (size: number) => `600 ${size}px ${fontFamily}`
@@ -336,20 +354,14 @@ function create(data: MapData, appearance: Appearance): LiveMap {
       height: (size + (second ? secondSize : 0)) * 1.2 + LABEL_HALO * 2,
     }
   }
-  const labels = lines.map(({ label, first, second }) => {
-    const element = document.createElement('div')
-    element.className = `map-label map-label-${label.kind}`
-    const line = (text: string, className: string) => {
-      const span = document.createElement('span')
-      span.className = className
-      span.textContent = text
-      element.append(span)
-    }
-    line(first, 'map-label-first')
-    if (second) line(second, 'map-label-second')
-    const marker = new maplibregl.Marker({ element, pitchAlignment: 'viewport', rotationAlignment: 'viewport' })
-    return { marker: marker.setLngLat(label.at), at: label.at, ...measured({ first, second }) }
-  })
+  const labels = lines.map(({ label, first, second }) => ({
+    kind: label.kind,
+    first,
+    second,
+    marker: null as maplibregl.Marker | null,
+    at: label.at,
+    ...measured({ first, second }),
+  }))
   // Measured again once the type for every name is in: the fonts for other scripts load only when a page
   // first needs them, and until then the sizes are a fallback font's.
   const allText = lines.map(({ first, second }) => `${first} ${second ?? ''}`).join(' ')
@@ -377,9 +389,12 @@ function create(data: MapData, appearance: Appearance): LiveMap {
 
   const raised = data.raised ? raisedRoads(map, data.raised, () => created.painted) : null
   raised?.setShown(useCabin.getState().mapRoads)
+  raised?.setLite(initialLite)
   const meshes = data.meshes ? buildingMeshes(map, data.meshes, () => created.painted) : null
   meshes?.setShown(useCabin.getState().mapBuildings)
+  meshes?.setLite(initialLite)
   ensureSpeedCameras(data.speedCameras)
+  const placeIcons = new PlaceIconCache()
   const created: LiveMap = {
     data,
     map,
@@ -394,6 +409,7 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     progress: null,
     canopies: { hidden: '', at: -Infinity },
     labels,
+    placeIcons,
     trafficLights: createTrafficLightPool(),
     speedCameras: createSpeedCameraPool(),
     wanted: appearance,
@@ -419,11 +435,12 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     glide: null,
     northUp: false,
     labelsPlacedFor: null,
+    labelsPlacedAt: -Infinity,
     kept: '',
     keptAt: 0,
   }
-  // Place icons are drawn when the map first needs each (placeIcons.ts), and again once the type for their
-  // names is in.
+  // Place icons are drawn lazily when the map first needs each (placeIcons.ts), bounded by `placeIcons`
+  // LRU eviction so multi-hour drives never bloat MapLibre's WebGL sprite atlas.
   map.on('styleimagemissing', ({ id }: { id: string }) => {
     const pixelRatio = window.devicePixelRatio || 1
     if (id === NO_ENTRY_ICON && !map.hasImage(id)) {
@@ -435,16 +452,14 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     map.addImage(id, drawPlaceIcon(icon.kind, icon.name, created.painted, pixelRatio, fontFamily, nameScale()), {
       pixelRatio,
     })
+    placeIcons.track(id, map)
   })
   document.fonts.ready
     .then(() => {
-      if (live === created) redrawPlaceIcons(created)
+      if (live === created) clearPlaceIcons(created)
     })
     .catch(() => {})
-  // The player's text size changed: once it has settled (a drag along the slider passes several), the names
-  // measured again for where they fit, and the places' images let go of. Drawn anew at the new size only as the
-  // tiles laid out again ask for them (styleimagemissing, above): the map keeps every place it has shown, and
-  // drawing them all again (some 2 ms each) held the cab up for a second at each step.
+  // React to map settings, performance mode, and text size changes.
   let resized: ReturnType<typeof setTimeout> | undefined
   stopTextSize?.()
   const unsubscribeTextSize = useCabin.subscribe((state, before) => {
@@ -453,14 +468,16 @@ function create(data: MapData, appearance: Appearance): LiveMap {
       meshes?.setShown(state.mapBuildings)
     }
     if (state.mapRoads !== before.mapRoads) raised?.setShown(state.mapRoads)
+    if (state.liteMode !== before.liteMode) {
+      meshes?.setLite(state.liteMode)
+      raised?.setLite(state.liteMode)
+    }
     if (state.textSize === before.textSize) return
     clearTimeout(resized)
     resized = setTimeout(() => {
       lines.forEach((line, index) => Object.assign(labels[index], measured(line)))
       created.labelsPlacedFor = null
-      for (const id of map.listImages()) {
-        if (parsePlaceIcon(id)?.name) map.removeImage(id)
-      }
+      clearPlaceIcons(created)
     }, TEXT_SIZE_SETTLE_MS)
   })
   stopTextSize = () => {
@@ -644,8 +661,8 @@ function syncAppearance(target: LiveMap) {
       target.map.setPaintProperty(layer, property, value)
     }
     target.painted = target.wanted
-    // Names' colours follow the appearance.
-    redrawPlaceIcons(target)
+    // Drop cached place icons so MapLibre lazily regenerates only currently visible icons in the new theme.
+    clearPlaceIcons(target)
   } catch {
     // The style is still loading.
   }
@@ -778,15 +795,11 @@ export function showTraffic(stretches: readonly TrafficStretch[]) {
   })
 }
 
-/** Draws the place icons the map has again, for its appearance (names' colours) and type. */
-function redrawPlaceIcons({ map, painted }: LiveMap) {
-  const pixelRatio = window.devicePixelRatio || 1
-  const fontFamily = getComputedStyle(document.body).fontFamily
+/** Releases cached place icons so MapLibre regenerates only currently visible icons via `styleimagemissing`. */
+function clearPlaceIcons({ map, placeIcons }: LiveMap) {
+  placeIcons.clear(map)
   for (const id of map.listImages()) {
-    const icon = parsePlaceIcon(id)
-    if (icon?.name) {
-      map.updateImage(id, drawPlaceIcon(icon.kind, icon.name, painted, pixelRatio, fontFamily, nameScale()))
-    }
+    if (parsePlaceIcon(id)?.name && map.hasImage(id)) map.removeImage(id)
   }
 }
 
@@ -811,6 +824,7 @@ function disposeLiveMap() {
   samples.length = 0
   if (!live) return
   live.stops.markers.forEach((marker) => marker.remove())
+  live.labels.forEach((label) => label.marker?.remove())
   live.meshes?.dispose()
   live.raised?.dispose()
   live.element.remove()
@@ -886,7 +900,8 @@ function place() {
       // 3D building in view (a player's log, 2026-10-27: the cab page's share up to 4x in towns), and the host hands
       // the game a new one in each of its 60 a second only if they come evenly and more often than that.
       const frameMs = display.tick(now)
-      if (!mapFrameDue(now, lastFrame, frameMs)) return
+      const pace = useCabin.getState().liteMode ? LITE_PACE : LEAST_PACE
+      if (!mapFrameDue(now, lastFrame, frameMs, pace)) return
       const dt = Math.min(now - lastFrame, 100)
       lastFrame = now
       syncAppearance(current)
@@ -905,7 +920,7 @@ function place() {
       current.raised?.update(now)
       current.meshes?.update(now)
       updateCamera(current, now, dt)
-      showLabels(current)
+      showLabels(current, now)
       keepView(current, now)
     })
   }
@@ -1167,19 +1182,25 @@ export function zoomLiveMap(direction: 1 | -1) {
   }
 }
 
+/** Minimum interval (ms) between city-label layout passes while moving. */
+const LABELS_EVERY_MS = 100
+
 /**
  * Shows the place names that fit: only places near enough to matter at this zoom (the tilted view reaches
  * to the horizon, where everything far away would pile up, and the game's distances between cities are
  * short), and of those, none overlapping a more important one.
  */
-function showLabels(target: LiveMap) {
+function showLabels(target: LiveMap, now: number) {
   const { map, labels } = target
+  if (target.labelsPlacedFor !== null && now - target.labelsPlacedAt < LABELS_EVERY_MS) return
   const centre = map.getCenter().toArray() as [number, number]
   const { clientWidth: width, clientHeight: height } = map.getContainer()
-  // Only when the view has changed: placing them projects every name.
-  const view = `${centre} ${map.getZoom()} ${map.getBearing()} ${map.getPitch()} ${width}x${height}`
+  // Quantize view coordinates (~50m centre, 0.05 zoom, 1.5° bearing, 1° pitch) so gentle camera damping
+  // does not trigger full O(N) projection passes on every single frame.
+  const view = `${Math.round(centre[0] * 2000)},${Math.round(centre[1] * 2000)} ${Math.round(map.getZoom() * 20)} ${Math.round(map.getBearing() / 1.5)} ${Math.round(map.getPitch())} ${width}x${height}`
   if (view === target.labelsPlacedFor) return
   target.labelsPlacedFor = view
+  target.labelsPlacedAt = now
   const range = labelRange(map.getZoom(), width)
   const boxes = labels.map((label) => {
     if (metresBetween(centre, label.at) > range) return null
@@ -1188,10 +1209,29 @@ function showLabels(target: LiveMap) {
     return { x, y, width: label.width, height: label.height }
   })
   const shown = placeLabels(boxes, LABEL_GAP)
-  labels.forEach(({ marker }, index) => {
-    const visible = marker.getElement().isConnected
-    if (shown.has(index) && !visible) marker.addTo(map)
-    else if (!shown.has(index) && visible) marker.remove()
+  labels.forEach((label, index) => {
+    if (shown.has(index)) {
+      if (!label.marker) {
+        const el = document.createElement('div')
+        el.className = `map-label map-label-${label.kind}`
+        const line = (text: string, className: string) => {
+          const span = document.createElement('span')
+          span.className = className
+          span.textContent = text
+          el.append(span)
+        }
+        line(label.first, 'map-label-first')
+        if (label.second) line(label.second, 'map-label-second')
+        label.marker = new maplibregl.Marker({
+          element: el,
+          pitchAlignment: 'viewport',
+          rotationAlignment: 'viewport',
+        }).setLngLat(label.at)
+      }
+      if (!label.marker.getElement().isConnected) label.marker.addTo(map)
+    } else if (label.marker && label.marker.getElement().isConnected) {
+      label.marker.remove()
+    }
   })
 }
 

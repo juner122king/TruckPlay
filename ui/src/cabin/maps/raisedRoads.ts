@@ -30,6 +30,7 @@ const HEADER_BYTES = 8 + 4 * BUCKETS
 /** Tiles further from the middle of the view than this, in tiles, aren't loaded: past that the map is too far to see them. */
 const TILES_REACH = 2
 const TILES_KEPT = 40
+const TILES_KEPT_LITE = 16
 const LOADING_AT_ONCE = 4
 const LOOK_EVERY_MS = 300
 /** A tile's surfaces are found by cells: how many a side, and how many of a vertex's units one is. */
@@ -170,6 +171,8 @@ export interface RaisedRoads {
   tilesChanged(): number
   /** Shows the roads at their real heights, or the flat map's alone. */
   setShown(shown: boolean): void
+  /** Tightens tile cache caps in Lite / low-spec mode. */
+  setLite(lite: boolean): void
   /** The stretches of the route on raised roads, to draw. */
   showRoute(lines: readonly RaisedLine[]): void
   /** How far on the screen something `height` over the ground at (x, z) is from the ground there, CSS pixels. */
@@ -266,6 +269,7 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
   let attributes: Record<string, number> = {}
   let changed = 0
   let showing = true
+  let lite = false
   let main: ArrayLike<number> | null = null
   let route: {
     program: WebGLProgram
@@ -469,7 +473,8 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
     // The nearest first.
     missing.sort((a, b) => a[0] - b[0])
     for (const [, key, x, y] of missing.slice(0, Math.max(LOADING_AT_ONCE - loading.size, 0))) load(key, x, y)
-    if (tiles.size > TILES_KEPT) {
+    const tilesCap = lite ? TILES_KEPT_LITE : TILES_KEPT
+    if (tiles.size > tilesCap) {
       for (const [key, tile] of tiles) {
         if (away(tile.x, tile.y) > TILES_REACH ** 2) drop(key, tile)
       }
@@ -637,6 +642,12 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
     applyShown()
   }
 
+  function setLite(on: boolean) {
+    if (on === lite) return
+    lite = on
+    looked = -Infinity
+  }
+
   // Again after a lost context: MapLibre brings the style back without layers like these.
   const restoreLayers = () => {
     map.addLayer(layer, ROUTE_LOWEST_LAYER)
@@ -667,5 +678,5 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
     program = null
     context = null
   }
-  return { update, surfaceAt, tilesChanged: () => changed, setShown, showRoute, screenLift, dispose }
+  return { update, surfaceAt, tilesChanged: () => changed, setShown, setLite, showRoute, screenLift, dispose }
 }

@@ -1,4 +1,4 @@
-import type { Sky } from '../../../shared/host'
+import type { PerformanceMode, Sky } from '../../../shared/host'
 import type { ReturnKind } from '../../keyboard/layouts'
 import type { MapZoomIntensity } from '../../maps/camera'
 import type { TurnKind } from '../../maps/guidance'
@@ -453,6 +453,9 @@ export interface Strings {
     /** The truck's information bar beside WestPlay (the DAF's, the Scania Smart Dash's), and what it is. */
     vehicleBar: string
     vehicleBarFooter: string
+    performanceMode: string
+    performanceModes: Record<PerformanceMode, string>
+    performanceModeFooter: string
     textSize: string
     brightness: string
     /** Text Size's own text, shown at the size chosen (iOS's). */

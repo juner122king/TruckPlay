@@ -463,6 +463,10 @@ export const strings: Strings = {
     automaticFooter: '夜间和大灯打开时切换为深色，就像卡车的光线传感器一样。',
     vehicleBar: '车辆栏',
     vehicleBarFooter: 'TruckPlay 旁边的卡车信息栏。关闭后，TruckPlay 会占满整个屏幕。',
+    performanceMode: '性能模式',
+    performanceModes: { auto: '自动适配', lite: '流畅优先（低配省资源）', quality: '画质优先' },
+    performanceModeFooter:
+      '“流畅优先”会将车机画面与地图帧率限制在 30 帧并关闭高开销实时毛玻璃，大幅降低核显与中低配电脑卡顿；“自动适配”会在核显或游戏掉帧时自动启用。',
     textSize: '文字大小',
     brightness: '亮度',
     textSizeAbout: 'TruckPlay 的 App 将调整为你在下方选择的阅读字号。',
@@ -941,7 +945,8 @@ export const strings: Strings = {
       muteNote: '纯视觉字幕模式 · 车机音乐不受影响',
     },
     roadside: {
-      greeting: (brand) => `您好，这里是${brand ? ` ${brand} ` : ''}24 小时道路救援中心。已收到您的车辆定位，请问需要哪项救援服务？`,
+      greeting: (brand) =>
+        `您好，这里是${brand ? ` ${brand} ` : ''}24 小时道路救援中心。已收到您的车辆定位，请问需要哪项救援服务？`,
       diagOk: '当前车辆基础状态正常，可直接选择下方道路服务。',
       diagFuelLow: (range) => `检测到剩余续航仅约 ${range}，如已熄火抛锚可呼叫紧急加油。`,
       diagWearHigh: (part, percent) => `检测到「${part}」磨损已达 ${percent}，建议拖至服务中心或导航前往维修。`,
@@ -979,7 +984,8 @@ export const strings: Strings = {
     },
     usedTrucks: {
       greeting: (count) => `您好，这里是二手卡车经销专线。当前存档市场共有 ${count} 辆在售二手车：`,
-      emptyGreeting: '您好，这里是二手卡车经销专线。当前存档未读取到在售二手车列表，可直接导航前往最近经销商或打开游戏菜单查看。',
+      emptyGreeting:
+        '您好，这里是二手卡车经销专线。当前存档未读取到在售二手车列表，可直接导航前往最近经销商或打开游戏菜单查看。',
       emptyTitle: '暂无已解析的在售二手车',
       emptyDesc: '进入游戏并触发存档刷新后将自动同步车源，您也可以直接前往最近卡车经销商。',
       odometer: (distance) => `里程 ${distance}`,
@@ -994,7 +1000,8 @@ export const strings: Strings = {
     company: {
       hqBadge: '总部',
       garageStats: (vehicles, drivers) => `${vehicles} 辆车 · ${drivers} 位司机`,
-      garageGreeting: (city, vehicles, drivers) => `${city}车库值班室已接通。当前驻场 ${vehicles} 辆卡车、${drivers} 名司机，需要为您规划回库路线或打开车库管理吗？`,
+      garageGreeting: (city, vehicles, drivers) =>
+        `${city}车库值班室已接通。当前驻场 ${vehicles} 辆卡车、${drivers} 名司机，需要为您规划回库路线或打开车库管理吗？`,
       navGarage: '导航回此车库',
       openGarageManager: '打开游戏车库管理（G）',
       driverLabel: (id) => `司机 #${id.replace(/^driver\./, '')}`,
@@ -1002,7 +1009,8 @@ export const strings: Strings = {
       driverStateWorking: '货运在途',
       driverStateReturning: '空驶返程',
       driverSubtitle: (city, state) => `${city} · ${state}`,
-      driverGreetingWorking: (id, city, garage) => `老板您好，我是${id}，目前正在 ${city} 附近执行运输任务（归属${garage}车库），一切顺利！`,
+      driverGreetingWorking: (id, city, garage) =>
+        `老板您好，我是${id}，目前正在 ${city} 附近执行运输任务（归属${garage}车库），一切顺利！`,
       driverGreetingIdle: (id, city) => `老板您好，我是${id}，目前在 ${city} 车库休整待命，等待下一趟派单。`,
       driverLastProfit: (amount) => `上一单净利 ${amount}`,
       driverSkillLevel: (points) => `技能总级 ${points}`,

@@ -36,8 +36,10 @@ const NO_CAP = 65535
 /** Tiles further past the view than this, in tiles, aren't loaded; at most this many kept, this many loaded at once. */
 const TILES_PAST_VIEW = 0.5
 const TILES_KEPT = 48
+const TILES_KEPT_LITE = 16
 const LOADING_AT_ONCE = 6
 const MODELS_KEPT = 1500
+const MODELS_KEPT_LITE = 500
 /** Model files fetched at once: the next starts as one is in, nearest first. */
 const MODEL_FETCHES = 16
 const LOOK_EVERY_MS = 300
@@ -155,6 +157,8 @@ export interface BuildingMeshes {
   /** Keeps the tiles round the view loaded, and their models. Called every frame; looks now and then. */
   update(now: number): void
   setShown(shown: boolean): void
+  /** Tightens tile and model cache caps in Lite / low-spec mode. */
+  setLite(lite: boolean): void
   /** What it has: for looking into it. */
   stats(): {
     known: number
@@ -276,6 +280,7 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
   let uniforms: Record<string, WebGLUniformLocation | null> = {}
   const attributes: Record<string, number> = {}
   let showing = true
+  let lite = false
   let frame = 0
   /** A look asked for, when one came too soon after the last: the map may be still by then, drawing nothing. */
   let again: ReturnType<typeof setTimeout> | null = null
@@ -402,13 +407,15 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
         if (known.has(key) && !tiles.has(key) && !loading.has(key)) missing.push([away(x, y), key, x, y])
       }
     }
+    const tilesCap = lite ? TILES_KEPT_LITE : TILES_KEPT
+    const modelsCap = lite ? MODELS_KEPT_LITE : MODELS_KEPT
     // The nearest first, and no more than are kept.
     missing.sort((a, b) => a[0] - b[0])
-    const room = Math.max(TILES_KEPT - tiles.size, 0)
+    const room = Math.max(tilesCap - tiles.size, 0)
     for (const [, key, x, y] of missing.slice(0, Math.min(Math.max(LOADING_AT_ONCE - loading.size, 0), room + 1))) {
       loadTile(key, x, y)
     }
-    if (tiles.size > TILES_KEPT || missing.length > 0) {
+    if (tiles.size > tilesCap || missing.length > 0) {
       for (const [key, tile] of tiles) {
         if (!inView(tile.x, tile.y)) dropTile(key, tile)
       }
@@ -425,9 +432,9 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
     }
     queue = [...new Set(wanted)]
     pump()
-    if (models.size > MODELS_KEPT) {
+    if (models.size > modelsCap) {
       const byUse = [...models].sort((a, b) => a[1].used - b[1].used)
-      for (const [id, model] of byUse.slice(0, models.size - MODELS_KEPT)) dropModel(id, model)
+      for (const [id, model] of byUse.slice(0, models.size - modelsCap)) dropModel(id, model)
     }
   }
 
@@ -556,6 +563,16 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
     map.triggerRepaint()
   }
 
+  function setLite(on: boolean) {
+    if (on === lite) return
+    lite = on
+    looked = -Infinity
+    if (lite && models.size > MODELS_KEPT_LITE) {
+      const byUse = [...models].sort((a, b) => a[1].used - b[1].used)
+      for (const [id, model] of byUse.slice(0, models.size - MODELS_KEPT_LITE)) dropModel(id, model)
+    }
+  }
+
   // Again after a lost context: MapLibre brings the style back without layers like these. Under the raised roads,
   // which read what it leaves in the depth buffer.
   const restoreLayers = () => {
@@ -589,5 +606,5 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
     program = null
     context = null
   }
-  return { update, setShown, stats, dispose }
+  return { update, setShown, setLite, stats, dispose }
 }

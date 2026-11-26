@@ -1,5 +1,6 @@
 import type { IconStyle } from '../shared/customize'
-import type { Equalizer } from '../shared/host'
+import type { Equalizer, PerformanceMode } from '../shared/host'
+export type { PerformanceMode } from '../shared/host'
 import { call, on } from './bridge'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -28,9 +29,10 @@ export interface Settings {
     iconStyle: IconStyle
   }
   /** The graphics card the screen is drawn on: one the player chose (an `Adapter`'s id), or `null`:
-   * WestPlay picks (the game's). */
+   * WestPlay picks (the game's), plus the performance profile (`auto`, `lite`, `quality`). */
   graphics: {
     gpu: string | null
+    performance?: PerformanceMode
   }
   /** The cab's sound: its Equalizer (the cab's own Settings) and which of a coach's speakers play (here, never in
    * the cab). */

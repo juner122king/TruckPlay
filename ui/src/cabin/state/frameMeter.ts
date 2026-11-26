@@ -23,36 +23,42 @@ export function screenName(): string {
 }
 
 /**
- * The cab page's own frame clock, for the host's performance line (crates/host performance.rs): its animation
- * frames counted while the game runs, those that came late (the page waiting for the processor or the graphics
- * card), and the screen shown each second; taken by the host with each line (`westplayReport()`, which starts the
- * counts again). Beside the frames Windows captured of the page, it says which is slow when the screen is: the page
- * itself, or Windows' capture of it (players' screens at a few frames a second, 2026-10-27); and which screen was
- * slow (a player's Maps, 2026-11-09).
+ * Passive frame counter driven by real rendering work (such as the live map's render callback) instead of an
+ * unconditional `requestAnimationFrame` loop. Static screens (Home, Settings, Music, Freight, or handed-over
+ * truck screen) stay completely idle so Chromium's compositor and Windows Graphics Capture consume zero CPU/GPU.
  */
+let activeRecorder: ((now: number) => void) | null = null
+
+/** Records a rendered frame timestamp (ms) from active animated views such as `liveMap.ts`. */
+export function recordRenderedFrame(now = performance.now()): void {
+  activeRecorder?.(now)
+}
+
 export function meterFrames(): () => void {
   let frames = 0
   let slow = 0
   let screens: Record<string, number> = {}
-  // The loop counting now (each start is a new one; an older one stops at its next frame).
-  let loop = 0
   let running = false
+  let last: number | null = null
   let shownEach: ReturnType<typeof setInterval> | undefined
+
+  const record = (now: number) => {
+    frames++
+    // Only count a gap as slow if it's a real frame stall (< 1000ms); longer gaps mean the map was paused/hidden.
+    if (last !== null) {
+      const gap = now - last
+      if (gap >= SLOW_MS && gap < 1000) slow++
+    }
+    last = now
+  }
+
   const follow = (on: boolean) => {
     if (on === running) return
     running = on
-    const mine = ++loop
+    last = null
     clearInterval(shownEach)
+    activeRecorder = on ? record : null
     if (!on) return
-    let last: number | null = null
-    const tick = (now: number) => {
-      if (mine !== loop) return
-      frames++
-      if (last !== null && now - last >= SLOW_MS) slow++
-      last = now
-      requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
     shownEach = setInterval(() => {
       const name = screenName()
       screens[name] = (screens[name] ?? 0) + 1
@@ -72,6 +78,7 @@ export function meterFrames(): () => void {
     stop()
     follow(false)
     clearInterval(shownEach)
+    activeRecorder = null
     delete taker.westplayReport
   }
 }

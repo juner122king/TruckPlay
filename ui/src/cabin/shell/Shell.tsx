@@ -70,6 +70,7 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
   // The apps' text size (state/textSize.ts), on <html> so menus portalled out of the apps and the screen
   // changes' snapshots take it too.
   const textSize = useCabin((state) => state.textSize)
+  const liteMode = useCabin((state) => state.liteMode)
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--text-scale', String(textScale(textSize)))
   }, [textSize])
@@ -133,7 +134,7 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
   }, [truckScreen, profile.scale, insets.left, insets.bottom])
 
   return (
-    <main className={`shell appearance-${appearance}`} style={style}>
+    <main className={`shell appearance-${appearance}`} data-lite={liteMode ? '' : undefined} style={style}>
       {strip && !isInHost() && <GameStripPreview name={strip.name} />}
       <div
         ref={carplay}

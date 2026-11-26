@@ -71,6 +71,15 @@ export interface CompanionWords {
     gpuAutoDetail: string
     gpuInUse: string
     gpuNote: string
+    /** Performance profile selector (`auto` / `lite` / `quality`) for low-end PCs. */
+    performance: string
+    performanceAuto: string
+    performanceAutoDetail: string
+    performanceLite: string
+    performanceLiteDetail: string
+    performanceQuality: string
+    performanceQualityDetail: string
+    performanceNote: string
     /** The coach speakers (owner 2026-11-13): a coach plays through its driver's pair, or through every unit over
      * the passengers' seats; a choice here, never in the cab, with a word for players with weak processors: the
      * coach driven's own count (`coachNote`, `{n}`), or none outside a coach (`coachNoteAny`, the group greyed). */

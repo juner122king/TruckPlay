@@ -203,6 +203,12 @@ export type GameActionKind =
 
 export type GameActionAnswer = 'done' | 'gamePaused' | 'notInGame' | 'busy' | 'unsupported' | 'noAnswer'
 
+export type PerformanceMode = 'auto' | 'lite' | 'quality'
+
+export function isPerformanceMode(value: unknown): value is PerformanceMode {
+  return value === 'auto' || value === 'lite' || value === 'quality'
+}
+
 export type HostMessage =
   | { type: 'mediaResource'; app: MediaApp; generation: number; resident: boolean }
   | { type: 'telemetry'; data: Telemetry }
@@ -230,6 +236,10 @@ export type HostMessage =
       equalizerCustom?: boolean
       /** The language chosen in the companion (a game code, `de_de`); `null`: the game's. */
       language?: string | null
+      /** Configured performance mode (`auto`, `lite`, `quality`). */
+      performance?: PerformanceMode
+      /** Whether low-spec / lite rendering is currently active (resolved from `performance` + GPU/FPS telemetry). */
+      lite?: boolean
     }
   /** The player's own wallpapers and icon sets (shared/customize.ts), their files at `CABIN_FILES`. */
   | { type: 'customize'; wallpapers: CustomWallpaper[]; iconSets: IconSet[] }
@@ -479,6 +489,8 @@ export type PageMessage =
   | { type: 'wallpaper'; id: string }
   /** The Vehicle Bar (the truck's strip) kept or not, chosen in Settings › Appearance, kept the same way. */
   | { type: 'truckStrip'; strip: 'auto' | 'off' }
+  /** Performance mode chosen in Settings › Appearance (`auto`, `lite`, `quality`). */
+  | { type: 'performance'; mode: PerformanceMode }
   /** The players' tone, set in Settings › Equalizer: the player's curve, and whether it plays (Custom) or the
    * speakers as tuned (Recommended); kept with WestPlay's settings and played by every player. */
   | ({ type: 'equalizer'; custom: boolean } & Equalizer)

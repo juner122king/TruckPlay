@@ -100,6 +100,10 @@ fn apply_initial_visibility(app: &AppHandle, fallback: bool) {
     }
 }
 
+/// Latest host status cached so hidden/tray windows do not receive 1 Hz IPC broadcasts,
+/// and receive the latest snapshot immediately when restored.
+struct CachedStatus(std::sync::Mutex<Option<Status>>);
+
 /// Brings the companion window up from the tray, taskbar, or background and focuses it.
 fn show_main_window(app: &AppHandle) {
     if let Some(lifecycle) = app.try_state::<WindowLifecycle>() {
@@ -118,6 +122,11 @@ fn show_main_window(app: &AppHandle) {
         let _ = window.set_focus();
         if let Ok(hwnd) = window.hwnd() {
             westplay_host::companion_window::force_foreground(hwnd.0 as isize);
+        }
+        if let Some(cached) = handle.try_state::<CachedStatus>()
+            && let Some(status) = cached.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        {
+            let _ = handle.emit("host-status", &status);
         }
     });
 }
@@ -517,6 +526,7 @@ fn main() {
                 dir: app.path().app_local_data_dir()?.join(westplay_host::customize::FOLDER),
                 changed: Arc::default(),
             };
+            app.manage(CachedStatus(std::sync::Mutex::new(None)));
             let host = start_host(
                 app.handle(),
                 open_request.clone(),
@@ -622,7 +632,16 @@ fn start_host(
                     game,
                     map_builder,
                     on_status: Box::new(move |status| {
-                        let _ = status_events.emit("host-status", status);
+                        if let Some(cached) = status_events.try_state::<CachedStatus>() {
+                            *cached.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(status.clone());
+                        }
+                        let should_emit = status.error.is_some()
+                            || status_events.get_webview_window("main").is_none_or(|w| {
+                                w.is_visible().unwrap_or(true) && !w.is_minimized().unwrap_or(false)
+                            });
+                        if should_emit {
+                            let _ = status_events.emit("host-status", status);
+                        }
                     }),
                     // The cab's own Settings changed one (its wallpaper): kept, and the companion told.
                     on_settings: Box::new(move |settings| {

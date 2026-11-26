@@ -37,7 +37,15 @@ import {
 } from './glyphs'
 import { type SettingsPage, useSettings } from './settings'
 import './settings.css'
-import { cabClock, EQUALIZER_BANDS, EQUALIZER_MOST, type Equalizer, isInHost, postToHost } from '../../../shared/host'
+import {
+  cabClock,
+  EQUALIZER_BANDS,
+  EQUALIZER_MOST,
+  type Equalizer,
+  isInHost,
+  type PerformanceMode,
+  postToHost,
+} from '../../../shared/host'
 
 /**
  * The Settings app, in iOS 26's Settings look: a large title, inset grouped cards, coloured tiles, chevrons
@@ -335,6 +343,8 @@ function AppearancePage() {
   const hasBar = useScreenProfile().oemStrip !== null
   const oemMode = useCabin((state) => state.oemMode)
   const chooseOemMode = useCabin((state) => state.chooseOemMode)
+  const performanceMode = useCabin((state) => state.performanceMode)
+  const choosePerformanceMode = useCabin((state) => state.choosePerformanceMode)
   const open = useSettings((state) => state.open)
   return (
     <Page title={text.settings.appearance}>
@@ -378,6 +388,16 @@ function AppearancePage() {
           />
         </Group>
       )}
+      <Group header={text.settings.performanceMode} footer={text.settings.performanceModeFooter}>
+        {(['auto', 'lite', 'quality'] as readonly PerformanceMode[]).map((choice) => (
+          <CheckRow
+            key={choice}
+            label={text.settings.performanceModes[choice]}
+            on={performanceMode === choice}
+            onPick={() => choosePerformanceMode(choice)}
+          />
+        ))}
+      </Group>
     </Page>
   )
 }

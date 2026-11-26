@@ -80,6 +80,46 @@ export interface NearestSpeedCamera {
   distance: number
 }
 
+const CAMERA_CELL_SIZE = 4000
+const cameraGridCache = new WeakMap<readonly SpeedCamera[], Map<string, SpeedCamera[]>>()
+
+function cameraGridFor(cameras: readonly SpeedCamera[]): Map<string, SpeedCamera[]> {
+  let grid = cameraGridCache.get(cameras)
+  if (!grid) {
+    grid = new Map()
+    for (const camera of cameras) {
+      if (!Number.isFinite(camera.x) || !Number.isFinite(camera.z)) continue
+      const key = `${Math.floor(camera.x / CAMERA_CELL_SIZE)},${Math.floor(camera.z / CAMERA_CELL_SIZE)}`
+      let bucket = grid.get(key)
+      if (!bucket) {
+        bucket = []
+        grid.set(key, bucket)
+      }
+      bucket.push(camera)
+    }
+    cameraGridCache.set(cameras, grid)
+  }
+  return grid
+}
+
+function nearbyCameras(cameras: readonly SpeedCamera[], x: number, z: number): readonly SpeedCamera[] {
+  // Small maps/test fixtures need no grid overhead.
+  if (cameras.length <= 32) return cameras
+  const grid = cameraGridFor(cameras)
+  const cx = Math.floor(x / CAMERA_CELL_SIZE)
+  const cz = Math.floor(z / CAMERA_CELL_SIZE)
+  const out: SpeedCamera[] = []
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const bucket = grid.get(`${cx + dx},${cz + dz}`)
+      if (bucket) {
+        for (let i = 0; i < bucket.length; i++) out.push(bucket[i])
+      }
+    }
+  }
+  return out
+}
+
 /**
  * Finds the nearest fixed speed camera ahead in the vehicle's driving corridor,
  * using the exact same corridor geometry and rules as `nearestTrafficLightAhead`.
@@ -90,7 +130,10 @@ export function nearestSpeedCameraAhead(
   route: CorridorRoute | null = null,
   routeNext = 0,
 ): NearestSpeedCamera | null {
-  const found = nearestAheadOnCorridor(cameras, telemetry, route, routeNext)
+  if (!telemetry || cameras.length === 0) return null
+  const candidates = nearbyCameras(cameras, telemetry.x, telemetry.z)
+  if (candidates.length === 0) return null
+  const found = nearestAheadOnCorridor(candidates, telemetry, route, routeNext)
   return found ? { camera: found.item, distance: found.distance } : null
 }
 

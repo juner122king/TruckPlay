@@ -10,15 +10,17 @@
  * drawn evenly at exactly 60 (every 2nd at 120 Hz), as few as 47.
  */
 
-/** The fewest the map is drawn a second when it isn't drawn on every display frame. */
+/** The fewest the map is drawn a second when it isn't drawn on every display frame (high quality). */
 export const LEAST_PACE = 70
+/** Target map frame rate in Lite / low-spec performance mode (matches host 30 FPS capture cap). */
+export const LITE_PACE = 30
 /** How many display frames' lengths the display's is measured over (the mean of their middle half: a frame the page
  * was late for doesn't move it, nor frames whose timing wavers either way). */
 const MEASURED = 32
 
 /** The display frames from one the map is drawn on to the next, at a display frame of `frameMs`. */
-export function framesApart(frameMs: number): number {
-  return Math.max(1, Math.floor(1000 / frameMs / LEAST_PACE))
+export function framesApart(frameMs: number, pace = LEAST_PACE): number {
+  return Math.max(1, Math.floor(1000 / frameMs / pace + 1e-6))
 }
 
 /** The display's frame length, ms, from the times between the last display frames (`gaps`, newest last); a 60th
@@ -33,8 +35,8 @@ export function displayFrameMs(gaps: readonly number[]): number {
 /** Whether the display frame at `now` is one the map is drawn on, the map last drawn at `last` (ms): when
  * [`framesApart`] frames have gone by since (half a frame early is in time: a frame's timing wavers). After a pause,
  * at once. */
-export function mapFrameDue(now: number, last: number, frameMs: number): boolean {
-  return now - last >= (framesApart(frameMs) - 0.5) * frameMs
+export function mapFrameDue(now: number, last: number, frameMs: number, pace = LEAST_PACE): boolean {
+  return now - last >= (framesApart(frameMs, pace) - 0.5) * frameMs
 }
 
 /** The display's frames as they come: their lengths, kept for [`displayFrameMs`]. */

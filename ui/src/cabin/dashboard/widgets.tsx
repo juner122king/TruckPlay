@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { type Backdrop, type Look, useWordsOver, wordsClass } from '../apps/music/contrast'
 import { Crossfade } from '../apps/music/Crossfade'
 import { VideoWidget } from '../apps/youtube/VideoWidget'
@@ -288,6 +289,9 @@ const COLUMN = 3
  * or the destination not showing: no route, no job, or turned off in Settings), as they come and go; and
  * not without the weather (no game, or one whose weather isn't read), or turned off itself.
  */
+/** Minimum truck movement (metres) before re-scanning all map city labels for the weather widget. */
+const WEATHER_CITY_MOVE_SQ = 500 * 500
+
 export function WeatherWidget() {
   const text = useText()
   const labels = useMapData()?.labels
@@ -298,9 +302,24 @@ export function WeatherWidget() {
   const room = widgets.weather && others < COLUMN
   const weather = useLive((state) => state.weather)
   const gameTime = useLive((state) => (state.telemetry ? cabClock(state.telemetry, state.clockShift) : 0))
+  const cachedCity = useRef<{
+    labels: typeof labels
+    x: number
+    z: number
+    place: ReturnType<typeof nearestCity>
+  } | null>(null)
   const place = useLive((state) => {
     const t = state.telemetry
-    return t && labels ? nearestCity([t.x, t.z], labels) : null
+    if (!t || !labels) return null
+    const prev = cachedCity.current
+    if (prev && prev.labels === labels) {
+      const dx = t.x - prev.x
+      const dz = t.z - prev.z
+      if (dx * dx + dz * dz < WEATHER_CITY_MOVE_SQ) return prev.place
+    }
+    const found = nearestCity([t.x, t.z], labels)
+    cachedCity.current = { labels, x: t.x, z: t.z, place: found }
+    return found
   })
   const view = weather ? weatherView(weather, gameTime, place, text) : null
   return (
