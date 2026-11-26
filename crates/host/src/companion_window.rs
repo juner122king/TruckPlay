@@ -17,10 +17,10 @@ use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindowRect, IsIconic, IsWindowVisible,
-    IsZoomed, RegisterClassExW, SC_MINIMIZE, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMINNOACTIVE, SWP_NOACTIVATE,
-    SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos, ShowWindow, ULW_ALPHA, UpdateLayeredWindow, WM_DPICHANGED,
-    WM_NCDESTROY, WM_SHOWWINDOW, WM_SYSCOMMAND, WM_WINDOWPOSCHANGED, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP,
+    IsZoomed, PostMessageW, RegisterClassExW, SC_MINIMIZE, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMINNOACTIVE,
+    SWP_NOACTIVATE, SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos, ShowWindow, ULW_ALPHA, UpdateLayeredWindow,
+    WM_CLOSE, WM_DPICHANGED, WM_NCDESTROY, WM_SHOWWINDOW, WM_SYSCOMMAND, WM_WINDOWPOSCHANGED, WNDCLASSEXW,
+    WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP,
 };
 use windows::core::w;
 
@@ -153,9 +153,10 @@ unsafe extern "system" fn subclass_proc(
     let state = unsafe { &mut *(ref_data as *mut FrameState) };
     match msg {
         WM_SYSCOMMAND if (wparam.0 & 0xFFF0) == SC_MINIMIZE as usize && state.keep_in_tray.load(Ordering::Relaxed) => {
-            // SAFETY: hiding directly avoids entering iconic state when minimizing to tray.
+            // SAFETY: posting `WM_CLOSE` routes taskbar/system minimize through Tauri's close-to-tray
+            // lifecycle so the companion window and its WebView2 processes are fully released.
             unsafe {
-                let _ = ShowWindow(hwnd, SW_HIDE);
+                let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
             }
             return LRESULT(0);
         }

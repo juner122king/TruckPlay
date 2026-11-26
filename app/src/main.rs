@@ -9,15 +9,15 @@ mod setup;
 mod update;
 
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use setup::SetupStore;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use westplay_host::maps::SetUpGame;
 use westplay_host::settings::{Settings, SettingsFile, SharedSettings};
 use westplay_host::{
@@ -25,19 +25,58 @@ use westplay_host::{
 };
 
 const TRAY_ID: &str = "main-tray";
+const MAIN_WINDOW_LABEL: &str = "main";
 
 struct Host {
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
-/// Companion window startup, tray persistence, and single-instance wakeup state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PendingShow {
+    /// Initial launch with `start_minimized = true` and `keep_in_tray = false`: show minimized on taskbar.
+    StartMinimized,
+    /// Normal launch or reopen from tray: show and focus once `companion_ready` fires (or after `SHOW_ANYWAY`).
+    ShowAndFocus,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct SavedBounds {
+    /// Last non-minimized, non-maximized logical `(x, y, width, height)`.
+    normal: Option<(f64, f64, f64, f64)>,
+    maximized: bool,
+}
+
+/// Companion window lifecycle: tray persistence (destroying the WebView2 window when sent to tray and
+/// recreating it on demand), saved geometry across recreations, and single-instance wakeup state.
 struct WindowLifecycle {
     keep_in_tray: Arc<AtomicBool>,
     quitting: Arc<AtomicBool>,
-    startup_handled: AtomicBool,
-    woken_early: AtomicBool,
-    start_minimized: bool,
+    closing: AtomicBool,
+    reopen_after_destroy: AtomicBool,
+    window_generation: AtomicU64,
+    shown_generation: AtomicU64,
+    pending_show: Mutex<PendingShow>,
+    saved_bounds: Mutex<SavedBounds>,
+}
+
+impl WindowLifecycle {
+    fn new(keep_in_tray: Arc<AtomicBool>, quitting: Arc<AtomicBool>) -> Self {
+        Self {
+            keep_in_tray,
+            quitting,
+            closing: AtomicBool::new(false),
+            reopen_after_destroy: AtomicBool::new(false),
+            window_generation: AtomicU64::new(0),
+            shown_generation: AtomicU64::new(0),
+            pending_show: Mutex::new(PendingShow::ShowAndFocus),
+            saved_bounds: Mutex::new(SavedBounds::default()),
+        }
+    }
+
+    fn stay_in_tray_on_exit(&self, code: Option<i32>) -> bool {
+        code.is_none() && self.keep_in_tray.load(Ordering::Acquire) && !self.quitting.load(Ordering::Acquire)
+    }
 }
 
 /// Requests from the companion window to open or close WestPlay on the truck's screen (the cabin page owns
@@ -58,29 +97,104 @@ struct SettingsStore {
 /// (`companion_ready`), so it never shows blank while the page loads; after this long it shows anyway.
 const SHOW_ANYWAY: Duration = Duration::from_secs(8);
 
-/// The companion's page has drawn its first screen: apply the configured startup visibility once.
+/// The companion's page has drawn its first screen: reveal the current companion window once.
 #[tauri::command]
 fn companion_ready(app: AppHandle) {
-    apply_initial_visibility(&app, false);
+    reveal_main_window(&app, None, false);
 }
 
-fn apply_initial_visibility(app: &AppHandle, fallback: bool) {
+fn emit_cached_status(app: &AppHandle) {
+    if let Some(cached) = app.try_state::<CachedStatus>()
+        && let Some(status) = cached.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    {
+        let _ = app.emit("host-status", &status);
+    }
+}
+
+fn save_window_bounds(window: &WebviewWindow, lifecycle: &WindowLifecycle) {
+    if window.is_minimized().unwrap_or(false) {
+        return;
+    }
+    let maximized = window.is_maximized().unwrap_or(false);
+    let mut saved = lifecycle.saved_bounds.lock().unwrap_or_else(|e| e.into_inner());
+    if maximized {
+        saved.maximized = true;
+        return;
+    }
+    let scale = window.scale_factor().unwrap_or(1.0).max(0.5);
+    if let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) {
+        let pos = pos.to_logical::<f64>(scale);
+        let size = size.to_logical::<f64>(scale);
+        if size.width >= 320.0 && size.height >= 240.0 && pos.x > -16_000.0 && pos.y > -16_000.0 {
+            saved.normal = Some((pos.x, pos.y, size.width, size.height));
+            saved.maximized = false;
+        }
+    }
+}
+
+/// Creates the companion window from `tauri.conf.json` (hidden until `companion_ready`), attaches its
+/// native rounded frame/shadow, and starts the fallback reveal timer. Must be called on the main thread.
+fn create_main_window(app: &AppHandle, pending: PendingShow) -> tauri::Result<()> {
+    if app.get_webview_window(MAIN_WINDOW_LABEL).is_some() {
+        return Ok(());
+    }
+    let Some(lifecycle) = app.try_state::<WindowLifecycle>() else {
+        return Ok(());
+    };
+    let Some(config) = app.config().app.windows.iter().find(|w| w.label == MAIN_WINDOW_LABEL).cloned() else {
+        return Err(tauri::Error::AssetNotFound(format!("window config `{MAIN_WINDOW_LABEL}`")));
+    };
+
+    let generation = lifecycle.window_generation.fetch_add(1, Ordering::AcqRel) + 1;
+    *lifecycle.pending_show.lock().unwrap_or_else(|e| e.into_inner()) = pending;
+    let saved = *lifecycle.saved_bounds.lock().unwrap_or_else(|e| e.into_inner());
+
+    let mut builder = WebviewWindowBuilder::from_config(app, &config)?.visible(false);
+    if let Some((x, y, width, height)) = saved.normal {
+        builder = builder.position(x, y).inner_size(width, height);
+    }
+    if saved.maximized {
+        builder = builder.maximized(true);
+    }
+
+    let window = builder.build()?;
+    if let Ok(hwnd) = window.hwnd() {
+        westplay_host::companion_window::attach(hwnd.0 as isize, lifecycle.keep_in_tray.clone());
+    }
+
+    if generation == 1 {
+        westplay_host::startup::mark("app: window set up");
+    } else {
+        westplay_host::log!("companion: recreated window from tray");
+    }
+
+    // A page that never says it's ready (it failed to load) still applies visibility.
+    let fallback_app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(SHOW_ANYWAY);
+        let app_handle = fallback_app.clone();
+        let _ = fallback_app.run_on_main_thread(move || reveal_main_window(&app_handle, Some(generation), true));
+    });
+    Ok(())
+}
+
+fn reveal_main_window(app: &AppHandle, generation: Option<u64>, fallback: bool) {
     let Some(lifecycle) = app.try_state::<WindowLifecycle>() else {
         return;
     };
-    if lifecycle.startup_handled.swap(true, Ordering::AcqRel) {
+    let current = lifecycle.window_generation.load(Ordering::Acquire);
+    let target = generation.unwrap_or(current);
+    if target == 0 || target != current {
         return;
     }
-    let Some(window) = app.get_webview_window("main") else {
+    if lifecycle.shown_generation.fetch_max(target, Ordering::AcqRel) >= target {
+        return;
+    }
+    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
         return;
     };
-    let woken = lifecycle.woken_early.load(Ordering::Acquire);
-    let keep_in_tray = lifecycle.keep_in_tray.load(Ordering::Acquire);
-    if !woken && lifecycle.start_minimized {
-        if keep_in_tray {
-            westplay_host::startup::mark("app: started in system tray");
-            return;
-        }
+    let pending = *lifecycle.pending_show.lock().unwrap_or_else(|e| e.into_inner());
+    if pending == PendingShow::StartMinimized {
         westplay_host::startup::mark("app: started minimized");
         if let Ok(hwnd) = window.hwnd() {
             westplay_host::companion_window::show_minimized_no_activate(hwnd.0 as isize);
@@ -90,43 +204,58 @@ fn apply_initial_visibility(app: &AppHandle, fallback: bool) {
         return;
     }
     if !window.is_visible().unwrap_or(false) {
-        westplay_host::startup::mark(if fallback {
-            "app: window shown without its page ready"
-        } else {
-            "app: window shown"
-        });
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
-
-/// Latest host status cached so hidden/tray windows do not receive 1 Hz IPC broadcasts,
-/// and receive the latest snapshot immediately when restored.
-struct CachedStatus(std::sync::Mutex<Option<Status>>);
-
-/// Brings the companion window up from the tray, taskbar, or background and focuses it.
-fn show_main_window(app: &AppHandle) {
-    if let Some(lifecycle) = app.try_state::<WindowLifecycle>() {
-        lifecycle.woken_early.store(true, Ordering::Release);
-        lifecycle.startup_handled.store(true, Ordering::Release);
-    }
-    let handle = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        let Some(window) = handle.get_webview_window("main") else {
-            return;
-        };
-        if window.is_minimized().unwrap_or(false) {
-            let _ = window.unminimize();
+        if target == 1 {
+            westplay_host::startup::mark(if fallback {
+                "app: window shown without its page ready"
+            } else {
+                "app: window shown"
+            });
+        } else if fallback {
+            westplay_host::log!("companion: recreated window shown without its page ready");
         }
         let _ = window.show();
         let _ = window.set_focus();
         if let Ok(hwnd) = window.hwnd() {
             westplay_host::companion_window::force_foreground(hwnd.0 as isize);
         }
-        if let Some(cached) = handle.try_state::<CachedStatus>()
-            && let Some(status) = cached.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
-        {
-            let _ = handle.emit("host-status", &status);
+    }
+    emit_cached_status(app);
+}
+
+/// Latest host status cached so hidden/destroyed tray windows do not receive 1 Hz IPC broadcasts,
+/// and receive the latest snapshot immediately when restored or recreated.
+struct CachedStatus(Mutex<Option<Status>>);
+
+/// Brings the companion window up from the tray (recreating it if it was destroyed), taskbar, or background
+/// and focuses it.
+fn show_main_window(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(lifecycle) = handle.try_state::<WindowLifecycle>() else {
+            return;
+        };
+        *lifecycle.pending_show.lock().unwrap_or_else(|e| e.into_inner()) = PendingShow::ShowAndFocus;
+        if lifecycle.closing.load(Ordering::Acquire) {
+            lifecycle.reopen_after_destroy.store(true, Ordering::Release);
+            return;
+        }
+        if let Some(window) = handle.get_webview_window(MAIN_WINDOW_LABEL) {
+            let current = lifecycle.window_generation.load(Ordering::Acquire);
+            if lifecycle.shown_generation.load(Ordering::Acquire) >= current {
+                if window.is_minimized().unwrap_or(false) {
+                    let _ = window.unminimize();
+                }
+                let _ = window.show();
+                let _ = window.set_focus();
+                if let Ok(hwnd) = window.hwnd() {
+                    westplay_host::companion_window::force_foreground(hwnd.0 as isize);
+                }
+                emit_cached_status(&handle);
+            }
+            return;
+        }
+        if let Err(error) = create_main_window(&handle, PendingShow::ShowAndFocus) {
+            westplay_host::log!("companion: couldn't recreate window: {error}");
         }
     });
 }
@@ -134,19 +263,15 @@ fn show_main_window(app: &AppHandle) {
 #[tauri::command]
 fn window_minimize(window: WebviewWindow, lifecycle: State<WindowLifecycle>) {
     if lifecycle.keep_in_tray.load(Ordering::Acquire) {
-        let _ = window.hide();
+        let _ = window.close();
     } else {
         let _ = window.minimize();
     }
 }
 
 #[tauri::command]
-fn window_close(window: WebviewWindow, lifecycle: State<WindowLifecycle>) {
-    if lifecycle.keep_in_tray.load(Ordering::Acquire) {
-        let _ = window.hide();
-    } else {
-        let _ = window.close();
-    }
+fn window_close(window: WebviewWindow) {
+    let _ = window.close();
 }
 
 #[tauri::command]
@@ -440,31 +565,43 @@ fn main() {
             setup::leave_pc
         ])
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let hide = window
-                    .app_handle()
-                    .try_state::<WindowLifecycle>()
-                    .is_some_and(|l| l.keep_in_tray.load(Ordering::Acquire) && !l.quitting.load(Ordering::Acquire));
-                if hide {
-                    api.prevent_close();
-                    let _ = window.hide();
+            if window.label() != MAIN_WINDOW_LABEL {
+                return;
+            }
+            match event {
+                WindowEvent::CloseRequested { .. } => {
+                    if let Some(lifecycle) = window.app_handle().try_state::<WindowLifecycle>() {
+                        if let Some(webview) = window.app_handle().get_webview_window(MAIN_WINDOW_LABEL) {
+                            save_window_bounds(&webview, &lifecycle);
+                        }
+                        lifecycle.closing.store(true, Ordering::Release);
+                    }
                 }
+                WindowEvent::Destroyed => {
+                    let app = window.app_handle();
+                    if let Some(lifecycle) = app.try_state::<WindowLifecycle>() {
+                        lifecycle.closing.store(false, Ordering::Release);
+                        let reopen = lifecycle.reopen_after_destroy.swap(false, Ordering::AcqRel);
+                        let quitting = lifecycle.quitting.load(Ordering::Acquire);
+                        if reopen && !quitting {
+                            if let Err(error) = create_main_window(app, PendingShow::ShowAndFocus) {
+                                westplay_host::log!("companion: couldn't recreate window after close: {error}");
+                            }
+                        } else if lifecycle.keep_in_tray.load(Ordering::Acquire) && !quitting {
+                            westplay_host::log!("companion: closed to system tray (WebView2 released)");
+                        }
+                    }
+                }
+                _ => {}
             }
         })
         .setup(move |app| {
-            westplay_host::startup::mark("app: window set up");
             let config_dir = app.path().app_config_dir()?;
             let file = SettingsFile::in_dir(&config_dir);
             let initial_settings = file.load();
             let shared = Arc::new(SharedSettings::new(initial_settings.clone()));
             let keep_in_tray = Arc::new(AtomicBool::new(initial_settings.window.keep_in_tray));
             let quitting = Arc::new(AtomicBool::new(false));
-
-            if let Some(window) = app.get_webview_window("main")
-                && let Ok(hwnd) = window.hwnd()
-            {
-                westplay_host::companion_window::attach(hwnd.0 as isize, keep_in_tray.clone());
-            }
 
             let menu = build_tray_menu(app.handle(), tray_is_zh(&initial_settings))?;
             let quit_flag = quitting.clone();
@@ -495,30 +632,8 @@ fn main() {
             let tray = tray_builder.build(app)?;
             let _ = tray.set_visible(initial_settings.window.keep_in_tray);
 
-            app.manage(WindowLifecycle {
-                keep_in_tray,
-                quitting,
-                startup_handled: AtomicBool::new(false),
-                woken_early: AtomicBool::new(false),
-                start_minimized: initial_settings.window.start_minimized,
-            });
-
-            // A page that never says it's ready (it failed to load) still applies initial visibility.
-            let fallback_app = app.handle().clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(SHOW_ANYWAY);
-                let app_handle = fallback_app.clone();
-                let _ = fallback_app.run_on_main_thread(move || apply_initial_visibility(&app_handle, true));
-            });
-
-            if let Some(wake_signal) = wake_signal {
-                let wake_app = app.handle().clone();
-                let _ = std::thread::Builder::new().name("westplay-wakeup".into()).spawn(move || {
-                    while wake_signal.wait() {
-                        show_main_window(&wake_app);
-                    }
-                });
-            }
+            app.manage(WindowLifecycle::new(keep_in_tray, quitting));
+            app.manage(CachedStatus(Mutex::new(None)));
 
             let setup = SetupStore::load(&config_dir, app.handle());
             setup::watch_installed_mods(&setup);
@@ -526,7 +641,6 @@ fn main() {
                 dir: app.path().app_local_data_dir()?.join(westplay_host::customize::FOLDER),
                 changed: Arc::default(),
             };
-            app.manage(CachedStatus(std::sync::Mutex::new(None)));
             let host = start_host(
                 app.handle(),
                 open_request.clone(),
@@ -538,17 +652,43 @@ fn main() {
             app.manage(customize);
             app.manage(SettingsStore { file, shared });
             app.manage(setup);
-            app.manage(std::sync::Mutex::new(host));
+            app.manage(Mutex::new(host));
             update::watch(app.handle());
+
+            if initial_settings.window.start_minimized && initial_settings.window.keep_in_tray {
+                westplay_host::startup::mark("app: started in system tray (companion window deferred)");
+            } else {
+                let pending = if initial_settings.window.start_minimized {
+                    PendingShow::StartMinimized
+                } else {
+                    PendingShow::ShowAndFocus
+                };
+                create_main_window(app.handle(), pending)?;
+            }
+
+            if let Some(wake_signal) = wake_signal {
+                let wake_app = app.handle().clone();
+                let _ = std::thread::Builder::new().name("westplay-wakeup".into()).spawn(move || {
+                    while wake_signal.wait() {
+                        show_main_window(&wake_app);
+                    }
+                });
+            }
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("failed to build the WestPlay app");
 
-    app.run(|app, event| {
-        if let RunEvent::Exit = event {
+    app.run(|app, event| match event {
+        RunEvent::ExitRequested { api, code, .. } => {
+            if app.try_state::<WindowLifecycle>().is_some_and(|l| l.stay_in_tray_on_exit(code)) {
+                api.prevent_exit();
+            }
+        }
+        RunEvent::Exit => {
             stop_host(app);
         }
+        _ => {}
     });
 }
 
@@ -635,10 +775,10 @@ fn start_host(
                         if let Some(cached) = status_events.try_state::<CachedStatus>() {
                             *cached.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(status.clone());
                         }
-                        let should_emit = status.error.is_some()
-                            || status_events.get_webview_window("main").is_none_or(|w| {
-                                w.is_visible().unwrap_or(true) && !w.is_minimized().unwrap_or(false)
-                            });
+                        let should_emit = status_events.get_webview_window(MAIN_WINDOW_LABEL).is_some_and(|w| {
+                            status.error.is_some()
+                                || (w.is_visible().unwrap_or(true) && !w.is_minimized().unwrap_or(false))
+                        });
                         if should_emit {
                             let _ = status_events.emit("host-status", status);
                         }
@@ -688,7 +828,12 @@ fn start_host(
             // In the log too: shown only, a player's said nothing of it (2026-11-11).
             westplay_host::log!("TruckPlay engine stopped: {error}");
             let status = Status { error: Some(format!("TruckPlay engine stopped: {error}")), ..Default::default() };
-            let _ = events.emit("host-status", &status);
+            if let Some(cached) = events.try_state::<CachedStatus>() {
+                *cached.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(status.clone());
+            }
+            if events.get_webview_window(MAIN_WINDOW_LABEL).is_some() {
+                let _ = events.emit("host-status", &status);
+            }
             return;
         }
     })?;
@@ -707,4 +852,35 @@ fn cabin_content(app: &AppHandle) -> Content {
     // Unbundled release builds (`cargo build --release`) use the UI build next to the sources.
     let root = bundled.unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../ui/dist"));
     Content::Folder { root, page: "cabin.html".into() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tray_exit_policy_prevents_exit_only_when_closing_last_window_with_tray_enabled() {
+        let keep = Arc::new(AtomicBool::new(true));
+        let quitting = Arc::new(AtomicBool::new(false));
+        let lifecycle = WindowLifecycle::new(keep.clone(), quitting.clone());
+
+        assert!(lifecycle.stay_in_tray_on_exit(None));
+        assert!(!lifecycle.stay_in_tray_on_exit(Some(0)));
+
+        quitting.store(true, Ordering::Release);
+        assert!(!lifecycle.stay_in_tray_on_exit(None));
+
+        quitting.store(false, Ordering::Release);
+        keep.store(false, Ordering::Release);
+        assert!(!lifecycle.stay_in_tray_on_exit(None));
+    }
+
+    #[test]
+    fn tauri_config_defers_main_window_creation_for_tray_lifecycle() {
+        let raw = include_str!("../tauri.conf.json");
+        let config: tauri::utils::config::Config = serde_json::from_str(raw).expect("valid tauri.conf.json");
+        let main = config.app.windows.iter().find(|w| w.label == MAIN_WINDOW_LABEL).expect("main window config");
+        assert!(!main.create, "main window should be created dynamically so tray-only startup skips WebView2");
+        assert!(!main.visible, "main window starts hidden until companion_ready");
+    }
 }

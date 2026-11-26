@@ -20,6 +20,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "TruckPlay",
         "width": 780,
         "height": 520,
