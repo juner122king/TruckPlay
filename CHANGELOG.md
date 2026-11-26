@@ -3,6 +3,13 @@
 What changed in each release of TruckPlay (independent GPL-3.0-or-later fork of WestPlay 2.4.x). The newest release's
 notes are what the app shows when it offers the update.
 
+## 1.0.2 (2026-11-26)
+- 新增 **本地视频播放** 功能：从游戏 `videos` 文件夹独立加载本地视频（支持 MP4 / WebM / MOV / MKV），通过支持字节范围请求的本地流媒体服务实现快速拖动进度条与高清播放；提供全屏 CarPlay Liquid Glass 影院界面（铺满/适应画面切换、0.75×–2× 倍速、播放列表抽屉、双击及按钮 ±10 秒快进/快退、彻底关闭与启停防抖）及 Dashboard 实时视频预览卡片。
+- 新增 **性能模式**（自动适配 / 流畅优先 / 画质优先）：可在车机设置或 Companion 中切换；开启「流畅优先」或在「自动适配」检测到核显/游戏持续掉帧时，自动将画面捕获与地图渲染限制为 30 帧并关闭高开销实时毛玻璃与抗锯齿，显著降低显卡资源争抢。
+- 全面优化内存与运行效率：托盘最小化或关闭 Companion 窗口时自动销毁 WebView2 实例并按需重建，休眠托盘预览并限制地图图标/资源缓存上限；消除宿主 STA 线程阻塞、媒体 WebView 泄漏与闲置内存滞留，并优化插件 `CreateTexture2D` 诊断 Hook 与信号量更新。
+- Added **local video playback** from a separate `videos` folder (MP4, WebM, MOV, MKV) backed by a byte-range loopback streaming server, with a full-screen CarPlay Liquid Glass theater UI (aspect crop toggle, 0.75×–2× speed picker, playlist drawer, ±10s skip, hardened startup/stop lifecycle) and a live Dashboard video widget.
+- Added **Performance Mode** (Auto / Smooth Priority / Quality Priority) to cap capture & map rendering at 30 FPS and disable heavy blur/MSAA on integrated GPUs or sustained frame drops, alongside Companion WebView2 teardown on tray hide, bounded map caches, STA/memory-leak fixes in host, and gated plugin diagnostics.
+
 ## 1.0.1 (2026-11-25)
 - 新增全局 **上一首 / 下一首** 快捷键（默认 `InteractionKey + 6` / `InteractionKey + 7`）：可在 Companion「控制」页自定义为单键或组合键，按键自动拦截不穿透游戏并支持多媒体键友好名称；同步升级共享内存桥接至 v32（更新重启后将自动同步新版 `westplay.dll`）。
 - 取消音量增减键长按 1 秒切歌机制，音量调节改为按下即刻响应。
