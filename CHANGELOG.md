@@ -3,6 +3,13 @@
 What changed in each release of TruckPlay (independent GPL-3.0-or-later fork of WestPlay 2.4.x). The newest release's
 notes are what the app shows when it offers the update.
 
+## 1.0.3 (2026-11-27)
+- **导航界面与运行性能全面升级**：以 CarPlay Ultra Liquid Glass 风格重构 Maps 与 Dashboard 导航浮层，新增交互式行程条（TripBar）及可展开抽屉、沿途一键停靠点（加油 / 休息 / 维修）、路线概览切换与货运任务锁定状态；升级转向指引卡片、车速显示、4×2 Bento 搜索面板与多路线选择卡片，并支持紧凑高度自适应与轻量模式毛玻璃降级。
+- **动态视觉中心与概览途经点管理**：将车辆镜头锚点从物理中心动态偏移至无遮挡走廊的视觉中心（支持四边平滑阻尼与预览同步）；新增概览模式途经点列表卡片（支持拖拽/键盘重排、删除与添加停靠点，货运任务锁定终点、自由驾驶可编辑终点），同步升级共享内存桥接至 v33（`RouteAction::SetStops`）；重组右下角地图控制栏为双竖向胶囊并优化按钮触控尺寸。
+- **导航运行时性能优化**：引入参考记忆化走廊与量化行程快照、3D 立体路线动态头部/静态其余段双 VBO 拆分、城市标注空间网格索引与惰性测量、ResizeObserver 视口缓存、静止零 DOM 变更门控及 POI 搜索预索引，在保持 3D 道路与建筑画质的同时大幅降低渲染开销。
+- **Freight 货运应用精密汽车座舱重构**：采用精密汽车座舱视觉语言全面重构 Freight 应用，拆分并重设计 HOS 工时视图、车辆检查（Inspection）、卡车蓝图（TruckBlueprint）与运单（Waybill）界面及配套矢量图标。
+- Redesigned Maps and Dashboard navigation overlays in CarPlay Ultra Liquid Glass style (interactive TripBar drawer, along-route pit-stop shortcuts, overview waypoint management with drag/keyboard reorder and `BRIDGE_VERSION` 33 `RouteAction::SetStops`, dynamic visual-center camera framing, and dual-capsule controls), optimized navigation runtime performance (split 3D route VBOs, memoized snapshots, spatial grid label culling), and redesigned the **Freight** app in precision automotive cockpit style (HOS, Inspection, TruckBlueprint, and Waybill views).
+
 ## 1.0.2 (2026-11-26)
 - 新增 **本地视频播放** 功能：从游戏 `videos` 文件夹独立加载本地视频（支持 MP4 / WebM / MOV / MKV），通过支持字节范围请求的本地流媒体服务实现快速拖动进度条与高清播放；提供全屏 CarPlay Liquid Glass 影院界面（铺满/适应画面切换、0.75×–2× 倍速、播放列表抽屉、双击及按钮 ±10 秒快进/快退、彻底关闭与启停防抖）及 Dashboard 实时视频预览卡片。
 - 新增 **性能模式**（自动适配 / 流畅优先 / 画质优先）：可在车机设置或 Companion 中切换；开启「流畅优先」或在「自动适配」检测到核显/游戏持续掉帧时，自动将画面捕获与地图渲染限制为 30 帧并关闭高开销实时毛玻璃与抗锯齿，显著降低显卡资源争抢。
