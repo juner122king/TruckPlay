@@ -17,7 +17,15 @@ const FIELD = 'map-search'
  * The keyboard comes up when the field is pressed, not with the panel. A change the game takes closes it,
  * with a confirmation pill over the map.
  */
-export function MapSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MapSearch({
+  open,
+  onClose,
+  onNotify,
+}: {
+  open: boolean
+  onClose: () => void
+  onNotify?: (message: string) => void
+}) {
   const text = useText()
   const [phase, setPhase] = useState<'closed' | 'open' | 'closing'>(open ? 'open' : 'closed')
   const [query, setQuery] = useState('')
@@ -77,13 +85,14 @@ export function MapSearch({ open, onClose }: { open: boolean; onClose: () => voi
               field={FIELD}
               onDone={(message) => {
                 close()
-                setConfirmation({ text: message, id: Date.now() })
+                if (onNotify) onNotify(message)
+                else setConfirmation({ text: message, id: Date.now() })
               }}
             />
           </div>
         </div>
       )}
-      {confirmation && (
+      {!onNotify && confirmation && (
         <div key={confirmation.id} className="map-confirmation glass" role="status">
           {confirmation.text}
         </div>

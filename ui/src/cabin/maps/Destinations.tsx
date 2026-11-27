@@ -36,10 +36,12 @@ function useTruckAt(): [number, number] | null {
   const at = useLive(
     useShallow((state) => {
       const t = state.telemetry
-      return t ? [Math.round(t.x / WHERE_STEP) * WHERE_STEP, Math.round(t.z / WHERE_STEP) * WHERE_STEP] : null
+      return t ? ([Math.round(t.x / WHERE_STEP) * WHERE_STEP, Math.round(t.z / WHERE_STEP) * WHERE_STEP] as const) : null
     }),
   )
-  return at ? toLngLat(at[0], at[1]) : null
+  const x = at?.[0]
+  const z = at?.[1]
+  return useMemo(() => (x !== undefined && z !== undefined ? toLngLat(x, z) : null), [x, z])
 }
 
 /** What the game's route allows: on a job, only stops (the destination is the job's). */
@@ -70,12 +72,20 @@ export function Destinations({ query, field, onDone }: DestinationsProps) {
   const text = useText()
   const places = usePlaces()
   const from = useTruckAt()
-  // On a route, the stops it offers are along the rest of it, nearest along it first: never behind the truck
-  // (PLAN.md: Navigation plan, A). Worked out again as the truck moves (`from` changes).
-  const onRoute = useLive((state) => state.route !== null)
-  const live = onRoute && places ? liveRouteProgress() : null
-  const ahead = live && places ? placesAhead(places, live.spans, live.progress) : null
-  const along = ahead ? new Map(ahead.map(({ place, along }) => [place, along])) : undefined
+  // On a route, the stops it offers are along the rest of it, nearest along it first: never behind the truck.
+  // Memoized against route identity and quantized truck bucket (`from`) so typing never rescans all POIs.
+  const route = useLive((state) => state.route)
+  const { ahead, along } = useMemo(() => {
+    if (!route || !places) return { ahead: null, along: undefined }
+    const live = liveRouteProgress()
+    if (!live) return { ahead: null, along: undefined }
+    // `from` invalidates this memo when the truck advances by `WHERE_STEP`.
+    const found = from !== undefined ? placesAhead(places, live.spans, live.progress) : []
+    return {
+      ahead: found,
+      along: new Map(found.map(({ place, along: dist }) => [place, dist])),
+    }
+  }, [places, route, from])
   const [kind, setKind] = useState<DestinationKind | null>(null)
   const [chosen, setChosen] = useState<Destination | null>(null)
   // Choosing a list or a place puts the keyboard away, as on the iPhone: what's chosen has the room.
@@ -189,15 +199,18 @@ function Home({
       {garages.length > 0 && (
         <section>
           <h3>{text.destinations.favourites}</h3>
-          {garages.map((garage) => (
-            <PlaceRow
-              key={garage.node}
-              place={garage}
-              title={garage.cityId === headquarters ? text.destinations.headquarters : text.destinations.yourGarage}
-              from={from}
-              onChoose={onChoose}
-            />
-          ))}
+          <div className="destinations-card">
+            {garages.map((garage) => (
+              <PlaceRow
+                key={garage.node}
+                place={garage}
+                title={garage.cityId === headquarters ? text.destinations.headquarters : text.destinations.yourGarage}
+                badge={garage.cityId === headquarters ? 'HQ' : undefined}
+                from={from}
+                onChoose={onChoose}
+              />
+            ))}
+          </div>
         </section>
       )}
       <section>
@@ -292,6 +305,7 @@ function PlaceList({
 function PlaceRow({
   place,
   title,
+  badge,
   from,
   along,
   detour,
@@ -299,6 +313,7 @@ function PlaceRow({
 }: {
   place: Destination
   title?: string
+  badge?: string
   from: [number, number] | null
   /** How far along the route it is (metres), on a route. */
   along?: number
@@ -321,7 +336,10 @@ function PlaceRow({
     <button type="button" className="destination-row" onClick={() => onChoose(place)}>
       <PlaceBadge kind={place.kind} />
       <span className="destination-text">
-        <span className="destination-name">{name}</span>
+        <span className="destination-name-line">
+          <span className="destination-name">{name}</span>
+          {badge && <span className="destination-hq-badge">{badge}</span>}
+        </span>
         {detail.length > 0 && <span className="destination-detail">{detail.join(' · ')}</span>}
       </span>
       {along !== undefined ? (
@@ -484,26 +502,45 @@ function PlaceCard({
         </p>
       )}
       {directions === 'finding' && <p className="destination-away">{text.destinations.finding}</p>}
-      {typeof directions === 'object' && directions !== null && (
-        // The route in focus carries Go in its own row (owner 2026-10-21), moving to whichever is previewed.
-        <div className="directions">
-          {directions.routes.map((route, index) => (
-            <div key={index} className="direction" data-picked={index === directions.picked || undefined}>
-              <button type="button" className="direction-pick" onClick={() => pick(index)}>
-                <span className="direction-time">{formatTripTime((route.seconds * scale) / 60, text)}</span>
-                <span className="direction-detail">
-                  {text.destinations.plans[route.plan]} · {formatTripDistance(route.length * scale, text.decimal, mph)}
-                </span>
-              </button>
-              {index === directions.picked && (
-                <button type="button" className="direction-go" disabled={asking} onClick={start}>
-                  {text.destinations.go}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {typeof directions === 'object' && directions !== null && (() => {
+        const fastestSeconds = Math.min(...directions.routes.map((r) => r.seconds))
+        return (
+          // The route in focus carries Go in its own row, with relative time delta vs fastest option.
+          <div className="directions">
+            {directions.routes.map((route, index) => {
+              const deltaMinutes = Math.round(((route.seconds - fastestSeconds) * scale) / 60)
+              const isFastest = route.seconds <= fastestSeconds + 1
+              return (
+                <div key={index} className="direction" data-picked={index === directions.picked || undefined}>
+                  <button type="button" className="direction-pick" onClick={() => pick(index)}>
+                    <span className="direction-top">
+                      <span className="direction-time">{formatTripTime((route.seconds * scale) / 60, text)}</span>
+                      {directions.routes.length > 1 && (
+                        <span className={`direction-delta${isFastest ? ' best' : ''}`}>
+                          {isFastest
+                            ? text.destinations.recommended
+                            : deltaMinutes > 0
+                              ? text.destinations.slowerBy(formatTripTime(deltaMinutes, text))
+                              : text.destinations.recommended}
+                        </span>
+                      )}
+                    </span>
+                    <span className="direction-detail">
+                      <span className="direction-plan-tag">{text.destinations.plans[route.plan]}</span>
+                      <span>{formatTripDistance(route.length * scale, text.decimal, mph)}</span>
+                    </span>
+                  </button>
+                  {index === directions.picked && (
+                    <button type="button" className="direction-go" disabled={asking} onClick={start}>
+                      {text.destinations.go}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
       {!(typeof directions === 'object' && directions !== null) && (
         <div className="destination-actions">
           {actions.map((action, index) => (

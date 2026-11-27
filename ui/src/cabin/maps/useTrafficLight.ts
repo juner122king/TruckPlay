@@ -3,7 +3,8 @@ import { formatTripDistance } from '../../shared/format'
 import type { SemaphoreInfo, Telemetry } from '../../shared/host'
 import { useLive } from '../state/store'
 import { useText } from '../state/text'
-import { nearestTrafficLightAhead, type TrafficLightRoute, trafficLightStateClass } from './trafficLights'
+import { nearestLightFor } from './navigationSnapshot'
+import { type TrafficLightRoute, trafficLightStateClass } from './trafficLights'
 
 export interface TrafficLightSnapshot {
   stateClass: string
@@ -22,7 +23,7 @@ export function trafficLightSnapshotOf(
   decimal: string,
   mph: boolean,
 ): TrafficLightSnapshot | null {
-  const nearest = nearestTrafficLightAhead(semaphores, telemetry, route, routeNext)
+  const nearest = nearestLightFor(semaphores, telemetry, route, routeNext)
   if (!nearest) return null
 
   const s = nearest.semaphore
@@ -45,11 +46,13 @@ export function trafficLightSnapshotOf(
   }
 }
 
-export function useUpcomingTrafficLight(): TrafficLightSnapshot | null {
+export function useUpcomingTrafficLight(enabled = true): TrafficLightSnapshot | null {
   const { decimal } = useText()
   return useLive(
     useShallow((state) =>
-      trafficLightSnapshotOf(state.semaphores, state.telemetry, state.route, state.routeNext, decimal, state.mph),
+      enabled
+        ? trafficLightSnapshotOf(state.semaphores, state.telemetry, state.route, state.routeNext, decimal, state.mph)
+        : null,
     ),
   )
 }

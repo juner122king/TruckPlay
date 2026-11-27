@@ -1,7 +1,7 @@
 import { MapResourceCache } from '../../shared/idleResources'
 import { useEffect, useState } from 'react'
 import { useMapData } from './mapData'
-import { metresBetween } from './projection'
+import { fromLngLat, metresBetween } from './projection'
 
 /**
  * Where the player can be routed (Maps' search, Destinations): every place on the map, and cities, from the
@@ -96,6 +96,37 @@ export function distanceTo(place: Destination, from: [number, number] | null): n
   return from ? metresBetween(place.at, from) : Infinity
 }
 
+export interface IndexedPlace {
+  place: Destination
+  foldedNames: readonly string[]
+  ownWords: readonly string[]
+  cityWords: readonly string[]
+  world: [number, number]
+}
+
+const placeIndexCache = new WeakMap<readonly Destination[], readonly IndexedPlace[]>()
+
+/** Lazily pre-indexes normalized search tokens and projected world coordinates once per places array. */
+export function indexedPlaces(places: readonly Destination[]): readonly IndexedPlace[] {
+  let index = placeIndexCache.get(places)
+  if (!index) {
+    index = places.map((place) => {
+      const foldedNames: string[] = []
+      if (place.name) foldedNames.push(fold(place.name))
+      if (place.localized) foldedNames.push(fold(place.localized))
+      return {
+        place,
+        foldedNames,
+        ownWords: words(`${place.name ?? ''} ${place.localized ?? ''}`),
+        cityWords: place.city ? words(place.city) : [],
+        world: fromLngLat(place.at[0], place.at[1]),
+      }
+    })
+    placeIndexCache.set(places, index)
+  }
+  return index
+}
+
 /** At most this many results. */
 const RESULTS = 40
 
@@ -115,19 +146,64 @@ export function searchPlaces(
   const asked = words(query)
   if (asked.length === 0) return []
   const whole = fold(query.trim())
+  const kindWordMap: Partial<Record<DestinationKind, string[]>> = {}
+  const kindWordsOf = (kind: DestinationKind): string[] => {
+    let cached = kindWordMap[kind]
+    if (!cached) {
+      cached = words(kindNames[kind] ?? '')
+      kindWordMap[kind] = cached
+    }
+    return cached
+  }
+  const indexed = indexedPlaces(places)
   const found: { place: Destination; group: number; distance: number }[] = []
-  for (const place of places) {
-    const own = words(`${place.name ?? ''} ${place.localized ?? ''}`)
-    const all = [...own, ...words(place.city ?? ''), ...words(kindNames[place.kind])]
-    if (!asked.every((word) => all.some((there) => there.startsWith(word)))) continue
-    const names = [place.name, place.localized].filter((name): name is string => !!name).map(fold)
-    const group = names.some((name) => name.startsWith(whole))
-      ? place.kind === 'city'
-        ? 0
-        : 1
-      : asked.every((word) => own.some((there) => there.startsWith(word)))
-        ? 2
-        : 3
+  for (let i = 0; i < indexed.length; i++) {
+    const entry = indexed[i]
+    const { place, foldedNames, ownWords, cityWords } = entry
+    const kindWords = kindWordsOf(place.kind)
+    let matchedAll = true
+    let matchedOwn = true
+    for (let w = 0; w < asked.length; w++) {
+      const needle = asked[w]
+      let inOwn = false
+      for (let k = 0; k < ownWords.length; k++) {
+        if (ownWords[k].startsWith(needle)) {
+          inOwn = true
+          break
+        }
+      }
+      if (!inOwn) {
+        matchedOwn = false
+        let inOther = false
+        for (let k = 0; k < cityWords.length; k++) {
+          if (cityWords[k].startsWith(needle)) {
+            inOther = true
+            break
+          }
+        }
+        if (!inOther) {
+          for (let k = 0; k < kindWords.length; k++) {
+            if (kindWords[k].startsWith(needle)) {
+              inOther = true
+              break
+            }
+          }
+        }
+        if (!inOther) {
+          matchedAll = false
+          break
+        }
+      }
+    }
+    if (!matchedAll) continue
+    let startsWhole = false
+    for (let n = 0; n < foldedNames.length; n++) {
+      if (foldedNames[n].startsWith(whole)) {
+        startsWhole = true
+        break
+      }
+    }
+    const group = startsWhole ? (place.kind === 'city' ? 0 : 1) : matchedOwn ? 2 : 3
     found.push({ place, group, distance: distanceOf(place) })
   }
   found.sort((a, b) => a.group - b.group || a.distance - b.distance)

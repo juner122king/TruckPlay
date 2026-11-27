@@ -4,7 +4,8 @@ import type { Telemetry } from '../../shared/host'
 import { useLive } from '../state/store'
 import { useText } from '../state/text'
 import type { CorridorRoute } from './corridor'
-import { nearestSpeedCameraAhead, type SpeedCamera, useSpeedCameras } from './speedCameras'
+import { nearestCameraFor } from './navigationSnapshot'
+import { type SpeedCamera, useSpeedCameras } from './speedCameras'
 
 export interface SpeedCameraSnapshot {
   distanceText: string
@@ -22,7 +23,7 @@ export function speedCameraSnapshotOf(
   decimal: string,
   mph: boolean,
 ): SpeedCameraSnapshot | null {
-  const nearest = nearestSpeedCameraAhead(cameras, telemetry, route, routeNext)
+  const nearest = nearestCameraFor(cameras, telemetry, route, routeNext)
   if (!nearest || !telemetry) return null
 
   const distanceText = nearest.distance >= 15 ? formatTripDistance(nearest.distance, decimal, mph) : ''
@@ -38,12 +39,12 @@ export function speedCameraSnapshotOf(
   }
 }
 
-export function useUpcomingSpeedCamera(): SpeedCameraSnapshot | null {
+export function useUpcomingSpeedCamera(enabled = true): SpeedCameraSnapshot | null {
   const { decimal } = useText()
   const cameras = useSpeedCameras()
   return useLive(
     useShallow((state) =>
-      cameras && cameras.length > 0
+      enabled && cameras && cameras.length > 0
         ? speedCameraSnapshotOf(cameras, state.telemetry, state.route, state.routeNext, decimal, state.mph)
         : null,
     ),

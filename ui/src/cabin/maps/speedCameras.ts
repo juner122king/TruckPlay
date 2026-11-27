@@ -10,6 +10,7 @@ import {
   isPointInsideViewport,
   nearestAheadOnCorridor,
   removeUnusedMarkers,
+  type UpcomingCorridor,
 } from './corridor'
 import { useMapData } from './mapData'
 import { toLngLat } from './projection'
@@ -22,7 +23,7 @@ export interface SpeedCamera {
   reverse: boolean
 }
 
-const MAX_MARKERS = 8
+const MAX_MARKERS = 1
 
 const CAMERA_SVG =
   '<svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -82,6 +83,7 @@ export interface NearestSpeedCamera {
 
 const CAMERA_CELL_SIZE = 4000
 const cameraGridCache = new WeakMap<readonly SpeedCamera[], Map<string, SpeedCamera[]>>()
+const nearbyCellCache = new WeakMap<readonly SpeedCamera[], { key: string; items: readonly SpeedCamera[] }>()
 
 function cameraGridFor(cameras: readonly SpeedCamera[]): Map<string, SpeedCamera[]> {
   let grid = cameraGridCache.get(cameras)
@@ -105,9 +107,12 @@ function cameraGridFor(cameras: readonly SpeedCamera[]): Map<string, SpeedCamera
 function nearbyCameras(cameras: readonly SpeedCamera[], x: number, z: number): readonly SpeedCamera[] {
   // Small maps/test fixtures need no grid overhead.
   if (cameras.length <= 32) return cameras
-  const grid = cameraGridFor(cameras)
   const cx = Math.floor(x / CAMERA_CELL_SIZE)
   const cz = Math.floor(z / CAMERA_CELL_SIZE)
+  const cellKey = `${cx},${cz}`
+  const cached = nearbyCellCache.get(cameras)
+  if (cached && cached.key === cellKey) return cached.items
+  const grid = cameraGridFor(cameras)
   const out: SpeedCamera[] = []
   for (let dx = -1; dx <= 1; dx++) {
     for (let dz = -1; dz <= 1; dz++) {
@@ -117,6 +122,7 @@ function nearbyCameras(cameras: readonly SpeedCamera[], x: number, z: number): r
       }
     }
   }
+  nearbyCellCache.set(cameras, { key: cellKey, items: out })
   return out
 }
 
@@ -129,11 +135,12 @@ export function nearestSpeedCameraAhead(
   telemetry: Telemetry | null,
   route: CorridorRoute | null = null,
   routeNext = 0,
+  precomputedUpcoming?: UpcomingCorridor | null,
 ): NearestSpeedCamera | null {
   if (!telemetry || cameras.length === 0) return null
   const candidates = nearbyCameras(cameras, telemetry.x, telemetry.z)
   if (candidates.length === 0) return null
-  const found = nearestAheadOnCorridor(candidates, telemetry, route, routeNext)
+  const found = nearestAheadOnCorridor(candidates, telemetry, route, routeNext, () => true, precomputedUpcoming)
   return found ? { camera: found.item, distance: found.distance } : null
 }
 
@@ -191,6 +198,16 @@ export function createSpeedCameraPool(): SpeedCameraPool {
   return { markers, elements }
 }
 
+interface SpeedCameraRenderState {
+  connected: boolean
+  limit: number
+  overspeed: boolean
+  lng: number
+  lat: number
+}
+
+const cameraPoolRenderState = new WeakMap<SpeedCameraPool, SpeedCameraRenderState>()
+
 /**
  * Synchronizes speed camera markers on the map using the same display rules as traffic lights:
  * displays only the single nearest speed camera ahead in the driving corridor when `zoom >= 13.5` and not hidden.
@@ -200,30 +217,39 @@ export function syncSpeedCameras(
   pool: SpeedCameraPool,
   cameras: readonly SpeedCamera[],
   hidden = false,
+  precomputed?: NearestSpeedCamera | null,
 ) {
   const { telemetry, route, routeNext, mph } = useLive.getState()
   const zoom = map.getZoom()
 
-  if (hidden || zoom < CORRIDOR_MIN_ZOOM || cameras.length === 0 || !telemetry) {
+  const clearPool = () => {
+    const prev = cameraPoolRenderState.get(pool)
+    if (prev && !prev.connected && pool.markers.length <= 1) return
     removeUnusedMarkers(pool.markers, 0)
+    if (prev) prev.connected = false
+  }
+
+  if (hidden || zoom < CORRIDOR_MIN_ZOOM || cameras.length === 0 || !telemetry) {
+    clearPool()
     return
   }
 
-  const nearest = nearestSpeedCameraAhead(cameras, telemetry, route, routeNext)
+  const nearest =
+    precomputed !== undefined ? precomputed : nearestSpeedCameraAhead(cameras, telemetry, route, routeNext)
   if (!nearest) {
-    removeUnusedMarkers(pool.markers, 0)
+    clearPool()
     return
   }
 
   const c = nearest.camera
   if (!Number.isFinite(c.x) || !Number.isFinite(c.z)) {
-    removeUnusedMarkers(pool.markers, 0)
+    clearPool()
     return
   }
 
   const lngLat = toLngLat(c.x, c.z)
   if (!isPointInsideViewport(map, lngLat)) {
-    removeUnusedMarkers(pool.markers, 0)
+    clearPool()
     return
   }
 
@@ -234,25 +260,59 @@ export function syncSpeedCameras(
   const speed = roadSpeed(telemetry.speed, mph)
   const overspeed = limit > 0 && speed > limit
 
-  if (badge.classList) {
-    badge.classList.toggle('overspeed', overspeed)
-    badge.classList.toggle('no-limit', limit <= 0)
-  } else {
-    badge.className = `speed-camera-badge${overspeed ? ' overspeed' : ''}${limit <= 0 ? ' no-limit' : ''}`
+  let prev = cameraPoolRenderState.get(pool)
+  const connectedNow = marker.getElement().isConnected
+  if (
+    prev &&
+    connectedNow &&
+    prev.connected &&
+    prev.limit === limit &&
+    prev.overspeed === overspeed &&
+    Math.abs(prev.lng - lngLat[0]) < 1e-7 &&
+    Math.abs(prev.lat - lngLat[1]) < 1e-7
+  ) {
+    if (pool.markers.length > 1) removeUnusedMarkers(pool.markers, 1)
+    return
   }
 
-  if (limit > 0) {
-    limitBox.style.display = 'flex'
-    limitText.textContent = `${limit}`
-  } else {
-    limitBox.style.display = 'none'
-    limitText.textContent = ''
+  if (!prev || prev.overspeed !== overspeed || (prev.limit <= 0) !== (limit <= 0)) {
+    if (badge.classList) {
+      badge.classList.toggle('overspeed', overspeed)
+      badge.classList.toggle('no-limit', limit <= 0)
+    } else {
+      badge.className = `speed-camera-badge${overspeed ? ' overspeed' : ''}${limit <= 0 ? ' no-limit' : ''}`
+    }
   }
 
-  marker.setLngLat(lngLat)
-  if (!marker.getElement().isConnected) {
+  if (!prev || prev.limit !== limit) {
+    if (limit > 0) {
+      limitBox.style.display = 'flex'
+      limitText.textContent = `${limit}`
+    } else {
+      limitBox.style.display = 'none'
+      limitText.textContent = ''
+    }
+  }
+
+  if (!prev || !connectedNow || Math.abs(prev.lng - lngLat[0]) >= 1e-7 || Math.abs(prev.lat - lngLat[1]) >= 1e-7) {
+    marker.setLngLat(lngLat)
+  }
+  if (!connectedNow) {
     marker.addTo(map)
   }
 
-  removeUnusedMarkers(pool.markers, 1)
+  if (!prev) {
+    prev = { connected: true, limit, overspeed, lng: lngLat[0], lat: lngLat[1] }
+    cameraPoolRenderState.set(pool, prev)
+  } else {
+    prev.connected = true
+    prev.limit = limit
+    prev.overspeed = overspeed
+    prev.lng = lngLat[0]
+    prev.lat = lngLat[1]
+  }
+
+  if (pool.markers.length > 1) {
+    removeUnusedMarkers(pool.markers, 1)
+  }
 }

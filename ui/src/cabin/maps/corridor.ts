@@ -51,6 +51,35 @@ export interface NearestCorridorMatch<T> {
   distance: number
 }
 
+export interface UpcomingCorridor {
+  line: Point[]
+  along: number[]
+}
+
+export function hasActiveCorridorRoute(telemetry: Telemetry | null, route: CorridorRoute | null): route is CorridorRoute {
+  return (
+    telemetry !== null &&
+    route !== null &&
+    route.nodes.length >= 2 &&
+    Number.isFinite(telemetry.navigationDistance) &&
+    telemetry.navigationDistance > 0
+  )
+}
+
+export function computeUpcomingCorridor(
+  telemetry: Telemetry | null,
+  route: CorridorRoute | null,
+  routeNext = 0,
+): UpcomingCorridor | null {
+  if (!telemetry || !hasActiveCorridorRoute(telemetry, route)) return null
+  const { x: tx, z: tz, heading } = telemetry
+  if (!Number.isFinite(tx) || !Number.isFinite(tz) || !Number.isFinite(heading)) return null
+  const rad = heading * 2 * Math.PI
+  const fx = -Math.sin(rad)
+  const fz = -Math.cos(rad)
+  return upcomingRouteLine(route, routeNext, [tx, tz], [fx, fz], ROUTE_MAX_FORWARD)
+}
+
 const routeSpansCache = new WeakMap<CorridorRoute, Spans>()
 
 function spansOf(route: CorridorRoute): Spans {
@@ -132,6 +161,7 @@ export function nearestAheadOnCorridor<T extends CorridorPoint>(
   route: CorridorRoute | null = null,
   routeNext = 0,
   accept: (item: T) => boolean = () => true,
+  precomputedUpcoming?: UpcomingCorridor | null,
 ): NearestCorridorMatch<T> | null {
   if (!telemetry || items.length === 0) return null
   const { x: tx, z: tz, heading } = telemetry
@@ -142,14 +172,11 @@ export function nearestAheadOnCorridor<T extends CorridorPoint>(
   const fx = -Math.sin(rad)
   const fz = -Math.cos(rad)
 
-  const hasActiveRoute =
-    route !== null &&
-    route.nodes.length >= 2 &&
-    Number.isFinite(telemetry.navigationDistance) &&
-    telemetry.navigationDistance > 0
-
-  if (hasActiveRoute && route) {
-    const upcoming = upcomingRouteLine(route, routeNext, [tx, tz], [fx, fz], ROUTE_MAX_FORWARD)
+  if (hasActiveCorridorRoute(telemetry, route)) {
+    const upcoming =
+      precomputedUpcoming !== undefined
+        ? precomputedUpcoming
+        : upcomingRouteLine(route, routeNext, [tx, tz], [fx, fz], ROUTE_MAX_FORWARD)
     if (!upcoming) return null
     const { line, along } = upcoming
 

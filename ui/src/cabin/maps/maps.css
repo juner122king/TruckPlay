@@ -10,25 +10,32 @@
   outline: none;
 }
 
-/* The truck: Apple's blue puck with a white rim and a soft halo. It stands facing the driver (a disc laid
-   on the tilted map reads as a squashed oval) and its arrow turns with the truck. */
+/* CarPlay Ultra 3D Navigation Puck: crisp white bezel, luminous blue directional chevron, soft ambient halo. */
 .map-puck {
   display: grid;
   place-items: center;
-  width: 50px;
-  height: 50px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  color: #1875ef;
-  background: rgb(245 253 255 / 0.92);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  color: #007aff;
+  background: radial-gradient(circle at 50% 35%, #ffffff 0%, #eaf3ff 100%);
+  border: 3px solid rgb(255 255 255 / 0.96);
+  box-shadow:
+    0 0 0 8px rgb(10 132 255 / 0.2),
+    0 6px 18px rgb(0 0 0 / 0.3);
 }
 .map-puck svg {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   margin-top: -2px;
+  filter: drop-shadow(0 1px 2px rgb(0 100 220 / 0.28));
 }
 .appearance-dark .map-puck {
-  background: rgb(205 227 244 / 0.88);
+  color: #1682ff;
+  background: radial-gradient(circle at 50% 35%, #f5faff 0%, #d2e7ff 100%);
+  box-shadow:
+    0 0 0 9px rgb(22 130 255 / 0.26),
+    0 6px 20px rgb(0 0 0 / 0.45);
 }
 
 /* Place names: WestPlay's type with a halo of the ground colour, so they read over anything. */
@@ -77,19 +84,21 @@
 
 .map-controls .glass {
   color: #fff;
-  background: rgb(20 23 28 / 0.72);
-  backdrop-filter: blur(28px) saturate(180%);
+  background: linear-gradient(165deg, rgb(24 28 36 / 0.8) 0%, rgb(15 18 24 / 0.88) 100%);
+  border: 1px solid rgb(255 255 255 / 0.15);
+  backdrop-filter: blur(18px) saturate(165%);
   box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.22),
-    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.24),
+    inset 0 -1px 0 rgb(255 255 255 / 0.05),
     var(--shadow-raised-large);
 }
 
 .appearance-light .map-controls .glass {
   color: #14161a;
-  background: rgb(255 255 255 / 0.84);
+  background: linear-gradient(165deg, rgb(255 255 255 / 0.88) 0%, rgb(244 246 250 / 0.94) 100%);
+  border-color: rgb(20 24 32 / 0.09);
   box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.88),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
     var(--shadow-raised-large);
 }
 
@@ -235,17 +244,44 @@
   height: 22px;
 }
 
-/* Turn-by-turn (GuidanceCard.tsx): route guidance is blue, whatever the appearance. In
-   motion with Apple's curves (shell.css, shell/transitions.css): the card springs in, a step done slides up
-   and away as the next rises in, the "then" row opens and closes, and the card fades away when the route
-   ends (the durations: STEP_CHANGE_MS and CLOSE_MS). */
+/* Turn-by-turn (GuidanceCard.tsx): CarPlay Ultra deep emerald-teal Liquid Glass card. */
 .guidance {
-  --glass: linear-gradient(160deg, rgb(15 110 116 / 0.88) 0%, rgb(10 78 84 / 0.94) 100%);
-  --glass-rim: rgb(200 248 242 / 0.36);
+  --glass: linear-gradient(155deg, rgb(14 118 122 / 0.9) 0%, rgb(8 76 84 / 0.95) 100%);
+  --glass-rim: rgb(206 252 246 / 0.36);
   background: var(--glass);
-  backdrop-filter: blur(32px) saturate(180%);
+  border: 1px solid rgb(180 245 238 / 0.22);
+  backdrop-filter: blur(18px) saturate(165%);
   color: #fff;
   animation: guidance-open var(--motion-spring-duration) var(--motion-ease) both;
+}
+
+.guidance-glyph-well {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.26),
+    0 4px 12px rgb(0 0 0 / 0.16);
+  transition:
+    background-color 220ms var(--motion-ease),
+    box-shadow 220ms var(--motion-ease);
+}
+
+.guidance-glyph-well[data-now='true'] {
+  background: rgb(110 231 183 / 0.26);
+  box-shadow:
+    inset 0 0 0 1.5px rgb(167 243 208 / 0.65),
+    0 4px 16px rgb(52 211 153 / 0.28);
+}
+
+.guidance-widget .guidance-glyph-well {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
 }
 
 .guidance.closing {
@@ -395,40 +431,44 @@
     0 12px 32px rgb(0 0 0 / 0.32);
 }
 
-/* Search drawer (MapSearch.tsx): dense glass matching map controls, opened from the bottom-right dock. */
+/* Search drawer (MapSearch.tsx): Liquid Glass floating panel beside the sidebar. */
 .map-tile .map-search {
   position: absolute;
-  color: #fff;
-  background: rgb(20 23 28 / 0.72);
-  backdrop-filter: blur(28px) saturate(180%);
-}
-
-.appearance-light .map-tile .map-search {
-  color: #14161a;
-  background: rgb(255 255 255 / 0.84);
-}
-
-.map-tile .map-search {
   left: 16px;
   top: 16px;
   width: 500px;
-  /* Down to the map's bottom whatever it holds, as CarPlay's search card is (owner 2026-11-03: a small card with
-     the room below it empty made no sense once the keyboard waited for the field), or to just above the keyboard
-     while it's up (below). Its height follows the keyboard as it rises and goes, on its curve. */
   height: calc(100% - 32px);
   padding: 16px;
   border-radius: 30px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: rgb(28 30 34 / 0.84);
-  transition: height var(--motion-duration) var(--motion-ease);
+  color: #fff;
+  background: linear-gradient(165deg, rgb(26 30 38 / 0.88) 0%, rgb(16 19 26 / 0.94) 100%);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(20px) saturate(165%);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.24),
+    0 22px 48px rgb(0 0 0 / 0.42);
+  transition:
+    height var(--motion-duration) var(--motion-ease),
+    width 280ms var(--motion-ease);
 }
+
+.appearance-light .map-tile .map-search {
+  color: #14161a;
+  background: linear-gradient(165deg, rgb(252 253 255 / 0.92) 0%, rgb(242 245 250 / 0.96) 100%);
+  border-color: rgb(20 24 32 / 0.1);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.96),
+    0 20px 44px rgb(0 0 0 / 0.16);
+}
+
 .map-navigation .map-search {
   left: var(--content-left);
   top: var(--edge);
   height: calc(100% - var(--edge) * 2);
-  width: min(460px, calc(100% - var(--content-left) - var(--edge) * 2));
+  width: min(464px, calc(100% - var(--content-left) - var(--edge) * 2));
 }
 
 /* Offering routes (Directions), narrower: the map shows them all beside it (liveMap.ts frames them there). */
@@ -436,11 +476,7 @@
   width: 400px;
 }
 .map-navigation .map-search:has(.directions) {
-  width: min(380px, calc(100% - var(--content-left) - var(--edge) * 2));
-}
-
-.appearance-light .map-tile .map-search {
-  background: rgb(250 250 252 / 0.9);
+  width: min(388px, calc(100% - var(--content-left) - var(--edge) * 2));
 }
 
 .map-search-top {
@@ -541,23 +577,41 @@
   fill-rule: evenodd;
 }
 
-.destinations-list {
+.destinations-list,
+.destinations-card {
   display: flex;
   flex-direction: column;
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  overflow: hidden;
+}
+
+.appearance-light .destinations-list,
+.appearance-light .destinations-card {
+  background: rgb(255 255 255 / 0.72);
+  border-color: rgb(20 24 32 / 0.07);
 }
 
 .map-tile .destination-row {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 8px 4px;
+  padding: 10px 12px;
   text-align: left;
-  border-radius: 16px;
+  border-radius: 0;
 }
 
 .map-tile .destination-row + .destination-row {
-  border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 0;
+  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.map-tile .destination-row:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.appearance-light .map-tile .destination-row:hover {
+  background: rgb(20 24 32 / 0.04);
 }
 
 .map-tile .destination-row:active {
@@ -571,6 +625,30 @@
   flex-direction: column;
 }
 
+.destination-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.destination-hq-badge {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--apple-indigo) 26%, transparent);
+  border: 1px solid color-mix(in oklab, var(--apple-indigo) 46%, transparent);
+  color: #c7ceff;
+  font-size: 12px;
+  font-weight: 780;
+  letter-spacing: 0.04em;
+}
+
+.appearance-light .destination-hq-badge {
+  background: color-mix(in oklab, var(--apple-indigo) 14%, transparent);
+  color: #4539c4;
+}
+
 .destination-name,
 .destination-detail {
   white-space: nowrap;
@@ -579,39 +657,57 @@
 }
 
 .destination-name {
-  font-size: calc(23px * var(--text-scale, 1));
-  font-weight: 600;
+  font-size: calc(21px * var(--text-scale, 1));
+  font-weight: 640;
 }
 
 .destination-detail {
-  font-size: calc(18px * var(--text-scale, 1));
+  font-size: calc(16.5px * var(--text-scale, 1));
   color: var(--text-dim);
 }
 
 .destination-distance {
   flex: none;
-  font-size: calc(19px * var(--text-scale, 1));
+  font-size: calc(17.5px * var(--text-scale, 1));
+  font-weight: 600;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 
 .destinations-nearby {
   display: grid;
-  /* Four equal columns, whatever their words: a long one (Hungarian's Pihenőhelyek, Finnish's Levähdyspaikat)
-     stays in its own, its label a little smaller to keep the word whole, never pushing the others. */
+  /* Four equal columns, whatever their words. */
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px 6px;
+  gap: 8px;
 }
 
 .map-tile .destinations-nearby button {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-size: calc(17px * var(--text-scale, 1));
-  font-weight: 600;
+  padding: 10px 4px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.065);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  font-size: calc(15.5px * var(--text-scale, 1));
+  font-weight: 620;
   text-align: center;
   container-type: inline-size;
+}
+
+.appearance-light .map-tile .destinations-nearby button {
+  background: rgb(255 255 255 / 0.72);
+  border-color: rgb(20 24 32 / 0.07);
+}
+
+.map-tile .destinations-nearby button:hover {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.appearance-light .map-tile .destinations-nearby button:hover {
+  background: rgb(255 255 255 / 0.94);
 }
 
 /* The label: as large as its longest word fits across the column (a bold letter about 0.66 of the size), never
@@ -710,11 +806,11 @@
   gap: 10px;
 }
 
-/* Directions: the routes offered before Go, the one picked marked as Apple Maps does. */
+/* Directions: multi-route comparison cards with relative time delta and inline Go CTA. */
 .directions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .map-tile .direction {
@@ -722,25 +818,86 @@
   align-items: center;
   gap: 10px;
   padding-right: 10px;
-  border-radius: 16px;
-  border: 2px solid transparent;
-  background: var(--field);
+  border-radius: 20px;
+  border: 1.5px solid rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.065);
+  transition:
+    border-color 180ms var(--motion-ease),
+    background-color 180ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease);
+}
+
+.appearance-light .map-tile .direction {
+  background: rgb(255 255 255 / 0.78);
+  border-color: rgb(20 24 32 / 0.08);
 }
 
 .map-tile .direction[data-picked] {
-  border-color: #2f7cf6;
+  border-color: var(--apple-blue);
+  background: color-mix(in oklab, var(--apple-blue) 14%, rgb(255 255 255 / 0.06));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 6px 18px color-mix(in oklab, var(--apple-blue) 22%, transparent);
 }
 
-/* The row itself picks the route (its time and what it's planned for). */
+.appearance-light .map-tile .direction[data-picked] {
+  background: color-mix(in oklab, var(--apple-blue) 9%, #ffffff);
+  box-shadow: 0 6px 18px color-mix(in oklab, var(--apple-blue) 15%, transparent);
+}
+
+/* The row itself picks the route (its time, delta badge, plan tag, and distance). */
 .map-tile .direction-pick {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 10px 14px;
+  gap: 5px;
+  padding: 12px 14px;
   text-align: left;
+}
+
+.direction-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.direction-delta {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(255 159 10 / 0.18);
+  color: #ffc15e;
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.appearance-light .direction-delta {
+  background: rgb(255 149 0 / 0.14);
+  color: #b25d00;
+}
+
+.direction-delta.best {
+  background: rgb(48 209 88 / 0.22);
+  color: #67eb98;
+}
+
+.appearance-light .direction-delta.best {
+  background: rgb(48 209 88 / 0.16);
+  color: #0e873d;
+}
+
+.direction-plan-tag {
+  padding: 1.5px 7px;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 0.1);
+  font-weight: 640;
+}
+
+.appearance-light .direction-plan-tag {
+  background: rgb(20 24 32 / 0.07);
 }
 
 /* Go, in the row in focus: CarPlay's green, as the card's other main action. */
@@ -748,15 +905,16 @@
   flex: none;
   height: 52px;
   padding: 0 24px;
-  border-radius: 14px;
-  background: #30d158;
+  border-radius: 15px;
+  background: linear-gradient(160deg, #34db5e 0%, #24bd4a 100%);
   color: #fff;
-  font-size: calc(22px * var(--text-scale, 1));
-  font-weight: 650;
+  font-size: calc(21px * var(--text-scale, 1));
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgb(48 209 88 / 0.36);
 }
 
 .appearance-light .map-tile .direction-go {
-  background: #28b84c;
+  background: linear-gradient(160deg, #2ec954 0%, #20ad42 100%);
 }
 
 .map-tile .direction-go:disabled {
@@ -764,13 +922,18 @@
 }
 
 .direction-time {
-  font-size: calc(24px * var(--text-scale, 1));
-  font-weight: 650;
+  font-size: calc(23px * var(--text-scale, 1));
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
 }
 
 .direction-detail {
-  font-size: calc(18px * var(--text-scale, 1));
-  opacity: 0.7;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(16px * var(--text-scale, 1));
+  opacity: 0.82;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Go: CarPlay's green, and the quieter second choice beside it. */
@@ -1121,20 +1284,25 @@
   opacity: 0.92;
 }
 
-.traffic-light-badge.urgent .traffic-light-pin {
-  animation: traffic-pin-urgent 900ms ease-in-out infinite;
+/* GPU-composited urgent glow pulses (opacity only — avoids per-frame box-shadow/border repaint). */
+.traffic-light-badge.urgent .traffic-light-pin::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 13px;
+  border: 1.5px solid var(--signal-accent, #ffffff);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--signal-accent, #ffffff) 58%, transparent);
+  pointer-events: none;
+  animation: gpu-urgent-pulse 900ms ease-in-out infinite;
 }
 
-@keyframes traffic-pin-urgent {
+@keyframes gpu-urgent-pulse {
   0%,
   100% {
-    border-color: color-mix(in srgb, var(--signal-accent, #ffffff) 62%, rgb(255 255 255 / 0.22));
+    opacity: 0.15;
   }
   50% {
-    border-color: var(--signal-accent, #ffffff);
-    box-shadow:
-      0 0 12px color-mix(in srgb, var(--signal-accent, #ffffff) 55%, transparent),
-      0 4px 12px rgb(0 0 0 / 0.45);
+    opacity: 1;
   }
 }
 
@@ -1268,19 +1436,15 @@
   transition: width 260ms linear;
 }
 
-.traffic-pill.urgent {
-  animation: traffic-pill-urgent 900ms ease-in-out infinite;
-}
-
-@keyframes traffic-pill-urgent {
-  0%,
-  100% {
-    border-color: rgb(255 255 255 / 0.18);
-  }
-  50% {
-    border-color: color-mix(in srgb, var(--pill-accent, #ffffff) 78%, #ffffff);
-    background: color-mix(in srgb, var(--pill-accent, #000000) 20%, rgb(8 18 22 / 0.78));
-  }
+.traffic-pill.urgent::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid color-mix(in srgb, var(--pill-accent, #ffffff) 82%, #ffffff);
+  background: color-mix(in srgb, var(--pill-accent, #000000) 20%, transparent);
+  pointer-events: none;
+  animation: gpu-urgent-pulse 900ms ease-in-out infinite;
 }
 
 /* Free-driving standalone traffic light & speed camera HUDs in top-left corner when no route guidance is active. */
@@ -1403,21 +1567,15 @@
   letter-spacing: -0.03em;
 }
 
-.speed-camera-badge.overspeed .speed-camera-pin {
-  animation: camera-pin-urgent 900ms ease-in-out infinite;
-}
-
-@keyframes camera-pin-urgent {
-  0%,
-  100% {
-    border-color: color-mix(in srgb, var(--camera-accent) 68%, rgb(255 255 255 / 0.22));
-  }
-  50% {
-    border-color: var(--camera-accent);
-    box-shadow:
-      0 0 12px color-mix(in srgb, var(--camera-accent) 60%, transparent),
-      0 4px 12px rgb(0 0 0 / 0.45);
-  }
+.speed-camera-badge.overspeed .speed-camera-pin::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 13px;
+  border: 1.5px solid var(--camera-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--camera-accent) 60%, transparent);
+  pointer-events: none;
+  animation: gpu-urgent-pulse 900ms ease-in-out infinite;
 }
 
 /* Quantized HUD speed camera pill (SpeedCameraPill.tsx): shared by guidance footer and free-drive capsule. */
@@ -1449,8 +1607,15 @@
   --pill-text: #ff6961;
 }
 
-.speed-camera-pill.urgent {
-  animation: traffic-pill-urgent 900ms ease-in-out infinite;
+.speed-camera-pill.urgent::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1.5px solid color-mix(in srgb, var(--pill-accent) 82%, #ffffff);
+  background: color-mix(in srgb, var(--pill-accent) 20%, transparent);
+  pointer-events: none;
+  animation: gpu-urgent-pulse 900ms ease-in-out infinite;
 }
 
 .speed-camera-pill-icon {
@@ -1934,9 +2099,14 @@
   .map-navigation .guidance-banner .guidance-instruction {
     font-size: clamp(14px, calc(16px * var(--text-scale, 1)), 21px);
   }
+  .map-navigation .guidance-banner .guidance-glyph-well {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
   .map-navigation .guidance-banner .maneuver-glyph {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
   }
   .map-navigation .lane-guidance {
     padding: 4px 6px;
@@ -1959,11 +2129,11 @@
   .guidance-step,
   .guidance-footer-slot,
   .guidance-then-slot,
-  .traffic-light-badge.urgent .traffic-light-pin,
-  .traffic-pill.urgent,
+  .traffic-light-badge.urgent .traffic-light-pin::before,
+  .traffic-pill.urgent::before,
   .traffic-pill-fill,
-  .speed-camera-badge.overspeed .speed-camera-pin,
-  .speed-camera-pill.urgent,
+  .speed-camera-badge.overspeed .speed-camera-pin::before,
+  .speed-camera-pill.urgent::before,
   .free-drive-signal,
   .map-recentre-btn,
   .map-recentre-core {

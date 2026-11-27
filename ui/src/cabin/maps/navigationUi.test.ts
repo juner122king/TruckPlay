@@ -2,10 +2,12 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { LaneHint, SemaphoreInfo, Telemetry } from '../../shared/host'
+import { strings as zhStrings } from '../state/strings/zh_cn'
 import { matchesTurnDirection } from './laneGuidance'
 import { LaneRibbon } from './LaneRibbon'
 import { MapControlsView } from './MapControls'
 import { TrafficLightPillView } from './TrafficLightPill'
+import { TripBarView } from './TripBar'
 import { trafficLightSnapshotOf } from './useTrafficLight'
 
 const baseTelemetry: Telemetry = {
@@ -255,5 +257,96 @@ describe('MapControlsView corner dock layout', () => {
     )
     expect(html).toContain('map-dock-search')
     expect(html).not.toContain('map-overview')
+  })
+})
+
+describe('TripBarView Liquid Glass interactive trip & pit-stop controls', () => {
+  const sampleTrip = {
+    arrival: '16:45',
+    time: '42 分钟',
+    stopTime: null,
+    totalTime: '42 分钟',
+    distance: '68 km',
+    progressPercent: 62,
+    stopCount: 1,
+    onJob: false,
+  }
+
+  it('renders compact Dashboard ETA pill without interactive drawer', () => {
+    const html = renderToStaticMarkup(
+      createElement(TripBarView, {
+        trip: sampleTrip,
+        interactive: false,
+        concealed: false,
+        hasMapData: true,
+        expanded: false,
+        busyStop: null,
+        endingRoute: false,
+        text: zhStrings,
+      }),
+    )
+    expect(html).toContain('eta-pill glass')
+    expect(html).toContain('16:45')
+    expect(html).toContain('68 km')
+    expect(html).not.toContain('trip-drawer')
+  })
+
+  it('renders expanded Maps trip drawer with along-route pit-stop buttons and end-route control', () => {
+    const html = renderToStaticMarkup(
+      createElement(TripBarView, {
+        trip: sampleTrip,
+        interactive: true,
+        concealed: false,
+        hasMapData: true,
+        expanded: true,
+        busyStop: null,
+        endingRoute: false,
+        text: zhStrings,
+      }),
+    )
+    expect(html).toContain('trip-drawer glass')
+    expect(html).toContain('pitstop-fuel')
+    expect(html).toContain('pitstop-rest')
+    expect(html).toContain('pitstop-service')
+    expect(html).toContain('结束路线')
+    expect(html).toContain('全路线总览')
+    expect(html).toContain('1 个途经点')
+  })
+
+  it('replaces end-route action with job-locked indicator while delivering a freight job', () => {
+    const html = renderToStaticMarkup(
+      createElement(TripBarView, {
+        trip: { ...sampleTrip, onJob: true },
+        interactive: true,
+        concealed: false,
+        hasMapData: true,
+        expanded: true,
+        busyStop: null,
+        endingRoute: false,
+        text: zhStrings,
+      }),
+    )
+    expect(html).toContain('trip-job-lock')
+    expect(html).not.toContain('结束路线')
+  })
+
+  it('renders free-drive quick search & pit-stop toolbar when no route is active', () => {
+    const html = renderToStaticMarkup(
+      createElement(TripBarView, {
+        trip: null,
+        interactive: true,
+        concealed: false,
+        hasMapData: true,
+        expanded: false,
+        busyStop: null,
+        endingRoute: false,
+        text: zhStrings,
+      }),
+    )
+    expect(html).toContain('free-drive-bar glass')
+    expect(html).toContain('free-drive-search-btn')
+    expect(html).toContain('pitstop-fuel')
+    expect(html).toContain('pitstop-rest')
+    expect(html).toContain('pitstop-service')
   })
 })

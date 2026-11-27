@@ -13,7 +13,9 @@ import {
   AUTO_RECENTRE_MS,
   BASE_FOLLOW_PITCH,
   bearingOf,
+  blendPadding,
   blendPose,
+  type CameraPadding,
   type CameraPose,
   clampZoomOffset,
   damp,
@@ -24,9 +26,11 @@ import {
   GLIDE_MS,
   navigationCameraFor,
   navZoomOffsetFor,
+  samePadding,
   samePose,
   type TruckSample,
   truckAt,
+  visualCenterPadding,
   zoomForSpeed,
   zoomOffsetFor,
 } from './camera'
@@ -45,6 +49,7 @@ import {
   type SpeedCameraPool,
 } from './speedCameras'
 import { createTrafficLightPool, syncTrafficLights, type TrafficLightPool } from './trafficLights'
+import { corridorMatchesFor } from './navigationSnapshot'
 import { cameraBounds, type MapData } from './mapData'
 import { loadView, type SavedView, saveView } from './mapView'
 import { createOverviewSession, routeBounds } from './routeOverview'
@@ -109,6 +114,8 @@ const BEARING_TAU_MS = 450
 const ZOOM_TAU_MS = 1500
 const NAV_ZOOM_TAU_MS = 1100
 const NAV_PITCH_TAU_MS = 1000
+/** How smoothly the camera shifts horizontally/vertically as HUD overlays appear or resize, ms. */
+const PADDING_TAU_MS = 280
 const SAMPLES_KEPT = 8
 /** Place names' type size (a second line smaller: labelLines; both times the player's text size,
  * `nameScale`), and halo (maps.css), and the space kept between two names, pixels. */
@@ -130,7 +137,9 @@ const WHEEL_ZOOM = 0.5
 const MIN_ZOOM = 9
 const MAX_ZOOM = 19.5
 /** How far the truck moves along the route before the route's head is drawn again from it, metres. */
-const ROUTE_HEAD_STEP = 0.5
+const ROUTE_HEAD_STEP = 1.0
+/** Spatial grid cell size (world metres) used to index city labels for O(1) viewport queries. */
+const LABEL_CELL_METRES = 20_000
 
 type Mode = 'follow' | 'browse' | 'return'
 
@@ -165,17 +174,30 @@ interface LiveMap {
   progress: Progress | null
   /** The canopies the truck is under, left out of the raised buildings (their ids, joined), and when they
    * were last looked for. */
-  canopies: { hidden: string; at: number }
-  /** Place names, most important first, with their size on screen; DOM markers are created lazily when visible. */
+  canopies: { hidden: string; at: number; lastX: number; lastZ: number }
+  /** Place names, most important first; text sizes and DOM markers are created lazily when in view. */
   labels: {
     kind: string
     first: string
     second: string | null
     marker: maplibregl.Marker | null
     at: [number, number]
-    width: number
-    height: number
+    world: [number, number]
+    width: number | null
+    height: number | null
   }[]
+  /** Spatial cell index for city labels (keyed by `cx,cz` in `LABEL_CELL_METRES` cells). */
+  labelGrid: Map<string, number[]>
+  /** Indices of city labels currently mounted on the map. */
+  activeLabels: Set<number>
+  /** Lazily measures a label's CSS pixel box once it enters the candidate range. */
+  measureLabel: (label: { first: string; second: string | null }) => { width: number; height: number }
+  /** Cached container CSS pixel dimensions maintained via ResizeObserver to avoid per-frame layout reads. */
+  containerSize: { width: number; height: number }
+  resizeObserver: ResizeObserver | null
+  /** Last applied puck and destination marker transforms to avoid redundant DOM mutations when stationary. */
+  puckLast: { lng: number; lat: number; bearing: number; liftX: number; liftY: number } | null
+  destLiftLast: { x: number; y: number } | null
   /** Bounded tracker for dynamically generated `place-*` icons so MapLibre's sprite atlas stays bounded. */
   placeIcons: PlaceIconCache
   /** Traffic light markers with real-time countdown timers. */
@@ -197,8 +219,8 @@ interface LiveMap {
   ahead: Point[] | null
   aheadTold: number
   aheadShown: readonly OtherPlayer[] | null
-  /** The following camera's damped bearing, zoom and tilt. */
-  camera: { bearing: number; zoom: number; pitch: number } | null
+  /** The following camera's damped bearing, zoom, tilt and visual-center padding. */
+  camera: { bearing: number; zoom: number; pitch: number; padding: CameraPadding } | null
   mode: Mode
   /** Whether the screen showing it lets the player move it (the Maps app). */
   interactive: boolean
@@ -217,8 +239,8 @@ interface LiveMap {
   zoomOffset: number
   /** The zoom when browsing began: a different zoom when it ends is one the player chose, and kept. */
   browsedFrom: number
-  /** The glide back onto the truck: where it set off from, and when. */
-  glide: { from: CameraPose; fromTop: number; started: number } | null
+  /** The glide back onto the truck: where it set off from, its padding, and when. */
+  glide: { from: CameraPose; fromPadding: CameraPadding; started: number } | null
   /** Following north up, from above (the compass tapped), rather than behind the truck; the arrow brings the
    * chase view back. */
   northUp: boolean
@@ -259,6 +281,16 @@ export function followBearing(listener: (bearing: number) => void): () => void {
 }
 
 let live: LiveMap | null = null
+/** Cached horizontal visual occlusion widths pushed by `MapView` (0 DOM layout reads in the 70 FPS loop). */
+let visualInsets: { left: number; right: number } = { left: 0, right: 0 }
+
+/** Updates the unobstructed viewport's left/right occlusion widths (in container CSS pixels) for visual centering. */
+export function setLiveMapVisualInsets(left: number, right: number): void {
+  visualInsets = {
+    left: Number.isFinite(left) ? Math.max(0, left) : 0,
+    right: Number.isFinite(right) ? Math.max(0, right) : 0,
+  }
+}
 const currentOverview = createOverviewSession(
   (routeOverview) => {
     useMapBrowsing.setState({ routeOverview })
@@ -332,10 +364,9 @@ function create(data: MapData, appearance: Appearance): LiveMap {
   })
   map.on('render', () => recordRenderedFrame())
 
-  // Added to the map when in range and clear of more important names (showLabels). Each says what
-  // labelLines gives: the name in the player's language, under the place's own where that's in another
-  // script. DOM elements and MapLibre markers are created lazily on first visibility to avoid pre-creating
-  // thousands of DOM nodes on large map mods.
+  // Added to the map when in range and clear of more important names (showLabels). Both text measurements
+  // and MapLibre DOM markers are created lazily on first visibility to avoid pre-creating thousands of DOM
+  // nodes or measuring thousands of city names synchronously on large map mods.
   const measure = document.createElement('canvas').getContext('2d')
   const fontFamily = getComputedStyle(document.body).fontFamily
   const font = (size: number) => `600 ${size}px ${fontFamily}`
@@ -344,38 +375,43 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     measure.font = font(size)
     return measure.measureText(text).width
   }
-  const lines = [...data.labels]
-    .sort((a, b) => b.population - a.population)
-    .map((label) => ({ label, ...labelLines(label.name, label.localized) }))
-  const measured = ({ first, second }: { first: string; second: string | null }) => {
-    const [size, secondSize] = [LABEL_SIZE * nameScale(), LABEL_SECOND_SIZE * nameScale()]
+  const measureLabel = ({ first, second }: { first: string; second: string | null }) => {
+    const scale = nameScale()
+    const [size, secondSize] = [LABEL_SIZE * scale, LABEL_SECOND_SIZE * scale]
     return {
       width: Math.max(textWidth(first, size), second ? textWidth(second, secondSize) : 0) + LABEL_HALO * 2,
       height: (size + (second ? secondSize : 0)) * 1.2 + LABEL_HALO * 2,
     }
   }
-  const labels = lines.map(({ label, first, second }) => ({
-    kind: label.kind,
-    first,
-    second,
-    marker: null as maplibregl.Marker | null,
-    at: label.at,
-    ...measured({ first, second }),
-  }))
-  // Measured again once the type for every name is in: the fonts for other scripts load only when a page
-  // first needs them, and until then the sizes are a fallback font's.
-  const allText = lines.map(({ first, second }) => `${first} ${second ?? ''}`).join(' ')
-  Promise.all([document.fonts.load(font(LABEL_SIZE), allText), document.fonts.load(font(LABEL_SECOND_SIZE), allText)])
-    .then(() => {
-      lines.forEach((line, index) => Object.assign(labels[index], measured(line)))
-      created.labelsPlacedFor = null
-    })
-    .catch(() => {})
+  const lines = [...data.labels]
+    .sort((a, b) => b.population - a.population)
+    .map((label) => ({ label, ...labelLines(label.name, label.localized) }))
+  const labelGrid = new Map<string, number[]>()
+  const labels = lines.map(({ label, first, second }, index) => {
+    const world = fromLngLat(label.at[0], label.at[1])
+    const cellKey = `${Math.floor(world[0] / LABEL_CELL_METRES)},${Math.floor(world[1] / LABEL_CELL_METRES)}`
+    let bucket = labelGrid.get(cellKey)
+    if (!bucket) {
+      bucket = []
+      labelGrid.set(cellKey, bucket)
+    }
+    bucket.push(index)
+    return {
+      kind: label.kind,
+      first,
+      second,
+      marker: null as maplibregl.Marker | null,
+      at: label.at,
+      world,
+      width: null as number | null,
+      height: null as number | null,
+    }
+  })
 
   const puckElement = document.createElement('div')
   puckElement.className = 'map-puck'
   puckElement.innerHTML =
-    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5 18 19l-6-3.2L6 19Z" fill="currentColor"/></svg>'
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.8 18.6 19.4l-6.6-3.4-6.6 3.4Z" fill="currentColor"/></svg>'
   const puck = new maplibregl.Marker({ element: puckElement, pitchAlignment: 'viewport', rotationAlignment: 'map' })
   const destinationElement = document.createElement('div')
   destinationElement.className = 'map-destination'
@@ -395,6 +431,18 @@ function create(data: MapData, appearance: Appearance): LiveMap {
   meshes?.setLite(initialLite)
   ensureSpeedCameras(data.speedCameras)
   const placeIcons = new PlaceIconCache()
+  const containerSize = { width: element.clientWidth, height: element.clientHeight }
+  let resizeObserver: ResizeObserver | null = null
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver((entries) => {
+      const box = entries[0]?.contentRect
+      if (box) {
+        containerSize.width = box.width
+        containerSize.height = box.height
+      }
+    })
+    resizeObserver.observe(element)
+  }
   const created: LiveMap = {
     data,
     map,
@@ -407,8 +455,15 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     stops: { key: '', markers: [] },
     routeShown: null,
     progress: null,
-    canopies: { hidden: '', at: -Infinity },
+    canopies: { hidden: '', at: -Infinity, lastX: Number.NaN, lastZ: Number.NaN },
     labels,
+    labelGrid,
+    activeLabels: new Set(),
+    measureLabel,
+    containerSize,
+    resizeObserver,
+    puckLast: null,
+    destLiftLast: null,
     placeIcons,
     trafficLights: createTrafficLightPool(),
     speedCameras: createSpeedCameraPool(),
@@ -456,7 +511,13 @@ function create(data: MapData, appearance: Appearance): LiveMap {
   })
   document.fonts.ready
     .then(() => {
-      if (live === created) clearPlaceIcons(created)
+      if (live !== created) return
+      for (const label of created.labels) {
+        label.width = null
+        label.height = null
+      }
+      created.labelsPlacedFor = null
+      clearPlaceIcons(created)
     })
     .catch(() => {})
   // React to map settings, performance mode, and text size changes.
@@ -475,7 +536,10 @@ function create(data: MapData, appearance: Appearance): LiveMap {
     if (state.textSize === before.textSize) return
     clearTimeout(resized)
     resized = setTimeout(() => {
-      lines.forEach((line, index) => Object.assign(labels[index], measured(line)))
+      for (const label of created.labels) {
+        label.width = null
+        label.height = null
+      }
       created.labelsPlacedFor = null
       clearPlaceIcons(created)
     }, TEXT_SIZE_SETTLE_MS)
@@ -823,8 +887,11 @@ function disposeLiveMap() {
   stopSamples = undefined
   samples.length = 0
   if (!live) return
+  live.resizeObserver?.disconnect()
+  live.resizeObserver = null
   live.stops.markers.forEach((marker) => marker.remove())
   live.labels.forEach((label) => label.marker?.remove())
+  live.activeLabels.clear()
   live.meshes?.dispose()
   live.raised?.dispose()
   live.element.remove()
@@ -887,6 +954,8 @@ function place() {
   if (current.element.parentElement !== host.element) {
     host.element.appendChild(current.element)
     current.map.resize()
+    current.containerSize.width = current.element.clientWidth
+    current.containerSize.height = current.element.clientHeight
     // Straight onto the truck, without easing in from wherever the camera was.
     current.camera = null
   }
@@ -910,13 +979,11 @@ function place() {
       syncRouteTraffic(current, now)
       syncRoute(current, now)
       syncCanopies(current, now)
-      syncTrafficLights(current.map, current.trafficLights, currentOverview.active())
-      syncSpeedCameras(
-        current.map,
-        current.speedCameras,
-        getLoadedSpeedCameras(current.data.speedCameras),
-        currentOverview.active(),
-      )
+      const overviewActive = currentOverview.active()
+      const cameras = getLoadedSpeedCameras(current.data.speedCameras)
+      const matches = overviewActive ? null : corridorMatchesFor(useLive.getState(), cameras)
+      syncTrafficLights(current.map, current.trafficLights, overviewActive, matches?.light ?? null)
+      syncSpeedCameras(current.map, current.speedCameras, cameras, overviewActive, matches?.camera ?? null)
       current.raised?.update(now)
       current.meshes?.update(now)
       updateCamera(current, now, dt)
@@ -1154,6 +1221,7 @@ function glideToTruck(target: LiveMap) {
       ? navZoomOffsetFor(map.getZoom(), speed, navCameraSettings())
       : zoomOffsetFor(map.getZoom(), speed)
   }
+  const currentPad = map.getPadding()
   target.glide = {
     from: {
       center: map.getCenter().toArray() as [number, number],
@@ -1161,7 +1229,12 @@ function glideToTruck(target: LiveMap) {
       bearing: map.getBearing(),
       pitch: map.getPitch(),
     },
-    fromTop: map.getPadding().top ?? 0,
+    fromPadding: {
+      top: currentPad.top ?? 0,
+      bottom: currentPad.bottom ?? 0,
+      left: currentPad.left ?? 0,
+      right: currentPad.right ?? 0,
+    },
     started: performance.now() - (reducedMotion() ? GLIDE_MS : 0),
   }
   target.mode = 'return'
@@ -1191,48 +1264,80 @@ const LABELS_EVERY_MS = 100
  * short), and of those, none overlapping a more important one.
  */
 function showLabels(target: LiveMap, now: number) {
-  const { map, labels } = target
+  const { map, labels, labelGrid, activeLabels } = target
   if (target.labelsPlacedFor !== null && now - target.labelsPlacedAt < LABELS_EVERY_MS) return
   const centre = map.getCenter().toArray() as [number, number]
-  const { clientWidth: width, clientHeight: height } = map.getContainer()
+  const width = target.containerSize.width || map.getContainer().clientWidth
+  const height = target.containerSize.height || map.getContainer().clientHeight
   // Quantize view coordinates (~50m centre, 0.05 zoom, 1.5° bearing, 1° pitch) so gentle camera damping
   // does not trigger full O(N) projection passes on every single frame.
-  const view = `${Math.round(centre[0] * 2000)},${Math.round(centre[1] * 2000)} ${Math.round(map.getZoom() * 20)} ${Math.round(map.getBearing() / 1.5)} ${Math.round(map.getPitch())} ${width}x${height}`
+  const view = `${Math.round(centre[0] * 2000)},${Math.round(centre[1] * 2000)} ${Math.round(map.getZoom() * 20)} ${Math.round(map.getBearing() / 1.5)} ${Math.round(map.getPitch())} ${Math.round(width)}x${Math.round(height)}`
   if (view === target.labelsPlacedFor) return
   target.labelsPlacedFor = view
   target.labelsPlacedAt = now
   const range = labelRange(map.getZoom(), width)
-  const boxes = labels.map((label) => {
+  const [cx, cz] = fromLngLat(centre[0], centre[1])
+  const minCellX = Math.floor((cx - range) / LABEL_CELL_METRES)
+  const maxCellX = Math.floor((cx + range) / LABEL_CELL_METRES)
+  const minCellZ = Math.floor((cz - range) / LABEL_CELL_METRES)
+  const maxCellZ = Math.floor((cz + range) / LABEL_CELL_METRES)
+  const candidateIndices: number[] = []
+  for (let gx = minCellX; gx <= maxCellX; gx++) {
+    for (let gz = minCellZ; gz <= maxCellZ; gz++) {
+      const bucket = labelGrid.get(`${gx},${gz}`)
+      if (bucket) {
+        for (let i = 0; i < bucket.length; i++) candidateIndices.push(bucket[i])
+      }
+    }
+  }
+  // Preserve importance order (labels are sorted descending by population).
+  candidateIndices.sort((a, b) => a - b)
+  const boxes = candidateIndices.map((index) => {
+    const label = labels[index]
     if (metresBetween(centre, label.at) > range) return null
+    if (label.width === null || label.height === null) {
+      const dims = target.measureLabel(label)
+      label.width = dims.width
+      label.height = dims.height
+    }
     const { x, y } = map.project(label.at)
     if (x < -label.width || x > width + label.width || y < -label.height || y > height + label.height) return null
     return { x, y, width: label.width, height: label.height }
   })
-  const shown = placeLabels(boxes, LABEL_GAP)
-  labels.forEach((label, index) => {
-    if (shown.has(index)) {
-      if (!label.marker) {
-        const el = document.createElement('div')
-        el.className = `map-label map-label-${label.kind}`
-        const line = (text: string, className: string) => {
-          const span = document.createElement('span')
-          span.className = className
-          span.textContent = text
-          el.append(span)
-        }
-        line(label.first, 'map-label-first')
-        if (label.second) line(label.second, 'map-label-second')
-        label.marker = new maplibregl.Marker({
-          element: el,
-          pitchAlignment: 'viewport',
-          rotationAlignment: 'viewport',
-        }).setLngLat(label.at)
+  const keptLocal = placeLabels(boxes, LABEL_GAP)
+  const nextActive = new Set<number>()
+  for (const localIndex of keptLocal) {
+    const index = candidateIndices[localIndex]
+    nextActive.add(index)
+    const label = labels[index]
+    if (!label.marker) {
+      const el = document.createElement('div')
+      el.className = `map-label map-label-${label.kind}`
+      const line = (text: string, className: string) => {
+        const span = document.createElement('span')
+        span.className = className
+        span.textContent = text
+        el.append(span)
       }
-      if (!label.marker.getElement().isConnected) label.marker.addTo(map)
-    } else if (label.marker && label.marker.getElement().isConnected) {
-      label.marker.remove()
+      line(label.first, 'map-label-first')
+      if (label.second) line(label.second, 'map-label-second')
+      label.marker = new maplibregl.Marker({
+        element: el,
+        pitchAlignment: 'viewport',
+        rotationAlignment: 'viewport',
+      }).setLngLat(label.at)
     }
-  })
+    if (!activeLabels.has(index) || !label.marker.getElement().isConnected) {
+      label.marker.addTo(map)
+    }
+  }
+  for (const prevIndex of activeLabels) {
+    if (!nextActive.has(prevIndex)) {
+      const marker = labels[prevIndex].marker
+      if (marker && marker.getElement().isConnected) marker.remove()
+    }
+  }
+  target.activeLabels = nextActive
 }
 
 /** A unit direction on the ground (x east, z south) for a compass bearing (degrees). */
@@ -1267,9 +1372,19 @@ const CANOPIES_EVERY_MS = 400
 function syncCanopies(target: LiveMap, now: number) {
   const { canopies, map } = target
   if (now - canopies.at < CANOPIES_EVERY_MS || !map.getLayer(BUILDING_LAYER)) return
-  canopies.at = now
   const truck = samples.at(-1)
   if (!truck) return
+  if (
+    Number.isFinite(canopies.lastX) &&
+    Number.isFinite(canopies.lastZ) &&
+    Math.hypot(truck.x - canopies.lastX, truck.z - canopies.lastZ) < 2
+  ) {
+    canopies.at = now
+    return
+  }
+  canopies.at = now
+  canopies.lastX = truck.x
+  canopies.lastZ = truck.z
   const found = map.querySourceFeatures(MAP_SOURCE, {
     sourceLayer: 'building',
     filter: ['==', ['get', 'kind'], 'canopy'],
@@ -1340,11 +1455,12 @@ function syncRoute(target: LiveMap, now: number) {
     const end = route?.nodes.at(-1)
     if (end) {
       destination.setLngLat(toLngLat(...end.position))
+      target.destLiftLast = null
       if (!destination.getElement().isConnected) destination.addTo(map)
     } else {
       rest.setData(NO_LINE)
       head.setData(NO_LINE)
-      target.raised?.showRoute([])
+      target.raised?.showRouteParts([], [], true)
       destination.remove()
     }
   }
@@ -1368,12 +1484,14 @@ function syncRoute(target: LiveMap, now: number) {
   if (currentOverview.active() && target.overviewNeedsFit && !target.pressed && now - target.touched > 300)
     frameCurrentRoute(target)
   const { heights } = shown
+  let restChanged = false
   if (progress.span !== shown.restAfter) {
     const { flat, raised } = cutRaised(restLine(shown.spans, progress.span), (point) => heights.get(point) ?? 0)
     rest.setData(linesOf(flat))
     shown.restRaised = raised
     shown.restAfter = progress.span
     shown.headFrom = null
+    restChanged = true
   }
   const moved = shown.headFrom
     ? Math.hypot(progress.at[0] - shown.headFrom[0], progress.at[1] - shown.headFrom[1])
@@ -1385,7 +1503,7 @@ function syncRoute(target: LiveMap, now: number) {
     head.setData(linesOf(flat))
     shown.headRaised = raised
     shown.headFrom = progress.at
-    target.raised?.showRoute([...shown.headRaised, ...shown.restRaised])
+    target.raised?.showRouteParts(shown.headRaised, shown.restRaised, restChanged)
   }
 }
 
@@ -1398,18 +1516,51 @@ function updateCamera(target: LiveMap, now: number, dt: number) {
   const shown: Point = target.progress ? snapToRoute(target.progress, [truck.x, truck.z]) : [truck.x, truck.z]
   const position = toLngLat(...shown)
   const bearing = bearingOf(truck.heading)
-  puck.setLngLat(position).setRotation(bearing)
+  let liftX = 0
+  let liftY = 0
   if (target.raised) {
     // On a raised road, up there with it. Eased: a point off a road's edge isn't a drop.
     const surface = target.raised.surfaceAt(shown[0], shown[1], truck.y, TRUCK_ON_SURFACE)
     target.puckHeight += ((surface?.drawn ?? 0) - target.puckHeight) * Math.min(dt / PUCK_RISE_MS, 1)
-    puck.setOffset(target.raised.screenLift(shown[0], shown[1], target.puckHeight))
+    ;[liftX, liftY] = target.raised.screenLift(shown[0], shown[1], target.puckHeight)
     // The flag at the end of the route too, on the road the route ends on.
     const end = target.routeShown?.spans.at(-1)?.at(-1)
-    if (end)
-      target.destination.setOffset(target.raised.screenLift(end[0], end[1], target.routeShown?.heights.get(end) ?? 0))
+    if (end) {
+      const [dx, dy] = target.raised.screenLift(end[0], end[1], target.routeShown?.heights.get(end) ?? 0)
+      const prevDest = target.destLiftLast
+      if (!prevDest || Math.abs(prevDest.x - dx) >= 0.05 || Math.abs(prevDest.y - dy) >= 0.05) {
+        target.destination.setOffset([dx, dy])
+        target.destLiftLast = { x: dx, y: dy }
+      }
+    }
   }
-  if (!puck.getElement().isConnected) puck.addTo(map)
+  const prevPuck = target.puckLast
+  const connected = puck.getElement().isConnected
+  if (
+    !prevPuck ||
+    !connected ||
+    Math.abs(prevPuck.lng - position[0]) >= 1e-7 ||
+    Math.abs(prevPuck.lat - position[1]) >= 1e-7 ||
+    Math.abs(prevPuck.bearing - bearing) >= 0.05
+  ) {
+    puck.setLngLat(position).setRotation(bearing)
+  }
+  if (
+    target.raised &&
+    (!prevPuck || Math.abs(prevPuck.liftX - liftX) >= 0.05 || Math.abs(prevPuck.liftY - liftY) >= 0.05)
+  ) {
+    puck.setOffset([liftX, liftY])
+  }
+  if (!prevPuck) {
+    target.puckLast = { lng: position[0], lat: position[1], bearing, liftX, liftY }
+  } else {
+    prevPuck.lng = position[0]
+    prevPuck.lat = position[1]
+    prevPuck.bearing = bearing
+    prevPuck.liftX = liftX
+    prevPuck.liftY = liftY
+  }
+  if (!connected) puck.addTo(map)
 
   if (target.mode === 'browse') {
     if (!target.pressed && !target.overview && !currentOverview.active() && now - target.touched > AUTO_RECENTRE_MS)
@@ -1430,36 +1581,52 @@ function updateCamera(target: LiveMap, now: number, dt: number) {
     basePitch = PITCH
   }
   const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, baseZoom + target.zoomOffset))
-  const height = map.getContainer().clientHeight
-  // Behind the truck: facing its way, tilted, the truck low on the screen. North up: from above, the truck in
-  // the middle.
-  const wanted = target.northUp
-    ? { bearing: 0, pitch: 0, top: 0 }
-    : { bearing, pitch: basePitch, top: height * (PUCK_FROM_TOP - 0.5) * 2 }
-  const padding = { top: wanted.top, bottom: 0, left: 0, right: 0 }
+  const width = target.containerSize.width || map.getContainer().clientWidth
+  const height = target.containerSize.height || map.getContainer().clientHeight
+  // Behind the truck: facing its way, tilted, the truck at the lower third of the unobstructed visual viewport.
+  // North up: from above, vertically centered at 50% while preserving horizontal visual centering.
+  const wanted = target.northUp ? { bearing: 0, pitch: 0 } : { bearing, pitch: basePitch }
+  const wantedPadding = visualCenterPadding({
+    width,
+    height,
+    leftOcc: target.interactive ? visualInsets.left : 0,
+    rightOcc: target.interactive ? visualInsets.right : 0,
+    northUp: target.northUp,
+    puckFromTop: PUCK_FROM_TOP,
+  })
 
   if (target.mode === 'return' && target.glide) {
     // Towards where the following camera is now (the truck moves on while it glides).
     const t = (now - target.glide.started) / GLIDE_MS
     const eased = easeInOut(t)
     const towards = { center: position, zoom, bearing: wanted.bearing, pitch: wanted.pitch }
-    const top = target.glide.fromTop + (wanted.top - target.glide.fromTop) * eased
-    moveCamera(map, blendPose(target.glide.from, towards, eased), { ...padding, top })
+    const pad = blendPadding(target.glide.fromPadding, wantedPadding, eased)
+    moveCamera(map, blendPose(target.glide.from, towards, eased), pad)
     if (t >= 1) {
       follow(target)
-      target.camera = { bearing: wanted.bearing, zoom, pitch: wanted.pitch }
+      target.camera = { bearing: wanted.bearing, zoom, pitch: wanted.pitch, padding: wantedPadding }
     }
     return
   }
 
+  const dampAxis = (cur: number, dst: number) => {
+    const next = reducedMotion() ? dst : damp(cur, dst, dt, PADDING_TAU_MS)
+    return Math.abs(next - dst) < 0.1 ? dst : next
+  }
   const zoomTau = target.interactive ? NAV_ZOOM_TAU_MS : ZOOM_TAU_MS
   target.camera = target.camera
     ? {
         bearing: dampBearing(target.camera.bearing, wanted.bearing, dt, BEARING_TAU_MS),
         zoom: damp(target.camera.zoom, zoom, dt, zoomTau),
         pitch: target.interactive ? damp(target.camera.pitch, wanted.pitch, dt, NAV_PITCH_TAU_MS) : wanted.pitch,
+        padding: {
+          top: dampAxis(target.camera.padding.top, wantedPadding.top),
+          bottom: dampAxis(target.camera.padding.bottom, wantedPadding.bottom),
+          left: dampAxis(target.camera.padding.left, wantedPadding.left),
+          right: dampAxis(target.camera.padding.right, wantedPadding.right),
+        },
       }
-    : { bearing: wanted.bearing, zoom, pitch: wanted.pitch }
+    : { bearing: wanted.bearing, zoom, pitch: wanted.pitch, padding: wantedPadding }
   // Held still while a button is down, so a drag can start (moving the camera cancels it).
   if (target.pressed) return
   const pose = {
@@ -1468,25 +1635,21 @@ function updateCamera(target: LiveMap, now: number, dt: number) {
     zoom: target.camera.zoom,
     pitch: target.camera.pitch,
   }
-  moveCamera(map, pose, padding)
+  moveCamera(map, pose, target.camera.padding)
 }
 
 /**
  * Moves the map to `pose`, unless it's there already: every move draws the whole map again, so a parked
  * truck (and a camera that has settled) leaves the map, and the GPU the game shares, idle.
  */
-function moveCamera(
-  map: maplibregl.Map,
-  pose: CameraPose,
-  padding: { top: number; bottom: number; left: number; right: number },
-) {
+function moveCamera(map: maplibregl.Map, pose: CameraPose, padding: CameraPadding) {
   const current = {
     center: map.getCenter().toArray() as [number, number],
     zoom: map.getZoom(),
     bearing: map.getBearing(),
     pitch: map.getPitch(),
   }
-  if (samePose(current, pose) && Math.abs((map.getPadding().top ?? 0) - padding.top) < 0.01) return
+  if (samePose(current, pose) && samePadding(map.getPadding(), padding)) return
   map.jumpTo({ ...pose, padding })
 }
 

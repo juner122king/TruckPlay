@@ -171,16 +171,15 @@ export interface BuildingMeshes {
   }
 }
 
-/** `main` for what's given in tile widths from (x, y), which is in tile widths too (as raisedRoads.ts). */
-function matrixFrom(main: ArrayLike<number>, x: number, y: number): Float32Array {
-  const matrix = new Float32Array(16)
+/** Writes `main` for tile-width coordinates offset by `(x, y)` into `out` without heap allocation. */
+function writeMatrixFrom(out: Float32Array, main: ArrayLike<number>, x: number, y: number): Float32Array {
   for (let i = 0; i < 4; i++) {
-    matrix[i] = main[i] / TILES
-    matrix[4 + i] = main[4 + i] / TILES
-    matrix[8 + i] = main[8 + i]
-    matrix[12 + i] = (main[i] * x + main[4 + i] * y) / TILES + main[12 + i]
+    out[i] = main[i] / TILES
+    out[4 + i] = main[4 + i] / TILES
+    out[8 + i] = main[8 + i]
+    out[12 + i] = (main[i] * x + main[4 + i] * y) / TILES + main[12 + i]
   }
-  return matrix
+  return out
 }
 
 function linked(gl: WebGL2RenderingContext, vertex: string, fragment: string): WebGLProgram {
@@ -285,6 +284,9 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
   /** A look asked for, when one came too soon after the last: the map may be still by then, drawing nothing. */
   let again: ReturnType<typeof setTimeout> | null = null
   let drawn = 0
+  const scratchMatrix = new Float32Array(16)
+  let lightCache: { bearingStep: number; vec: Float32Array } | null = null
+  let meshColourCache: { appearance: Appearance; flat: boolean; vec: Float32Array } | null = null
 
   void fetch(`${address}/index.json`, { signal: requests.signal })
     .then((response) => (response.ok ? response.json() : []))
@@ -421,16 +423,20 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
       }
     }
     // The models the tiles in view place, the nearest tiles' first.
-    const wanted: number[] = []
-    const shown = [...tiles.values()].filter((tile) => inView(tile.x, tile.y))
+    const wanted = new Set<number>()
+    const shown: Tile[] = []
+    for (const tile of tiles.values()) {
+      if (inView(tile.x, tile.y)) shown.push(tile)
+    }
     shown.sort((a, b) => away(a.x, a.y) - away(b.x, b.y))
     for (const tile of shown) {
       for (const run of tile.runs) {
-        if (!models.has(run.model) && !loadingModels.has(run.model) && !unreadable.has(run.model))
-          wanted.push(run.model)
+        if (!models.has(run.model) && !loadingModels.has(run.model) && !unreadable.has(run.model)) {
+          wanted.add(run.model)
+        }
       }
     }
-    queue = [...new Set(wanted)]
+    queue = Array.from(wanted)
     pump()
     if (models.size > modelsCap) {
       const byUse = [...models].sort((a, b) => a[1].used - b[1].used)
@@ -507,10 +513,23 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
       const main = args.defaultProjectionData.mainMatrix
       const [x0, y0, x1, y1] = viewTiles()
       const [mx, my] = middle()
+      const look = appearance()
+      if (!meshColourCache || meshColourCache.appearance !== look || meshColourCache.flat !== flat) {
+        meshColourCache = {
+          appearance: look,
+          flat,
+          vec: new Float32Array(flat ? flatBuildingColour(look) : buildingColour(look)),
+        }
+      }
+      const bearing = map.getBearing()
+      const bearingStep = Math.round(bearing * 2)
+      if (!lightCache || lightCache.bearingStep !== bearingStep) {
+        lightCache = { bearingStep, vec: new Float32Array(lightAt(bearing)) }
+      }
       gl.useProgram(program)
       gl.uniform1f(uniforms.u_rise, rise)
-      gl.uniform3fv(uniforms.u_colour, flat ? flatBuildingColour(appearance()) : buildingColour(appearance()))
-      gl.uniform3fv(uniforms.u_light, lightAt(map.getBearing()))
+      gl.uniform3fv(uniforms.u_colour, meshColourCache.vec)
+      gl.uniform3fv(uniforms.u_light, lightCache.vec)
       gl.uniform1f(uniforms.u_flat, flat ? 1 : 0)
       gl.disable(gl.CULL_FACE)
       gl.disable(gl.STENCIL_TEST)
@@ -522,7 +541,7 @@ export function buildingMeshes(map: maplibregl.Map, address: string, appearance:
       for (const tile of tiles.values()) {
         if (tile.x + 1 < x0 || tile.x > x1 || tile.y + 1 < y0 || tile.y > y1) continue
         if (!tile.buffer) uploadTile(gl, tile)
-        gl.uniformMatrix4fv(uniforms.u_matrix, false, matrixFrom(main, tile.x, tile.y))
+        gl.uniformMatrix4fv(uniforms.u_matrix, false, writeMatrixFrom(scratchMatrix, main, tile.x, tile.y))
         const near = zoom >= NEAR_ZOOM && Math.hypot(tile.x + 0.5 - mx, tile.y + 0.5 - my) <= NEAR_TILES + 0.75
         gl.uniform1f(uniforms.u_bridge, 0)
         for (const run of tile.runs) {

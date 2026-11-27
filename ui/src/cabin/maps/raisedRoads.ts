@@ -175,6 +175,8 @@ export interface RaisedRoads {
   setLite(lite: boolean): void
   /** The stretches of the route on raised roads, to draw. */
   showRoute(lines: readonly RaisedLine[]): void
+  /** Splits the raised route into a dynamic short head buffer and a static remaining-route buffer. */
+  showRouteParts(head: readonly RaisedLine[], rest: readonly RaisedLine[], restChanged: boolean): void
   /** How far on the screen something `height` over the ground at (x, z) is from the ground there, CSS pixels. */
   screenLift(x: number, z: number, height: number): [number, number]
 }
@@ -185,16 +187,15 @@ function worldOf(x: number, z: number): [number, number] {
   return [(x / METRES_PER_DEGREE + 180) / 360, 0.5 - Math.log(Math.tan(Math.PI / 4 + latitude / 2)) / (2 * Math.PI)]
 }
 
-/** `main` for what's given in tile widths from (x, y), which is in tile widths too. */
-function matrixFrom(main: ArrayLike<number>, x: number, y: number): Float32Array {
-  const matrix = new Float32Array(16)
+/** Writes `main` for tile-width coordinates offset by `(x, y)` into `out` without allocating. */
+function writeMatrixFrom(out: Float32Array, main: ArrayLike<number>, x: number, y: number): Float32Array {
   for (let i = 0; i < 4; i++) {
-    matrix[i] = main[i] / TILES
-    matrix[4 + i] = main[4 + i] / TILES
-    matrix[8 + i] = main[8 + i]
-    matrix[12 + i] = (main[i] * x + main[4 + i] * y) / TILES + main[12 + i]
+    out[i] = main[i] / TILES
+    out[4 + i] = main[4 + i] / TILES
+    out[8 + i] = main[8 + i]
+    out[12 + i] = (main[i] * x + main[4 + i] * y) / TILES + main[12 + i]
   }
-  return matrix
+  return out
 }
 
 function linked(gl: WebGLRenderingContext | WebGL2RenderingContext, vertex: string, fragment: string): WebGLProgram {
@@ -271,17 +272,32 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
   let showing = true
   let lite = false
   let main: ArrayLike<number> | null = null
+  const scratchMatrix = new Float32Array(16)
+  let colourCache: {
+    appearance: Appearance
+    zoomStep: number
+    kinds: Float32Array
+    side: Float32Array
+    water: Float32Array
+    past: number
+  } | null = null
   let route: {
     program: WebGLProgram
     uniforms: Record<string, WebGLUniformLocation | null>
-    array: WebGLVertexArrayObject
-    buffer: WebGLBuffer
+    headArray: WebGLVertexArrayObject
+    headBuffer: WebGLBuffer
+    restArray: WebGLVertexArrayObject
+    restBuffer: WebGLBuffer
   } | null = null
-  let routeLines: readonly RaisedLine[] = []
-  let routeStale = false
-  /** Where the stretches of the route are in its buffer, and the place its points are from, in tile widths. */
-  let routeRuns: { first: number; count: number }[] = []
-  let routeOrigin: [number, number] = [0, 0]
+  let headLines: readonly RaisedLine[] = []
+  let restLines: readonly RaisedLine[] = []
+  let headStale = false
+  let restStale = false
+  /** Where the stretches of each route part are in its buffer, and its local origin in tile widths. */
+  let headRuns: { first: number; count: number }[] = []
+  let headOrigin: [number, number] = [0, 0]
+  let restRuns: { first: number; count: number }[] = []
+  let restOrigin: [number, number] = [0, 0]
 
   void fetch(`${address}/index.json`, { signal: requests.signal })
     .then((response) => (response.ok ? response.json() : []))
@@ -417,38 +433,78 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
     return [((raised[0] - ground[0]) / 2) * clientWidth, (-(raised[1] - ground[1]) / 2) * clientHeight]
   }
 
-  function showRoute(lines: readonly RaisedLine[]) {
-    if (lines.length === 0 && routeLines.length === 0) return
-    routeLines = lines
-    routeStale = true
-    map.triggerRepaint()
+  function showRouteParts(head: readonly RaisedLine[], rest: readonly RaisedLine[], restChanged: boolean) {
+    const headChanged = head.length > 0 || headLines.length > 0
+    if (!headChanged && !restChanged) return
+    if (headChanged) {
+      headLines = head
+      headStale = true
+    }
+    if (restChanged && (rest.length > 0 || restLines.length > 0)) {
+      restLines = rest
+      restStale = true
+    }
+    if (headStale || restStale) map.triggerRepaint()
   }
 
-  /** The route's stretches into its buffer: two vertices a point, x, y, height, the way it goes (x, y) and which side. */
-  function uploadRoute(gl: WebGL2RenderingContext, buffer: WebGLBuffer) {
-    routeStale = false
-    routeRuns = []
-    const lines = routeLines.filter((line) => line.length > 1)
-    if (lines.length === 0) return
-    const origin = worldOf(lines[0][0][0], lines[0][0][1]).map((part) => part * TILES)
-    routeOrigin = [origin[0], origin[1]]
-    const data = new Float32Array(lines.reduce((sum, line) => sum + line.length, 0) * 2 * 6)
+  function showRoute(lines: readonly RaisedLine[]) {
+    showRouteParts([], lines, lines.length > 0 || restLines.length > 0)
+  }
+
+  /** Uploads a set of raised route lines into a VBO: two vertices per point (x, y, height, tangent x/y, side). */
+  function uploadRoutePart(
+    gl: WebGL2RenderingContext,
+    buffer: WebGLBuffer,
+    rawLines: readonly RaisedLine[],
+    usage: number,
+  ): { runs: { first: number; count: number }[]; origin: [number, number] } {
+    const runs: { first: number; count: number }[] = []
+    const lines = rawLines.filter((line) => line.length > 1)
+    if (lines.length === 0) return { runs, origin: [0, 0] }
+    const originRaw = worldOf(lines[0][0][0], lines[0][0][1])
+    const origin: [number, number] = [originRaw[0] * TILES, originRaw[1] * TILES]
+    let totalPoints = 0
+    for (let i = 0; i < lines.length; i++) totalPoints += lines[i].length
+    const data = new Float32Array(totalPoints * 2 * 6)
     let vertex = 0
     for (const line of lines) {
-      routeRuns.push({ first: vertex, count: line.length * 2 })
-      const placed = line.map(([x, z]) => worldOf(x, z).map((part, i) => part * TILES - origin[i]))
-      line.forEach(([, , height], index) => {
-        const [before, after] = [placed[Math.max(index - 1, 0)], placed[Math.min(index + 1, line.length - 1)]]
-        const [wayX, wayY] = [after[0] - before[0], after[1] - before[1]]
-        const length = Math.hypot(wayX, wayY) || 1
-        for (const side of [-1, 1]) {
-          data.set([placed[index][0], placed[index][1], height, wayX / length, wayY / length, side], vertex * 6)
-          vertex++
-        }
+      runs.push({ first: vertex, count: line.length * 2 })
+      const placed = line.map(([x, z]) => {
+        const w = worldOf(x, z)
+        return [w[0] * TILES - origin[0], w[1] * TILES - origin[1]] as const
       })
+      for (let index = 0; index < line.length; index++) {
+        const height = line[index][2]
+        const before = placed[index > 0 ? index - 1 : 0]
+        const after = placed[index + 1 < line.length ? index + 1 : line.length - 1]
+        const wayX = after[0] - before[0]
+        const wayY = after[1] - before[1]
+        const length = Math.hypot(wayX, wayY) || 1
+        const ux = wayX / length
+        const uy = wayY / length
+        const px = placed[index][0]
+        const py = placed[index][1]
+        let offset = vertex * 6
+        data[offset] = px
+        data[offset + 1] = py
+        data[offset + 2] = height
+        data[offset + 3] = ux
+        data[offset + 4] = uy
+        data[offset + 5] = -1
+        vertex++
+        offset = vertex * 6
+        data[offset] = px
+        data[offset + 1] = py
+        data[offset + 2] = height
+        data[offset + 3] = ux
+        data[offset + 4] = uy
+        data[offset + 5] = 1
+        vertex++
+      }
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW)
+    gl.bufferData(gl.ARRAY_BUFFER, data, usage)
+    return { runs, origin }
   }
 
   function update(now: number) {
@@ -529,23 +585,43 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
       const zoom = map.getZoom()
       main = args.defaultProjectionData.mainMatrix
       if (zoom < RISE_ZOOMS[0] || !program || tiles.size === 0) return
-      const colours = raisedColours(appearance(), zoom)
+      const look = appearance()
+      const zoomStep = Math.round(zoom * 20)
+      if (!colourCache || colourCache.appearance !== look || colourCache.zoomStep !== zoomStep) {
+        const c = raisedColours(look, zoom)
+        colourCache = {
+          appearance: look,
+          zoomStep,
+          kinds: new Float32Array(c.kinds.flat()),
+          side: new Float32Array(c.side),
+          water: new Float32Array(c.water),
+          past: c.past,
+        }
+      }
       const shown = inView()
+      if (shown.length === 0) return
       gl.useProgram(program)
       gl.uniform1f(uniforms.u_rise, riseAt(zoom))
       gl.uniform2f(uniforms.u_shadow, SHADOW[0], SHADOW[1])
-      gl.uniform3fv(uniforms.u_kinds, colours.kinds.flat())
-      gl.uniform3fv(uniforms.u_side, colours.side)
-      gl.uniform3fv(uniforms.u_water, colours.water)
+      gl.uniform3fv(uniforms.u_kinds, colourCache.kinds)
+      gl.uniform3fv(uniforms.u_side, colourCache.side)
+      gl.uniform3fv(uniforms.u_water, colourCache.water)
       const bearing = (map.getBearing() * Math.PI) / 180
       gl.uniform2f(uniforms.u_towards, -Math.sin(bearing), Math.cos(bearing))
-      gl.uniform1f(uniforms.u_past, (colours.past * TILES) / (512 * 2 ** zoom))
+      gl.uniform1f(uniforms.u_past, (colourCache.past * TILES) / (512 * 2 ** zoom))
       overTheMap(gl)
       for (const tile of shown) {
         if (!tile.array) upload(gl, tile)
       }
+      let boundTile: Tile | null = null
       const within = (tile: Tile) => {
-        gl.uniformMatrix4fv(uniforms.u_matrix, false, matrixFrom(args.defaultProjectionData.mainMatrix, tile.x, tile.y))
+        if (boundTile === tile) return
+        boundTile = tile
+        gl.uniformMatrix4fv(
+          uniforms.u_matrix,
+          false,
+          writeMatrixFrom(scratchMatrix, args.defaultProjectionData.mainMatrix, tile.x, tile.y),
+        )
         gl.bindVertexArray(tile.array)
       }
       // The water back under them, and the shadows.
@@ -577,53 +653,81 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
     onAdd(_, raw) {
       const gl = raw as WebGL2RenderingContext
       const made = linked(gl, ROUTE_VERTEX_SHADER, ROUTE_FRAGMENT_SHADER)
-      const array = gl.createVertexArray()
-      const buffer = gl.createBuffer()
-      gl.bindVertexArray(array)
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-      const attribute = (name: string, size: number, offset: number) => {
-        const at = gl.getAttribLocation(made, name)
-        gl.enableVertexAttribArray(at)
-        gl.vertexAttribPointer(at, size, gl.FLOAT, false, 24, offset)
+      const setupVao = () => {
+        const array = gl.createVertexArray()
+        const buffer = gl.createBuffer()
+        gl.bindVertexArray(array)
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+        const attribute = (name: string, size: number, offset: number) => {
+          const at = gl.getAttribLocation(made, name)
+          gl.enableVertexAttribArray(at)
+          gl.vertexAttribPointer(at, size, gl.FLOAT, false, 24, offset)
+        }
+        attribute('a_at', 2, 0)
+        attribute('a_high', 1, 8)
+        attribute('a_along', 2, 12)
+        attribute('a_side', 1, 20)
+        gl.bindVertexArray(null)
+        return { array, buffer }
       }
-      attribute('a_at', 2, 0)
-      attribute('a_high', 1, 8)
-      attribute('a_along', 2, 12)
-      attribute('a_side', 1, 20)
-      gl.bindVertexArray(null)
+      const head = setupVao()
+      const rest = setupVao()
       route = {
         program: made,
         uniforms: locations(gl, made, ['u_matrix', 'u_rise', 'u_half', 'u_colour']),
-        array,
-        buffer,
+        headArray: head.array,
+        headBuffer: head.buffer,
+        restArray: rest.array,
+        restBuffer: rest.buffer,
       }
-      routeStale = true
+      headStale = headLines.length > 0
+      restStale = restLines.length > 0
     },
     render(raw, args: CustomRenderMethodInput) {
       const gl = raw as WebGL2RenderingContext
       if (!route) return
-      if (routeStale) uploadRoute(gl, route.buffer)
-      if (routeRuns.length === 0) return
+      if (headStale) {
+        headStale = false
+        const uploaded = uploadRoutePart(gl, route.headBuffer, headLines, gl.DYNAMIC_DRAW)
+        headRuns = uploaded.runs
+        headOrigin = uploaded.origin
+      }
+      if (restStale) {
+        restStale = false
+        const uploaded = uploadRoutePart(gl, route.restBuffer, restLines, gl.STATIC_DRAW)
+        restRuns = uploaded.runs
+        restOrigin = uploaded.origin
+      }
+      if (headRuns.length === 0 && restRuns.length === 0) return
       const zoom = map.getZoom()
       const colours = routeColours(appearance())
       // As MapLibre draws a line: its width lies on the ground, so it narrows into the distance with the flat map's.
       const tilesPerPixel = TILES / (512 * 2 ** zoom)
       gl.useProgram(route.program)
-      gl.uniformMatrix4fv(
-        route.uniforms.u_matrix,
-        false,
-        matrixFrom(args.defaultProjectionData.mainMatrix, routeOrigin[0], routeOrigin[1]),
-      )
       gl.uniform1f(route.uniforms.u_rise, riseAt(zoom))
-      gl.bindVertexArray(route.array)
       overTheMap(gl)
+      const drawPart = (
+        array: WebGLVertexArrayObject,
+        runs: { first: number; count: number }[],
+        origin: [number, number],
+      ) => {
+        if (runs.length === 0) return
+        gl.uniformMatrix4fv(
+          route!.uniforms.u_matrix,
+          false,
+          writeMatrixFrom(scratchMatrix, args.defaultProjectionData.mainMatrix, origin[0], origin[1]),
+        )
+        gl.bindVertexArray(array)
+        for (const { first, count } of runs) gl.drawArrays(gl.TRIANGLE_STRIP, first, count)
+      }
       for (const [colour, width] of [
         [colours.casing, routeWidth(zoom) + ROUTE_CASING],
         [colours.fill, routeWidth(zoom)],
       ] as const) {
         gl.uniform3fv(route.uniforms.u_colour, colour)
         gl.uniform1f(route.uniforms.u_half, (width / 2) * tilesPerPixel)
-        for (const { first, count } of routeRuns) gl.drawArrays(gl.TRIANGLE_STRIP, first, count)
+        drawPart(route.restArray, restRuns, restOrigin)
+        drawPart(route.headArray, headRuns, headOrigin)
       }
       gl.bindVertexArray(null)
     },
@@ -665,18 +769,33 @@ export function raisedRoads(map: maplibregl.Map, address: string, appearance: ()
       if (program) context.deleteProgram(program)
       if (route) {
         context.deleteProgram(route.program)
-        context.deleteBuffer(route.buffer)
-        context.deleteVertexArray(route.array)
+        context.deleteBuffer(route.headBuffer)
+        context.deleteVertexArray(route.headArray)
+        context.deleteBuffer(route.restBuffer)
+        context.deleteVertexArray(route.restArray)
       }
     }
     loading.clear()
     known = null
     route = null
-    routeLines = []
-    routeRuns = []
+    headLines = []
+    restLines = []
+    headRuns = []
+    restRuns = []
+    colourCache = null
     main = null
     program = null
     context = null
   }
-  return { update, surfaceAt, tilesChanged: () => changed, setShown, setLite, showRoute, screenLift, dispose }
+  return {
+    update,
+    surfaceAt,
+    tilesChanged: () => changed,
+    setShown,
+    setLite,
+    showRoute,
+    showRouteParts,
+    screenLift,
+    dispose,
+  }
 }

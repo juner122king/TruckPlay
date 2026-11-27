@@ -1,5 +1,4 @@
-import type { Destination, DestinationKind } from './places'
-import { fromLngLat } from './projection'
+import { type Destination, type DestinationKind, indexedPlaces } from './places'
 import type { Point, Progress, Spans } from './route'
 
 /**
@@ -103,8 +102,9 @@ export function placesAhead(places: readonly Destination[], spans: Spans, progre
     ;[x0, x1, z0, z1] = [Math.min(x0, x - far), Math.max(x1, x + far), Math.min(z0, z - far), Math.max(z1, z + far)]
   }
   const found: Ahead[] = []
-  for (const place of places) {
-    const point = fromLngLat(...place.at)
+  const indexed = indexedPlaces(places)
+  for (let i = 0; i < indexed.length; i++) {
+    const { place, world: point } = indexed[i]
     if (point[0] < x0 || point[0] > x1 || point[1] < z0 || point[1] > z1) continue
     const at = nearest(rest, point, REACH[place.kind])
     if (at && at.along > 1) found.push({ place, ...at })

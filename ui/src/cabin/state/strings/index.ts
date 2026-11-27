@@ -88,6 +88,22 @@ export interface Strings {
     elevated: string
     unsupported: string
     failed: string
+    recommended: string
+    slowerBy: (time: string) => string
+    tripActions: string
+    stopsCount: (count: number) => string
+    jobLocked: string
+    quickStops: {
+      alongTitle: string
+      nearbyTitle: string
+      fuel: string
+      rest: string
+      service: string
+      searching: string
+      addedDistance: (name: string, distance: string) => string
+      added: (name: string) => string
+      noNearby: string
+    }
   }
   /** The keyboard: its keys (named for screen readers where they show a symbol), and a field's clear button. */
   keyboard: {

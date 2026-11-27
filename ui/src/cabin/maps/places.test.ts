@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { type Destination, type DestinationKind, fold, nearestOfKind, ownGarages, searchPlaces } from './places'
+import {
+  type Destination,
+  type DestinationKind,
+  fold,
+  indexedPlaces,
+  nearestOfKind,
+  ownGarages,
+  searchPlaces,
+} from './places'
 import { toLngLat } from './projection'
 
 const KINDS: Record<DestinationKind, string> = {
@@ -64,6 +72,20 @@ describe('searchPlaces', () => {
     expect(names(searchPlaces(places, 'fuel', truck, KINDS))).toEqual(['Filling station (Taranto)'])
     expect(searchPlaces(places, '  ', truck, KINDS)).toEqual([])
     expect(searchPlaces(places, 'zzz', truck, KINDS)).toEqual([])
+  })
+
+  it('caches pre-indexed tokens and matches Turkish/diacritic/kana queries consistently', () => {
+    const intl = [
+      place('city', 'İstanbul', 'İstanbul', 10),
+      place('city', 'Jönköping', 'Jönköping', 20),
+      place('city', 'パリ', 'パリ', 30, { localized: 'Paris' }),
+    ]
+    const first = indexedPlaces(intl)
+    const second = indexedPlaces(intl)
+    expect(second).toBe(first)
+    expect(searchPlaces(intl, 'istanbul', truck, KINDS).map((p) => p.name)).toEqual(['İstanbul'])
+    expect(searchPlaces(intl, 'jonk', truck, KINDS).map((p) => p.name)).toEqual(['Jönköping'])
+    expect(searchPlaces(intl, 'ぱり', truck, KINDS).map((p) => p.name)).toEqual(['パリ'])
   })
 })
 

@@ -223,7 +223,9 @@ function StepLines({ shown, size, text }: { shown: Shown; size: number; text: St
   const isNow = shown.distance === text.now
   return (
     <>
-      <ManeuverGlyph step={shown.step} size={size} />
+      <div className="guidance-glyph-well" data-now={isNow || undefined}>
+        <ManeuverGlyph step={shown.step} size={size} />
+      </div>
       <div className="guidance-copy">
         <div className="guidance-distance" data-now={isNow || undefined}>
           {shown.distance}

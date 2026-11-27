@@ -261,3 +261,81 @@ export function blendPose(from: CameraPose, to: CameraPose, t: number): CameraPo
     pitch: lerp(from.pitch, to.pitch),
   }
 }
+
+/** MapLibre camera padding insets in CSS pixels. */
+export interface CameraPadding {
+  top: number
+  bottom: number
+  left: number
+  right: number
+}
+
+/** Inputs used to place the vehicle at the unobstructed visual center of the map viewport. */
+export interface VisualViewportInsets {
+  /** Map container width, CSS pixels. */
+  width: number
+  /** Map container height, CSS pixels. */
+  height: number
+  /** Left-side UI occlusion width (sidebar + visible left navigation cards), CSS pixels. */
+  leftOcc: number
+  /** Weighted right-side UI/margin occlusion width, CSS pixels. */
+  rightOcc: number
+  /** North-up top-down mode centers vertically at 50%; 3D chase mode uses `puckFromTop` (66%). */
+  northUp: boolean
+  /** Vertical anchor fraction from the top edge in 3D chase mode. */
+  puckFromTop?: number
+}
+
+/** Maximum net horizontal padding fraction of container width (keeps vehicle safely within [33%, 67%]). */
+const MAX_NET_HORIZONTAL_RATIO = 0.34
+
+/**
+ * Computes minimal MapLibre camera padding that places the truck at the visual center of the
+ * unobstructed road viewport rather than the raw physical center of the canvas.
+ */
+export function visualCenterPadding({
+  width,
+  height,
+  leftOcc,
+  rightOcc,
+  northUp,
+  puckFromTop = 0.66,
+}: VisualViewportInsets): CameraPadding {
+  const safeW = Number.isFinite(width) && width > 0 ? width : 0
+  const safeH = Number.isFinite(height) && height > 0 ? height : 0
+  const left = Number.isFinite(leftOcc) ? Math.max(0, leftOcc) : 0
+  const right = Number.isFinite(rightOcc) ? Math.max(0, rightOcc) : 0
+  const maxNetX = safeW * MAX_NET_HORIZONTAL_RATIO
+  const netX = Math.max(-maxNetX, Math.min(maxNetX, left - right))
+  return {
+    top: northUp ? 0 : Math.max(0, safeH * (puckFromTop - 0.5) * 2),
+    bottom: 0,
+    left: netX > 0 ? netX : 0,
+    right: netX < 0 ? -netX : 0,
+  }
+}
+
+/** Horizontal CSS pixel shift from the physical canvas center corresponding to `padding`. */
+export function visualShiftXOf(padding: Pick<CameraPadding, 'left' | 'right'>): number {
+  return (padding.left - padding.right) / 2
+}
+
+/** Linearly interpolates all four padding insets (`t` in 0..1). */
+export function blendPadding(from: CameraPadding, to: CameraPadding, t: number): CameraPadding {
+  return {
+    top: lerp(from.top, to.top, t),
+    bottom: lerp(from.bottom, to.bottom, t),
+    left: lerp(from.left, to.left, t),
+    right: lerp(from.right, to.right, t),
+  }
+}
+
+/** Whether two camera paddings are visually identical (within `epsilon` CSS pixels on all 4 sides). */
+export function samePadding(a: Partial<CameraPadding>, b: CameraPadding, epsilon = 0.05): boolean {
+  return (
+    Math.abs((a.top ?? 0) - b.top) < epsilon &&
+    Math.abs((a.bottom ?? 0) - b.bottom) < epsilon &&
+    Math.abs((a.left ?? 0) - b.left) < epsilon &&
+    Math.abs((a.right ?? 0) - b.right) < epsilon
+  )
+}

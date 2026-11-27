@@ -3,6 +3,7 @@ import {
   BASE_FOLLOW_PITCH,
   bearingDelta,
   bearingOf,
+  blendPadding,
   blendPose,
   type CameraPose,
   clampZoomOffset,
@@ -15,9 +16,12 @@ import {
   navigationCameraFor,
   navSpeedZoom,
   navZoomOffsetFor,
+  samePadding,
   samePose,
   type TruckSample,
   truckAt,
+  visualCenterPadding,
+  visualShiftXOf,
   zoomForSpeed,
   zoomOffsetFor,
 } from './camera'
@@ -236,5 +240,71 @@ describe('navigationCameraFor', () => {
     expect(navZoomOffsetFor(base - 1.2, kmh(90), standard)).toBeCloseTo(-1.2)
     expect(navZoomOffsetFor(30, 0, standard)).toBe(2)
     expect(navZoomOffsetFor(5, 0, standard)).toBe(-4)
+  })
+})
+
+describe('visualCenterPadding', () => {
+  it('centers the vehicle in the unobstructed road corridor during active full-screen navigation', () => {
+    // 1280x720: left cards end at 446px, weighted right corner inset is 110px
+    const pad = visualCenterPadding({
+      width: 1280,
+      height: 720,
+      leftOcc: 446,
+      rightOcc: 110,
+      northUp: false,
+      puckFromTop: 0.66,
+    })
+    expect(pad.left).toBeCloseTo(336)
+    expect(pad.right).toBe(0)
+    expect(pad.bottom).toBe(0)
+    expect(pad.top).toBeCloseTo(720 * 0.32)
+    // Resulting vehicle screen x = 640 + 168 = 808px (midway between 446 and 1170)
+    expect(640 + visualShiftXOf(pad)).toBeCloseTo(808)
+  })
+
+  it('centers the vehicle in the content area beside the sidebar when free-driving', () => {
+    const pad = visualCenterPadding({
+      width: 1280,
+      height: 720,
+      leftOcc: 136,
+      rightOcc: 24,
+      northUp: false,
+    })
+    expect(pad.left).toBeCloseTo(112)
+    expect(pad.right).toBe(0)
+    expect(640 + visualShiftXOf(pad)).toBeCloseTo(696)
+  })
+
+  it('zeros vertical offset in north-up mode while preserving horizontal visual center', () => {
+    const pad = visualCenterPadding({
+      width: 1280,
+      height: 720,
+      leftOcc: 446,
+      rightOcc: 110,
+      northUp: true,
+    })
+    expect(pad.top).toBe(0)
+    expect(pad.bottom).toBe(0)
+    expect(pad.left).toBeCloseTo(336)
+  })
+
+  it('clamps horizontal padding on narrow screens so the truck never crowds the right edge', () => {
+    const pad = visualCenterPadding({
+      width: 640,
+      height: 480,
+      leftOcc: 420,
+      rightOcc: 80,
+      northUp: false,
+    })
+    expect(pad.left).toBeCloseTo(640 * 0.34)
+    expect(320 + visualShiftXOf(pad)).toBeLessThanOrEqual(640 * 0.67 + 0.01)
+  })
+
+  it('blends and compares all four padding sides cleanly', () => {
+    const a = { top: 0, bottom: 0, left: 0, right: 0 }
+    const b = { top: 200, bottom: 0, left: 300, right: 0 }
+    expect(blendPadding(a, b, 0.5)).toEqual({ top: 100, bottom: 0, left: 150, right: 0 })
+    expect(samePadding({ top: 200.01, bottom: 0, left: 299.98, right: 0 }, b)).toBe(true)
+    expect(samePadding({ top: 200, bottom: 0, left: 290, right: 0 }, b)).toBe(false)
   })
 })
