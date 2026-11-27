@@ -458,9 +458,12 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
     let mut following: Option<Following> = None;
     // The game's route as its map nodes (0 for points inside junctions), for the hand-over.
     let mut route_uids: Option<Vec<u64>> = None;
-    // The game's waypoints with the route, the ones WestPlay put in to hold a route it handed over (kept once
-    // it follows: they stay in the game's route), and the player's stops among them as last told to the page.
+    // The game's waypoints with the route, the navigator's ordered targets (plus job flag), the ones WestPlay
+    // put in to hold a route it handed over (kept once it follows: they stay in the game's route), and the
+    // player's stops among them as last told to the page.
     let mut route_waypoints: Vec<u64> = Vec::new();
+    let mut route_targets: Vec<route::RouteTarget> = Vec::new();
+    let mut route_on_job = false;
     let mut held_vias: Vec<u64> = Vec::new();
     let mut route_stops_message: Option<String> = None;
     // Whether the player's keyboard types into the page's field, as last told to the page.
@@ -863,7 +866,9 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 });
                 meter.second(Instant::now(), sample, &webview, &profiles);
                 if let Some(snap) = meter.take_latest_snapshot() {
-                    if snap.game_fps > 1.0 && snap.game_fps < 40.0 && snap.gpu_busy_percent.is_none_or(|pct| pct >= 85.0)
+                    if snap.game_fps > 1.0
+                        && snap.game_fps < 40.0
+                        && snap.gpu_busy_percent.is_none_or(|pct| pct >= 85.0)
                     {
                         low_fps_windows = low_fps_windows.saturating_add(1);
                     } else if snap.game_fps >= 52.0 {
@@ -884,9 +889,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         perf_mode
                     );
                     if let Some(pipeline) = &pipeline {
-                        pipeline
-                            .capture
-                            .set_max_fps(if effective_lite { capture::LITE_FPS } else { capture::MAX_FPS });
+                        pipeline.capture.set_max_fps(if effective_lite { capture::LITE_FPS } else { capture::MAX_FPS });
                     }
                     let _ = webview.post_json(&settings_message(&config.settings.get(), effective_lite));
                 }
@@ -1042,16 +1045,20 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                 RouteUpdate::Next(_) => route_next_message = Some(message.clone()),
                 RouteUpdate::Paths { .. } => route_paths_message = Some(message.clone()),
                 RouteUpdate::Offered { .. } => {}
-                RouteUpdate::Route { id, nodes, waypoints } => {
+                RouteUpdate::Route { id, nodes, waypoints, targets, on_job } => {
                     route_number = Some(id);
                     route_uids = Some(nodes.iter().map(|node| node.uid).collect());
                     route_waypoints = waypoints;
+                    route_targets = targets;
+                    route_on_job = on_job;
                     (route_message, route_paths_message, route_next_message) = (Some(message.clone()), None, None);
                 }
                 RouteUpdate::None => {
                     route_number = None;
                     route_uids = None;
                     route_waypoints.clear();
+                    route_targets.clear();
+                    route_on_job = false;
                     (route_message, route_paths_message, route_next_message) = (Some(message.clone()), None, None);
                 }
             }
@@ -1063,6 +1070,8 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                     route_number,
                     route_uids.as_deref(),
                     &route_waypoints,
+                    &route_targets,
+                    route_on_job,
                     &[hidden, &held_vias].concat(),
                 );
                 let _ = webview.post_json(&stops);
@@ -1365,8 +1374,7 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         )
                     {
                         // Nothing to pause, hide or stop: Player's player isn't running.
-                    } else if let Some(player) =
-                        start_music_player(&mut music_player, &stage, &config, &music_folders)
+                    } else if let Some(player) = start_music_player(&mut music_player, &stage, &config, &music_folders)
                     {
                         let _ = player.command(&command);
                     }
@@ -1404,12 +1412,50 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         }
                     }
                 }
-                Some(PageMessage::Route { id, action, node }) => {
-                    let node = node.as_deref().and_then(|node| u64::from_str_radix(node, 16).ok()).unwrap_or(0);
+                Some(PageMessage::Route { id, action, node, nodes }) => {
                     let block = &bridge.bridge().route;
                     following = None;
-                    if let Some(overtaken) = route_changes.ask(block, id, action.into(), node, &[], Instant::now()) {
-                        let _ = webview.post_json(&overtaken);
+                    let reply = if action == PageRouteAction::SetStops {
+                        held_vias.clear();
+                        if nodes.len() > westplay_shared::MAX_ROUTE_STOPS {
+                            Some(serde_json::json!({ "type": "routeAnswer", "id": id, "answer": "full" }).to_string())
+                        } else {
+                            let mut vias = Vec::with_capacity(nodes.len());
+                            let mut valid = true;
+                            for hex in &nodes {
+                                match u64::from_str_radix(hex, 16) {
+                                    Ok(uid) if uid != 0 => vias.push(uid),
+                                    _ => {
+                                        valid = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            if valid {
+                                route_changes.ask(
+                                    block,
+                                    id,
+                                    westplay_shared::RouteAction::SetStops,
+                                    0,
+                                    &vias,
+                                    Instant::now(),
+                                )
+                            } else {
+                                Some(
+                                    serde_json::json!({ "type": "routeAnswer", "id": id, "answer": "noSuchNode" })
+                                        .to_string(),
+                                )
+                            }
+                        }
+                    } else {
+                        if matches!(action, PageRouteAction::End | PageRouteAction::Go) {
+                            held_vias.clear();
+                        }
+                        let node = node.as_deref().and_then(|node| u64::from_str_radix(node, 16).ok()).unwrap_or(0);
+                        route_changes.ask(block, id, action.into(), node, &[], Instant::now())
+                    };
+                    if let Some(reply) = reply {
+                        let _ = webview.post_json(&reply);
                     }
                 }
                 Some(PageMessage::Detours { id, nodes }) => {
@@ -1513,7 +1559,14 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
                         let _ = webview.post_json(&followed_message(follow.id, true, "done"));
                         // Its waypoints stay in the game's route: never the player's stops.
                         held_vias = follow.handover.handed().to_vec();
-                        let stops = stops_message(route_number, route_uids.as_deref(), &route_waypoints, &held_vias);
+                        let stops = stops_message(
+                            route_number,
+                            route_uids.as_deref(),
+                            &route_waypoints,
+                            &route_targets,
+                            route_on_job,
+                            &held_vias,
+                        );
                         let _ = webview.post_json(&stops);
                         route_stops_message = Some(stops);
                         following = None;
@@ -2548,11 +2601,8 @@ pub fn run(mut config: Config, stop: Arc<AtomicBool>) -> Result<(), Error> {
             }
         }
 
-        let idle_sleep = if !game_running && !status.screen_drawing {
-            Duration::from_millis(10)
-        } else {
-            Duration::from_millis(1)
-        };
+        let idle_sleep =
+            if !game_running && !status.screen_drawing { Duration::from_millis(10) } else { Duration::from_millis(1) };
         std::thread::sleep(idle_sleep);
     }
 
@@ -2942,20 +2992,74 @@ fn game_message(running: bool) -> String {
     serde_json::json!({ "type": "game", "running": running }).to_string()
 }
 
-/// `{"type":"routeStops","id":…,"stops":[…]}`: the player's stops along the route `id`, by the index of
-/// their map node in it (ascending): the game's waypoints (`waypoints`, map node uids) but those WestPlay put
-/// in to hold a route it handed over (`hidden`), and but the destination (off a job, the game keeps it as the
-/// last waypoint: seen 2026-10-21, at the route's last node). A waypoint not on the route is left out.
-fn stops_message(id: Option<u32>, route: Option<&[u64]>, waypoints: &[u64], hidden: &[u64]) -> String {
+/// `{"type":"routeStops","id":…,"stops":[…],"targets":[…]}`: the player's stops along the route `id`
+/// (by map node index, in route order), and the ordered target list (intermediate stops + trailing
+/// destination, with `locked: true` on a freight job's destination). WestPlay's hidden route-holding
+/// waypoints (`hidden`) are excluded except for the trailing destination.
+fn stops_message(
+    id: Option<u32>,
+    route: Option<&[u64]>,
+    waypoints: &[u64],
+    targets: &[route::RouteTarget],
+    on_job: bool,
+    hidden: &[u64],
+) -> String {
+    let Some(route) = route else {
+        return serde_json::json!({ "type": "routeStops", "id": id, "stops": [], "targets": [] }).to_string();
+    };
+    if !targets.is_empty() {
+        let visible: Vec<&route::RouteTarget> = targets
+            .iter()
+            .enumerate()
+            .filter(|&(index, target)| index + 1 == targets.len() || !hidden.contains(&target.uid))
+            .map(|(_, target)| target)
+            .collect();
+        let mut stops = Vec::new();
+        let mut target_entries = Vec::with_capacity(visible.len());
+        let mut search_from = 0usize;
+        for (index, target) in visible.iter().enumerate() {
+            let is_last = index + 1 == visible.len();
+            let node_index = if is_last {
+                route
+                    .iter()
+                    .rposition(|&node| node == target.uid)
+                    .or_else(|| (!route.is_empty()).then_some(route.len() - 1))
+            } else {
+                route
+                    .get(search_from..)
+                    .and_then(|tail| tail.iter().position(|&node| node == target.uid).map(|rel| search_from + rel))
+                    .or_else(|| route.iter().position(|&node| node == target.uid))
+            };
+            if !is_last && let Some(at) = node_index {
+                search_from = at;
+                if at + 1 < route.len() && !stops.contains(&at) {
+                    stops.push(at);
+                }
+            }
+            target_entries.push(serde_json::json!({
+                "uid": format!("{:x}", target.uid),
+                "position": target.position,
+                "nodeIndex": node_index,
+                "locked": is_last && on_job,
+            }));
+        }
+        return serde_json::json!({
+            "type": "routeStops",
+            "id": id,
+            "stops": stops,
+            "targets": target_entries,
+        })
+        .to_string();
+    }
     let mut stops: Vec<usize> = waypoints
         .iter()
         .filter(|uid| !hidden.contains(uid))
-        .filter_map(|uid| route?.iter().position(|node| node == uid))
-        .filter(|&at| route.is_some_and(|route| at + 1 < route.len()))
+        .filter_map(|uid| route.iter().position(|node| node == uid))
+        .filter(|&at| at + 1 < route.len())
         .collect();
     stops.sort_unstable();
     stops.dedup();
-    serde_json::json!({ "type": "routeStops", "id": id, "stops": stops }).to_string()
+    serde_json::json!({ "type": "routeStops", "id": id, "stops": stops, "targets": [] }).to_string()
 }
 
 /// The most presses of a keybind the page is told of at once.
@@ -3424,12 +3528,14 @@ enum PageMessage {
     Typing {
         selection: u32,
     },
-    /// A change to the game's route (Maps' search): at a map node (its uid in hex) to go or add a stop; `id`
-    /// comes back with the game's answer (`route_change`).
+    /// A change to the game's route (Maps' search / overview stops): at a map node (its uid in hex) to go or
+    /// add a stop, or a full ordered `nodes` list for `setStops`; `id` comes back with the game's answer.
     Route {
         id: u32,
         action: PageRouteAction,
         node: Option<String>,
+        #[serde(default)]
+        nodes: Vec<String>,
     },
     /// The routes to a map node (its uid in hex), or to `also` if a route comes to that last (the other end of the lane
     /// past the place), from where the truck is, to offer before Go (`planner`); `id` comes back with them.
@@ -3511,6 +3617,7 @@ enum PageRouteAction {
     AddStop,
     Go,
     End,
+    SetStops,
 }
 
 impl From<PageRouteAction> for westplay_shared::RouteAction {
@@ -3519,6 +3626,7 @@ impl From<PageRouteAction> for westplay_shared::RouteAction {
             PageRouteAction::AddStop => Self::AddStop,
             PageRouteAction::Go => Self::Go,
             PageRouteAction::End => Self::End,
+            PageRouteAction::SetStops => Self::SetStops,
         }
     }
 }
@@ -3656,7 +3764,9 @@ pub(crate) fn is_language_tag(tag: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Keybind, PageMessage, PageRouteAction, keybind_message, parse_page_message, screen_message, settings_message};
+    use super::{
+        Keybind, PageMessage, PageRouteAction, keybind_message, parse_page_message, screen_message, settings_message,
+    };
 
     #[test]
     fn a_language_tag_is_a_language_and_up_to_two_parts() {
@@ -3745,12 +3855,54 @@ mod tests {
     #[test]
     fn the_players_stops_are_the_waypoints_but_westplays_and_the_destination() {
         let route = [10, 11, 12, 13, 14, 15];
-        // The game's: a stop at 13, WestPlay's own at 11, another stop at 12, the destination at 15, one off
-        // the route.
-        let message = super::stops_message(Some(7), Some(&route), &[13, 11, 12, 15, 99], &[11]);
-        assert_eq!(message, r#"{"id":7,"stops":[2,3],"type":"routeStops"}"#);
+        // Legacy fallback when ordered targets are unavailable: a stop at 13, WestPlay's own at 11,
+        // another stop at 12, the destination at 15, one off the route.
+        let message = super::stops_message(Some(7), Some(&route), &[13, 11, 12, 15, 99], &[], false, &[11]);
+        assert_eq!(message, r#"{"id":7,"stops":[2,3],"targets":[],"type":"routeStops"}"#);
         // No route: none.
-        assert_eq!(super::stops_message(None, None, &[13], &[]), r#"{"id":null,"stops":[],"type":"routeStops"}"#);
+        assert_eq!(
+            super::stops_message(None, None, &[13], &[], false, &[]),
+            r#"{"id":null,"stops":[],"targets":[],"type":"routeStops"}"#
+        );
+        // Ordered targets on a backtracking route: stops follow navigator target order, hidden vias are
+        // excluded (destination kept), and job destination is locked.
+        let backtracking = [10, 12, 13, 12, 15];
+        let target = |uid: u64, x: f32| crate::route::RouteTarget { uid, position: [x, 0.0] };
+        let job_msg: serde_json::Value = serde_json::from_str(&super::stops_message(
+            Some(9),
+            Some(&backtracking),
+            &[12, 13],
+            &[target(13, 130.0), target(12, 120.0), target(15, 150.0)],
+            true,
+            &[],
+        ))
+        .unwrap();
+        assert_eq!(job_msg["stops"], serde_json::json!([2, 3]));
+        assert_eq!(
+            job_msg["targets"],
+            serde_json::json!([
+                { "uid": "d", "position": [130.0, 0.0], "nodeIndex": 2, "locked": false },
+                { "uid": "c", "position": [120.0, 0.0], "nodeIndex": 3, "locked": false },
+                { "uid": "f", "position": [150.0, 0.0], "nodeIndex": 4, "locked": true },
+            ])
+        );
+        let free_msg: serde_json::Value = serde_json::from_str(&super::stops_message(
+            Some(10),
+            Some(&route),
+            &[11, 13, 15],
+            &[target(11, 110.0), target(13, 130.0), target(15, 150.0)],
+            false,
+            &[11],
+        ))
+        .unwrap();
+        assert_eq!(free_msg["stops"], serde_json::json!([3]));
+        assert_eq!(
+            free_msg["targets"],
+            serde_json::json!([
+                { "uid": "d", "position": [130.0, 0.0], "nodeIndex": 3, "locked": false },
+                { "uid": "f", "position": [150.0, 0.0], "nodeIndex": 5, "locked": false },
+            ])
+        );
     }
 
     #[test]
@@ -3816,11 +3968,25 @@ mod tests {
         );
         assert_eq!(
             parse_page_message(r#"{"type":"route","id":3,"action":"addStop","node":"478ef4c4cd160002"}"#),
-            Some(PageMessage::Route { id: 3, action: PageRouteAction::AddStop, node: Some("478ef4c4cd160002".into()) })
+            Some(PageMessage::Route {
+                id: 3,
+                action: PageRouteAction::AddStop,
+                node: Some("478ef4c4cd160002".into()),
+                nodes: Vec::new(),
+            })
         );
         assert_eq!(
             parse_page_message(r#"{"type":"route","id":4,"action":"end"}"#),
-            Some(PageMessage::Route { id: 4, action: PageRouteAction::End, node: None })
+            Some(PageMessage::Route { id: 4, action: PageRouteAction::End, node: None, nodes: Vec::new() })
+        );
+        assert_eq!(
+            parse_page_message(r#"{"type":"route","id":6,"action":"setStops","nodes":["a","b"]}"#),
+            Some(PageMessage::Route {
+                id: 6,
+                action: PageRouteAction::SetStops,
+                node: None,
+                nodes: vec!["a".into(), "b".into()],
+            })
         );
         assert_eq!(parse_page_message(r#"{"type":"route","id":5,"action":"teleport"}"#), None);
         assert_eq!(
@@ -4146,7 +4312,13 @@ mod tests {
         use westplay_mapdata::junctions::{Maneuver, Turn};
         let node = RouteNode { position: [1.0, 2.0], height: 3.0, forward: [0.0, -1.0], uid: 7, distance_left: 1500.0 };
         assert_eq!(
-            super::route_message_for(&RouteUpdate::Route { id: 5, nodes: vec![node], waypoints: vec![] }),
+            super::route_message_for(&RouteUpdate::Route {
+                id: 5,
+                nodes: vec![node],
+                waypoints: vec![],
+                targets: vec![],
+                on_job: false,
+            }),
             r#"{"id":5,"nodes":[[1.0,2.0,0.0,-1.0,1500.0,3.0]],"type":"route"}"#
         );
         assert_eq!(super::route_message_for(&RouteUpdate::Next(3)), r#"{"next":3,"type":"routeNext"}"#);

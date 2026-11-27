@@ -6,6 +6,7 @@ import { strings as zhStrings } from '../state/strings/zh_cn'
 import { matchesTurnDirection } from './laneGuidance'
 import { LaneRibbon } from './LaneRibbon'
 import { MapControlsView } from './MapControls'
+import { OverviewStopsCardView } from './OverviewStopsCard'
 import { TrafficLightPillView } from './TrafficLightPill'
 import { TripBarView } from './TripBar'
 import { trafficLightSnapshotOf } from './useTrafficLight'
@@ -153,7 +154,7 @@ describe('MapControlsView corner dock layout', () => {
     zoomOut: 'Zoom out',
   }
 
-  it('renders an always-on icon-only recentre button in centred state when following', () => {
+  it('renders two stacked vertical capsules with recentre + compass above zoom when following a route', () => {
     const html = renderToStaticMarkup(
       createElement(MapControlsView, {
         browsing: false,
@@ -165,7 +166,8 @@ describe('MapControlsView corner dock layout', () => {
       }),
     )
     expect(html).toContain('map-controls map-dock')
-    expect(html).toContain('map-recentre-btn glass centred')
+    expect(html).toContain('map-view-rail map-orient-rail glass')
+    expect(html).toContain('map-recentre-btn centred')
     expect(html).not.toContain('map-recentre-label')
     expect(html).toContain('aria-pressed="true"')
     expect(html).not.toContain('map-compass north-up')
@@ -173,7 +175,7 @@ describe('MapControlsView corner dock layout', () => {
     expect(html).toContain('map-action-bar glass')
     expect(html).toContain('map-dock-search')
     expect(html).toContain('map-overview')
-    expect(html).toContain('map-view-rail glass')
+    expect(html).toContain('map-view-rail map-zoom-rail glass')
     expect(html).toContain('data-control="zoom-in"')
     expect(html).toContain('data-control="zoom-out"')
   })
@@ -189,7 +191,7 @@ describe('MapControlsView corner dock layout', () => {
         labels,
       }),
     )
-    expect(html).toContain('map-recentre-btn glass off-center')
+    expect(html).toContain('map-recentre-btn off-center')
     expect(html).toContain('aria-label="Recenter"')
     expect(html).not.toContain('disabled=""')
     expect(html).not.toContain('map-overview selected')
@@ -207,7 +209,7 @@ describe('MapControlsView corner dock layout', () => {
         labels,
       }),
     )
-    expect(html).toContain('map-recentre-btn glass off-center')
+    expect(html).toContain('map-recentre-btn off-center')
     expect(html).toContain('aria-label="Return to navigation"')
     expect(html).toContain('map-dock-search selected')
     expect(html).toContain('map-overview selected')
@@ -246,16 +248,28 @@ describe('MapControlsView corner dock layout', () => {
         labels,
       }),
     )
-    expect(html).toContain('map-recentre-btn glass centred')
+    expect(html).toContain('map-recentre-btn centred')
     expect(html).toContain('map-compass north-up')
     expect(html).not.toContain('disabled=""')
   })
 
-  it('omits route overview button when free-driving without a route', () => {
+  it('hides the redundant dock action bar when free-driving with search closed', () => {
     const html = renderToStaticMarkup(
       createElement(MapControlsView, { browsing: false, overview: false, hasRoute: false, searchOpen: false, labels }),
     )
-    expect(html).toContain('map-dock-search')
+    expect(html).toContain('map-view-rail map-orient-rail glass')
+    expect(html).toContain('map-view-rail map-zoom-rail glass')
+    expect(html).not.toContain('map-action-bar')
+    expect(html).not.toContain('map-dock-search')
+    expect(html).not.toContain('map-overview')
+  })
+
+  it('keeps the selected search toggle in the dock when search is open without a route', () => {
+    const html = renderToStaticMarkup(
+      createElement(MapControlsView, { browsing: false, overview: false, hasRoute: false, searchOpen: true, labels }),
+    )
+    expect(html).toContain('map-action-bar glass')
+    expect(html).toContain('map-dock-search selected')
     expect(html).not.toContain('map-overview')
   })
 })
@@ -348,5 +362,165 @@ describe('TripBarView Liquid Glass interactive trip & pit-stop controls', () => 
     expect(html).toContain('pitstop-fuel')
     expect(html).toContain('pitstop-rest')
     expect(html).toContain('pitstop-service')
+  })
+})
+
+describe('OverviewStopsCardView job vs non-job rendering', () => {
+  it('renders drag handles and delete buttons for all rows including destination in non-job mode', () => {
+    const html = renderToStaticMarkup(
+      createElement(OverviewStopsCardView, {
+        snapshot: {
+          routeId: 1,
+          onJob: false,
+          movableCount: 2,
+          intermediateCount: 1,
+          items: [
+            {
+              uid: 'a1',
+              key: 'uid:a1',
+              position: [100, 0],
+              nodeIndex: 1,
+              locked: false,
+              isDestination: false,
+              stopNumber: 1,
+              placeKind: 'fuel',
+              title: 'Shell',
+              subtitle: '加油站 · 柏林',
+              distance: '30 km',
+              editable: true,
+            },
+            {
+              uid: 'b2',
+              key: 'uid:b2',
+              position: [200, 0],
+              nodeIndex: 2,
+              locked: false,
+              isDestination: true,
+              stopNumber: null,
+              placeKind: 'company',
+              title: 'LKW',
+              subtitle: '公司 · 慕尼黑',
+              distance: '120 km',
+              editable: true,
+            },
+          ],
+        },
+        text: zhStrings,
+        busy: false,
+        draggingIndex: null,
+        dragOffsetY: 0,
+        dropMarker: null,
+        keyboardGrabbedIndex: null,
+        statusAnnouncement: '',
+        onAddStop: () => {},
+      }),
+    )
+    expect(html).toContain('overview-stops-card glass')
+    expect(html).toContain('路线途经点')
+    expect(html).toContain('1 个途经点')
+    expect(html).toContain('overview-stops-add')
+    expect(html.match(/class="overview-stop-handle"/g)?.length).toBe(2)
+    expect(html.match(/class="overview-stop-delete"/g)?.length).toBe(2)
+    expect(html).not.toContain('overview-stop-lock')
+    expect(html).toContain('data-own-drag=""')
+  })
+
+  it('locks the job destination row without drag handle or delete button on a freight job', () => {
+    const html = renderToStaticMarkup(
+      createElement(OverviewStopsCardView, {
+        snapshot: {
+          routeId: 2,
+          onJob: true,
+          movableCount: 1,
+          intermediateCount: 1,
+          items: [
+            {
+              uid: 'a1',
+              key: 'uid:a1',
+              position: [100, 0],
+              nodeIndex: 1,
+              locked: false,
+              isDestination: false,
+              stopNumber: 1,
+              placeKind: 'fuel',
+              title: 'Shell',
+              subtitle: '加油站 · 柏林',
+              distance: '30 km',
+              editable: true,
+            },
+            {
+              uid: 'jobdest',
+              key: 'uid:jobdest',
+              position: [300, 0],
+              nodeIndex: 3,
+              locked: true,
+              isDestination: true,
+              stopNumber: null,
+              placeKind: null,
+              title: 'EuroGoodies',
+              subtitle: '送达地 · 慕尼黑',
+              distance: '120 km',
+              editable: false,
+            },
+          ],
+        },
+        text: zhStrings,
+        busy: false,
+        draggingIndex: null,
+        dragOffsetY: 0,
+        dropMarker: null,
+        keyboardGrabbedIndex: null,
+        statusAnnouncement: '',
+        onAddStop: () => {},
+      }),
+    )
+    expect(html).toContain('overview-stop-row is-destination is-locked')
+    expect(html.match(/class="overview-stop-handle"/g)?.length).toBe(1)
+    expect(html.match(/class="overview-stop-delete"/g)?.length).toBe(1)
+    expect(html.match(/class="overview-stop-lock"/g)?.length).toBe(1)
+    expect(html).toContain('EuroGoodies')
+    expect(html).toContain('任务终点已锁定')
+  })
+
+  it('still renders the card with add button and locked destination when a job has zero intermediate stops', () => {
+    const html = renderToStaticMarkup(
+      createElement(OverviewStopsCardView, {
+        snapshot: {
+          routeId: 3,
+          onJob: true,
+          movableCount: 0,
+          intermediateCount: 0,
+          items: [
+            {
+              uid: 'jobdest',
+              key: 'uid:jobdest',
+              position: [300, 0],
+              nodeIndex: 3,
+              locked: true,
+              isDestination: true,
+              stopNumber: null,
+              placeKind: null,
+              title: 'EuroGoodies',
+              subtitle: '送达地 · 慕尼黑',
+              distance: '120 km',
+              editable: false,
+            },
+          ],
+        },
+        text: zhStrings,
+        busy: false,
+        draggingIndex: null,
+        dragOffsetY: 0,
+        dropMarker: null,
+        keyboardGrabbedIndex: null,
+        statusAnnouncement: '',
+        onAddStop: () => {},
+      }),
+    )
+    expect(html).toContain('overview-stops-card glass')
+    expect(html).toContain('overview-stops-add')
+    expect(html).toContain('overview-stop-lock')
+    expect(html).toContain('overview-stops-hint')
+    expect(html).not.toContain('overview-stop-delete')
   })
 })

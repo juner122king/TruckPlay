@@ -12,6 +12,7 @@
 /* In navigation app: true full-screen, filling all 4 sides with no card radius or shadow. */
 .map-tile.map-navigation {
   --nav-corner-inset: max(8px, calc((var(--panel-radius) - 32px) * var(--corner-inset)));
+  --nav-left-card-width: min(352px, calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 256px));
   border-radius: 0;
   box-shadow: none;
 }
@@ -385,19 +386,22 @@
   z-index: 6;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 10px;
-  max-width: min(404px, calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 210px));
+  width: var(--nav-left-card-width);
+  max-width: var(--nav-left-card-width);
 }
 .map-navigation .nav-trip-cluster.free-drive-cluster {
-  max-width: calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 210px);
+  width: auto;
+  align-items: flex-start;
+  max-width: calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 116px);
 }
 .map-navigation .eta-pill {
   position: relative;
   left: auto;
   bottom: auto;
   width: 100%;
-  min-width: 248px;
+  min-width: 0;
   max-width: 100%;
   padding: 12px 18px;
   border-radius: 24px;
@@ -488,7 +492,7 @@
 /* Expandable Liquid Glass Trip Action & Along-Route Pit-Stop Popover */
 .trip-drawer {
   width: 100%;
-  min-width: 312px;
+  min-width: 0;
   padding: 14px;
   border-radius: 26px;
   background: linear-gradient(165deg, rgb(24 30 39 / 0.86) 0%, rgb(14 18 25 / 0.92) 100%);
@@ -522,19 +526,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 2px;
+  padding: 0 3px;
 }
 .trip-drawer-title {
-  font-size: calc(14.5px * var(--text-scale, 1));
-  font-weight: 700;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 680;
   letter-spacing: 0.02em;
-  color: rgb(255 255 255 / 0.74);
+  color: rgb(255 255 255 / 0.72);
 }
 .appearance-light .trip-drawer-title {
-  color: rgb(20 24 32 / 0.64);
+  color: rgb(20 24 32 / 0.62);
 }
 .trip-stops-badge {
-  padding: 2px 9px;
+  padding: 2px 10px;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.11);
   color: rgb(255 255 255 / 0.88);
@@ -548,52 +552,62 @@
 .trip-pitstops {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 9px;
 }
-.trip-pitstop-btn {
+.trip-drawer .trip-pitstop-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 11px 8px;
+  gap: 8px;
+  padding: 12px 8px 10px;
   border-radius: 18px;
-  background: rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.09);
   border: 1px solid rgb(255 255 255 / 0.12);
-  color: #fff;
+  color: #f5f7fa;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
   transition:
     background-color 160ms var(--motion-ease),
     border-color 160ms var(--motion-ease),
+    box-shadow 160ms var(--motion-ease),
     transform 140ms var(--motion-ease);
 }
-.appearance-light .trip-pitstop-btn {
-  background: rgb(20 24 32 / 0.045);
+.appearance-light .trip-drawer .trip-pitstop-btn {
+  background: rgb(255 255 255 / 0.84);
   border-color: rgb(20 24 32 / 0.08);
-  color: #14181b;
+  color: #161a20;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 2px 6px rgb(15 23 42 / 0.06);
 }
-.trip-pitstop-btn:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.14);
+.trip-drawer .trip-pitstop-btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.16);
+  border-color: rgb(255 255 255 / 0.22);
 }
-.appearance-light .trip-pitstop-btn:hover:not(:disabled) {
-  background: rgb(20 24 32 / 0.08);
+.appearance-light .trip-drawer .trip-pitstop-btn:hover:not(:disabled) {
+  background: #fff;
+  border-color: rgb(20 24 32 / 0.14);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px rgb(15 23 42 / 0.09);
 }
-.trip-pitstop-btn:active:not(:disabled) {
-  transform: scale(0.94);
+.trip-drawer .trip-pitstop-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
-.trip-pitstop-btn:disabled {
+.trip-drawer .trip-pitstop-btn:disabled {
   opacity: 0.55;
 }
 .trip-pitstop-icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   color: #fff;
 }
 .trip-pitstop-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 21px;
+  height: 21px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.1;
@@ -602,44 +616,50 @@
 }
 .pitstop-fuel .trip-pitstop-icon {
   background: linear-gradient(145deg, #4b94ff 0%, #1c6ef2 100%);
-  box-shadow: 0 3px 10px rgb(28 110 242 / 0.4);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 3px 10px rgb(28 110 242 / 0.38);
 }
 .pitstop-rest .trip-pitstop-icon {
   background: linear-gradient(145deg, #6b7cff 0%, #4b4ee0 100%);
-  box-shadow: 0 3px 10px rgb(75 78 224 / 0.38);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 3px 10px rgb(75 78 224 / 0.36);
 }
 .pitstop-service .trip-pitstop-icon {
   background: linear-gradient(145deg, #ffad33 0%, #f08200 100%);
-  box-shadow: 0 3px 10px rgb(240 130 0 / 0.38);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 3px 10px rgb(240 130 0 / 0.36);
 }
 .trip-pitstop-label {
-  font-size: calc(14.5px * var(--text-scale, 1));
-  font-weight: 650;
-  line-height: 1.1;
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 660;
+  line-height: 1.15;
   white-space: nowrap;
 }
 .trip-route-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 9px;
 }
-.trip-action-btn,
-.trip-job-lock {
+.trip-drawer .trip-action-btn,
+.trip-drawer .trip-job-lock {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 44px;
-  padding: 0 12px;
+  min-block-size: 46px;
+  padding: 0 14px;
   border-radius: 15px;
   font-size: calc(15px * var(--text-scale, 1));
-  font-weight: 650;
+  font-weight: 660;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.trip-action-btn svg,
-.trip-job-lock svg {
+.trip-drawer .trip-action-btn svg,
+.trip-drawer .trip-job-lock svg {
   width: 18px;
   height: 18px;
   flex: none;
@@ -649,48 +669,68 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.trip-action-btn {
-  background: rgb(255 255 255 / 0.1);
+.trip-drawer .trip-action-btn {
+  background: rgb(255 255 255 / 0.09);
   border: 1px solid rgb(255 255 255 / 0.12);
-  color: #fff;
+  color: #f5f7fa;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
   transition:
     background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease),
+    box-shadow 160ms var(--motion-ease),
     transform 140ms var(--motion-ease);
 }
-.appearance-light .trip-action-btn {
-  background: rgb(20 24 32 / 0.06);
+.appearance-light .trip-drawer .trip-action-btn {
+  background: rgb(255 255 255 / 0.84);
   border-color: rgb(20 24 32 / 0.08);
-  color: #14181b;
+  color: #161a20;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 2px 6px rgb(15 23 42 / 0.06);
 }
-.trip-action-btn:hover:not(:disabled) {
+.trip-drawer .trip-action-btn:hover:not(:disabled) {
   background: rgb(255 255 255 / 0.16);
+  border-color: rgb(255 255 255 / 0.22);
 }
-.appearance-light .trip-action-btn:hover:not(:disabled) {
-  background: rgb(20 24 32 / 0.1);
+.appearance-light .trip-drawer .trip-action-btn:hover:not(:disabled) {
+  background: #fff;
+  border-color: rgb(20 24 32 / 0.14);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px rgb(15 23 42 / 0.09);
 }
-.trip-action-btn:active:not(:disabled) {
+.trip-drawer .trip-action-btn:active:not(:disabled) {
   transform: scale(0.96);
 }
-.trip-action-btn.danger {
-  background: rgb(255 69 58 / 0.2);
-  border-color: rgb(255 69 58 / 0.36);
-  color: #ff7a70;
+.trip-drawer .trip-action-btn.danger {
+  background: rgb(255 69 58 / 0.18);
+  border-color: rgb(255 69 58 / 0.34);
+  color: #ff8278;
+  box-shadow: inset 0 1px 0 rgb(255 160 155 / 0.14);
 }
-.appearance-light .trip-action-btn.danger {
-  background: rgb(255 59 48 / 0.12);
-  border-color: rgb(255 59 48 / 0.26);
+.appearance-light .trip-drawer .trip-action-btn.danger {
+  background: rgb(255 59 48 / 0.11);
+  border-color: rgb(255 59 48 / 0.24);
   color: #d12c22;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    0 2px 6px rgb(209 44 34 / 0.06);
 }
-.trip-action-btn.danger:hover:not(:disabled) {
-  background: rgb(255 69 58 / 0.28);
+.trip-drawer .trip-action-btn.danger:hover:not(:disabled) {
+  background: rgb(255 69 58 / 0.26);
+  border-color: rgb(255 69 58 / 0.44);
 }
-.trip-job-lock {
+.appearance-light .trip-drawer .trip-action-btn.danger:hover:not(:disabled) {
+  background: rgb(255 59 48 / 0.17);
+  border-color: rgb(255 59 48 / 0.34);
+}
+.trip-drawer .trip-job-lock {
   background: rgb(255 255 255 / 0.05);
   border: 1px dashed rgb(255 255 255 / 0.16);
   color: rgb(255 255 255 / 0.56);
   font-size: calc(13.5px * var(--text-scale, 1));
 }
-.appearance-light .trip-job-lock {
+.appearance-light .trip-drawer .trip-job-lock {
   background: rgb(20 24 32 / 0.04);
   border-color: rgb(20 24 32 / 0.14);
   color: rgb(20 24 32 / 0.54);
@@ -700,130 +740,180 @@
 .free-drive-bar {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 10px;
+  padding: 7px 9px;
   border-radius: 999px;
-  background: linear-gradient(165deg, rgb(24 30 39 / 0.84) 0%, rgb(15 19 26 / 0.9) 100%);
+  background: linear-gradient(165deg, rgb(24 30 39 / 0.86) 0%, rgb(15 19 26 / 0.92) 100%);
   border: 1px solid rgb(255 255 255 / 0.16);
-  backdrop-filter: blur(18px) saturate(165%);
+  backdrop-filter: blur(20px) saturate(175%);
   color: #fff;
   box-shadow:
     inset 0 1.5px 0 rgb(255 255 255 / 0.24),
+    inset 0 -1px 0 rgb(255 255 255 / 0.05),
     var(--shadow-raised-large);
 }
 .appearance-light .free-drive-bar {
   background: linear-gradient(165deg, rgb(255 255 255 / 0.9) 0%, rgb(244 247 252 / 0.95) 100%);
-  border-color: rgb(20 24 32 / 0.09);
+  border-color: rgb(20 24 32 / 0.1);
   color: #14181b;
   box-shadow:
-    inset 0 1.5px 0 rgb(255 255 255 / 0.95),
+    inset 0 1.5px 0 rgb(255 255 255 / 0.96),
     var(--shadow-raised-large);
 }
-.free-drive-search-btn {
+.free-drive-bar .free-drive-search-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 46px;
-  padding: 0 16px;
+  justify-content: center;
+  gap: 9px;
+  min-block-size: 56px;
+  padding: 0 20px 0 18px;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--apple-blue) 22%, rgb(255 255 255 / 0.08));
-  border: 1px solid color-mix(in oklab, var(--apple-blue) 45%, transparent);
-  color: #8cc9ff;
-  font-size: calc(16px * var(--text-scale, 1));
-  font-weight: 680;
+  background: rgb(255 255 255 / 0.09);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  color: #f5f7fa;
+  font-size: calc(17px * var(--text-scale, 1));
+  font-weight: 660;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
   transition:
     background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease),
+    box-shadow 160ms var(--motion-ease),
     transform 140ms var(--motion-ease);
 }
-.appearance-light .free-drive-search-btn {
-  background: color-mix(in oklab, var(--apple-blue) 12%, transparent);
-  border-color: color-mix(in oklab, var(--apple-blue) 28%, transparent);
-  color: #006ee6;
+.appearance-light .free-drive-bar .free-drive-search-btn {
+  background: rgb(255 255 255 / 0.84);
+  border-color: rgb(20 24 32 / 0.08);
+  color: #161a20;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 2px 6px rgb(15 23 42 / 0.06);
 }
-.free-drive-search-btn:hover {
-  background: color-mix(in oklab, var(--apple-blue) 32%, rgb(255 255 255 / 0.1));
+.free-drive-bar .free-drive-search-btn:hover {
+  background: rgb(255 255 255 / 0.16);
+  border-color: rgb(255 255 255 / 0.22);
 }
-.free-drive-search-btn:active {
+.appearance-light .free-drive-bar .free-drive-search-btn:hover {
+  background: #fff;
+  border-color: rgb(20 24 32 / 0.14);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px rgb(15 23 42 / 0.09);
+}
+.free-drive-bar .free-drive-search-btn:active {
   transform: scale(0.95);
 }
-.free-drive-search-btn svg {
-  width: 20px;
-  height: 20px;
+.free-drive-bar .free-drive-search-btn svg {
+  width: 21px;
+  height: 21px;
+  flex: none;
+  color: #58a6ff;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.4;
   stroke-linecap: round;
 }
+.appearance-light .free-drive-bar .free-drive-search-btn svg {
+  color: #007aff;
+}
 .free-drive-divider {
   width: 1.5px;
-  height: 26px;
+  height: 30px;
   background: currentColor;
-  opacity: 0.16;
+  opacity: 0.14;
   flex: none;
 }
 .free-drive-stops {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
-.pitstop-chip {
+.free-drive-bar .pitstop-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 46px;
-  padding: 0 14px;
+  justify-content: center;
+  gap: 10px;
+  min-block-size: 56px;
+  padding: 0 20px 0 12px;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.08);
-  font-size: calc(15px * var(--text-scale, 1));
-  font-weight: 650;
+  background: rgb(255 255 255 / 0.09);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  color: #f5f7fa;
+  font-size: calc(17px * var(--text-scale, 1));
+  font-weight: 660;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
   transition:
     background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease),
+    box-shadow 160ms var(--motion-ease),
     transform 140ms var(--motion-ease);
 }
-.appearance-light .pitstop-chip {
-  background: rgb(20 24 32 / 0.055);
+.appearance-light .free-drive-bar .pitstop-chip {
+  background: rgb(255 255 255 / 0.84);
+  border-color: rgb(20 24 32 / 0.08);
+  color: #161a20;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 2px 6px rgb(15 23 42 / 0.06);
 }
-.pitstop-chip:hover:not(:disabled) {
-  background: rgb(255 255 255 / 0.15);
+.free-drive-bar .pitstop-chip:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.16);
+  border-color: rgb(255 255 255 / 0.22);
 }
-.appearance-light .pitstop-chip:hover:not(:disabled) {
-  background: rgb(20 24 32 / 0.1);
+.appearance-light .free-drive-bar .pitstop-chip:hover:not(:disabled) {
+  background: #fff;
+  border-color: rgb(20 24 32 / 0.14);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 10px rgb(15 23 42 / 0.09);
 }
-.pitstop-chip:active:not(:disabled) {
+.free-drive-bar .pitstop-chip:active:not(:disabled) {
   transform: scale(0.95);
 }
-.pitstop-chip:disabled {
+.free-drive-bar .pitstop-chip:disabled {
   opacity: 0.55;
 }
-.pitstop-chip svg {
-  width: 18px;
-  height: 18px;
+.pitstop-chip-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+.pitstop-chip-icon svg {
+  width: 19px;
+  height: 19px;
   flex: none;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.1;
+  stroke-width: 2.15;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.pitstop-chip.pitstop-fuel svg {
-  color: #4b94ff;
+.pitstop-chip.pitstop-fuel .pitstop-chip-icon {
+  background: linear-gradient(145deg, #4b94ff 0%, #1c6ef2 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 3px 8px rgb(28 110 242 / 0.36);
 }
-.pitstop-chip.pitstop-rest svg {
-  color: #848dff;
+.pitstop-chip.pitstop-rest .pitstop-chip-icon {
+  background: linear-gradient(145deg, #6b7cff 0%, #4b4ee0 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 3px 8px rgb(75 78 224 / 0.34);
 }
-.pitstop-chip.pitstop-service svg {
-  color: #ffaa33;
+.pitstop-chip.pitstop-service .pitstop-chip-icon {
+  background: linear-gradient(145deg, #ffad33 0%, #f08200 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 3px 8px rgb(240 130 0 / 0.34);
 }
-.appearance-light .pitstop-chip.pitstop-fuel svg {
-  color: #1c6ef2;
-}
-.appearance-light .pitstop-chip.pitstop-rest svg {
-  color: #4b4ee0;
-}
-.appearance-light .pitstop-chip.pitstop-service svg {
-  color: #d97500;
+.pitstop-chip-label {
+  line-height: 1.1;
 }
 
 .map-navigation .eta-arrival {
@@ -947,6 +1037,7 @@
 @container carplay (max-height: 520px) {
   .map-tile.map-navigation {
     --nav-corner-inset: max(6px, calc((var(--panel-radius) - 24px) * var(--corner-inset)));
+    --nav-left-card-width: min(312px, calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 212px));
   }
   .map-navigation .speed-stack {
     transform: scale(0.78);
@@ -960,65 +1051,94 @@
   }
   .map-navigation .nav-trip-cluster {
     gap: 6px;
-    max-width: min(332px, calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 165px));
+    width: var(--nav-left-card-width);
+    max-width: var(--nav-left-card-width);
   }
   .map-navigation .nav-trip-cluster.free-drive-cluster {
-    max-width: calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 165px);
+    width: auto;
+    max-width: calc(100% - var(--content-left) - var(--edge) - var(--nav-corner-inset) - 96px);
   }
   .map-navigation .eta-pill {
     padding: 8px 14px;
     border-radius: 18px;
-    min-width: 210px;
+    min-width: 0;
   }
   .map-navigation .trip-drawer {
-    min-width: 288px;
-    padding: 9px 10px;
-    border-radius: 18px;
-    gap: 6px;
+    min-width: 0;
+    padding: 10px 11px;
+    border-radius: 20px;
+    gap: 8px;
   }
   .map-navigation .trip-drawer-title {
     font-size: calc(13px * var(--text-scale, 1));
   }
   .map-navigation .trip-stops-badge {
     font-size: calc(12px * var(--text-scale, 1));
-    padding: 1px 7px;
+    padding: 2px 8px;
   }
-  .map-navigation .trip-pitstops {
-    gap: 6px;
+  .map-navigation .trip-pitstops,
+  .map-navigation .trip-route-actions {
+    gap: 7px;
   }
-  .map-navigation .trip-pitstop-btn {
+  .map-navigation .trip-drawer .trip-pitstop-btn {
     flex-direction: row;
-    padding: 6px 8px;
-    border-radius: 12px;
-    gap: 5px;
+    min-block-size: 40px;
+    padding: 6px 10px;
+    border-radius: 13px;
+    gap: 7px;
   }
   .map-navigation .trip-pitstop-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 7px;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
   }
   .map-navigation .trip-pitstop-icon svg {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
   }
   .map-navigation .trip-pitstop-label {
-    font-size: calc(13px * var(--text-scale, 1));
+    font-size: calc(13.5px * var(--text-scale, 1));
   }
-  .map-navigation .trip-action-btn,
-  .map-navigation .trip-job-lock {
-    height: 34px;
-    border-radius: 11px;
-    font-size: calc(13px * var(--text-scale, 1));
+  .map-navigation .trip-drawer .trip-action-btn,
+  .map-navigation .trip-drawer .trip-job-lock {
+    min-block-size: 38px;
+    padding: 0 11px;
+    border-radius: 12px;
+    font-size: calc(13.5px * var(--text-scale, 1));
   }
   .map-navigation .free-drive-bar {
-    padding: 5px 6px;
+    padding: 6px 8px;
+    gap: 8px;
+  }
+  .map-navigation .free-drive-divider {
+    height: 26px;
+  }
+  .map-navigation .free-drive-stops {
     gap: 6px;
   }
-  .map-navigation .free-drive-search-btn,
-  .map-navigation .pitstop-chip {
-    height: 38px;
-    padding: 0 11px;
-    font-size: calc(13.5px * var(--text-scale, 1));
+  .map-navigation .free-drive-bar .free-drive-search-btn {
+    min-block-size: 46px;
+    padding: 0 16px 0 14px;
+    gap: 7px;
+    font-size: calc(15.5px * var(--text-scale, 1));
+  }
+  .map-navigation .free-drive-bar .free-drive-search-btn svg {
+    width: 19px;
+    height: 19px;
+  }
+  .map-navigation .free-drive-bar .pitstop-chip {
+    min-block-size: 46px;
+    padding: 0 16px 0 10px;
+    gap: 8px;
+    font-size: calc(15.5px * var(--text-scale, 1));
+  }
+  .map-navigation .free-drive-bar .pitstop-chip-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .map-navigation .free-drive-bar .pitstop-chip-icon svg {
+    width: 16px;
+    height: 16px;
   }
   .map-navigation .eta-progress-track {
     margin-top: 6px;
@@ -1031,11 +1151,13 @@
     visibility: hidden;
     pointer-events: none;
   }
-  .pitstop-chip span {
+  .free-drive-bar .pitstop-chip-label {
     display: none;
   }
-  .pitstop-chip {
-    padding: 0 12px;
+  .free-drive-bar .pitstop-chip {
+    min-inline-size: 46px;
+    padding: 0 9px;
+    justify-content: center;
   }
 }
 @media (prefers-reduced-motion: reduce) {

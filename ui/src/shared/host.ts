@@ -318,9 +318,9 @@ export type HostMessage =
   /** Whether the game's window shows (`false`: minimised, or on another desktop; in front or not: Lossless
    * Scaling's window is in front of it). */
   | { type: 'gameShown'; shown: boolean }
-  /** The player's stops along the route `id`: their map nodes' indices in it, ascending (not WestPlay's own
-   * waypoints, nor the destination). */
-  | { type: 'routeStops'; id: number | null; stops: number[] }
+  /** The player's stops along the route `id`: their map nodes' indices in it (in route order), plus the
+   * ordered route targets (intermediate stops and trailing destination, with `locked` on a job destination). */
+  | { type: 'routeStops'; id: number | null; stops: number[]; targets?: RouteTargetInfo[] }
   /** The game's menu gone while it's still paused: its still picture before the truck moves on. */
   | { type: 'menuGone'; gone: boolean }
   /** A keybind of the player's (the companion's Controls), pressed in the game. */
@@ -510,9 +510,9 @@ export type PageMessage =
   /** Where the host's cursor may be seen (page pixels): the CarPlay area, its corners round as its black ones, a
    * little inside the frame's edge (shell/cursorArea.ts). */
   | { type: 'cursorArea'; area: { left: number; top: number; right: number; bottom: number; radius: number } }
-  /** A change to the game's GPS route (Maps' search), at a map node (its uid, hex) for going or adding a
-   * stop; the host answers with `routeAnswer` and the same `id`. */
-  | { type: 'route'; id: number; action: RouteAction; node?: string }
+  /** A change to the game's GPS route (Maps' search / overview stops): at a map node (its uid, hex) for going
+   * or adding a stop, or an ordered `nodes` list for `setStops`; the host answers with `routeAnswer` and `id`. */
+  | { type: 'route'; id: number; action: RouteAction; node?: string; nodes?: string[] }
   /** The routes to a map node (its uid, hex; or to `also`, if a route comes to that last) from where the truck is, to
    * offer before Go (Directions). */
   | { type: 'routes'; id: number; node: string; also?: string }
@@ -1623,9 +1623,21 @@ export type TypedEvent = { text: string } | { key: 'backspace' | 'wordBackspace'
  * the keys the game's (`paused`: the truck moved, or the field was selected while it moved). */
 export type TypingState = 'off' | 'typing' | 'paused'
 
+/** One ordered target on the game's GPS route (intermediate stop or final destination). */
+export interface RouteTargetInfo {
+  /** Map node uid in lowercase hex (matches `Destination.node` / `Destination.also`). */
+  uid: string
+  /** World coordinates `[x, z]` in game metres. */
+  position: [number, number]
+  /** Matched node index along `route.nodes`, or `null` if off the road node list. */
+  nodeIndex: number | null
+  /** True when this target is an active freight job's destination (cannot be moved or deleted). */
+  locked: boolean
+}
+
 /** What the page asks of the game's route: a stop added (before a job's destination), the route to a place
- * alone (not on a job), or no more stops. */
-export type RouteAction = 'addStop' | 'go' | 'end'
+ * alone (not on a job), no more stops, or replacing the ordered stops list (`setStops`). */
+export type RouteAction = 'addStop' | 'go' | 'end' | 'setStops'
 
 /** A route WestPlay planned (crates/host planner.rs): what it's planned for, its length (metres) and time
  * (seconds), both on the map's ground (the page gives them in the game's scale), and its line through its

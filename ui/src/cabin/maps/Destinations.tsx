@@ -36,7 +36,9 @@ function useTruckAt(): [number, number] | null {
   const at = useLive(
     useShallow((state) => {
       const t = state.telemetry
-      return t ? ([Math.round(t.x / WHERE_STEP) * WHERE_STEP, Math.round(t.z / WHERE_STEP) * WHERE_STEP] as const) : null
+      return t
+        ? ([Math.round(t.x / WHERE_STEP) * WHERE_STEP, Math.round(t.z / WHERE_STEP) * WHERE_STEP] as const)
+        : null
     }),
   )
   const x = at?.[0]
@@ -448,7 +450,7 @@ function PlaceCard({
     }
   }
 
-  const ask = async (action: RouteAction) => {
+  const ask = async (action: Exclude<RouteAction, 'setStops'>) => {
     setAsking(true)
     setProblem(null)
     // The route's distance and time left before a stop: what the stop adds is the difference after.
@@ -502,45 +504,47 @@ function PlaceCard({
         </p>
       )}
       {directions === 'finding' && <p className="destination-away">{text.destinations.finding}</p>}
-      {typeof directions === 'object' && directions !== null && (() => {
-        const fastestSeconds = Math.min(...directions.routes.map((r) => r.seconds))
-        return (
-          // The route in focus carries Go in its own row, with relative time delta vs fastest option.
-          <div className="directions">
-            {directions.routes.map((route, index) => {
-              const deltaMinutes = Math.round(((route.seconds - fastestSeconds) * scale) / 60)
-              const isFastest = route.seconds <= fastestSeconds + 1
-              return (
-                <div key={index} className="direction" data-picked={index === directions.picked || undefined}>
-                  <button type="button" className="direction-pick" onClick={() => pick(index)}>
-                    <span className="direction-top">
-                      <span className="direction-time">{formatTripTime((route.seconds * scale) / 60, text)}</span>
-                      {directions.routes.length > 1 && (
-                        <span className={`direction-delta${isFastest ? ' best' : ''}`}>
-                          {isFastest
-                            ? text.destinations.recommended
-                            : deltaMinutes > 0
-                              ? text.destinations.slowerBy(formatTripTime(deltaMinutes, text))
-                              : text.destinations.recommended}
-                        </span>
-                      )}
-                    </span>
-                    <span className="direction-detail">
-                      <span className="direction-plan-tag">{text.destinations.plans[route.plan]}</span>
-                      <span>{formatTripDistance(route.length * scale, text.decimal, mph)}</span>
-                    </span>
-                  </button>
-                  {index === directions.picked && (
-                    <button type="button" className="direction-go" disabled={asking} onClick={start}>
-                      {text.destinations.go}
+      {typeof directions === 'object' &&
+        directions !== null &&
+        (() => {
+          const fastestSeconds = Math.min(...directions.routes.map((r) => r.seconds))
+          return (
+            // The route in focus carries Go in its own row, with relative time delta vs fastest option.
+            <div className="directions">
+              {directions.routes.map((route, index) => {
+                const deltaMinutes = Math.round(((route.seconds - fastestSeconds) * scale) / 60)
+                const isFastest = route.seconds <= fastestSeconds + 1
+                return (
+                  <div key={index} className="direction" data-picked={index === directions.picked || undefined}>
+                    <button type="button" className="direction-pick" onClick={() => pick(index)}>
+                      <span className="direction-top">
+                        <span className="direction-time">{formatTripTime((route.seconds * scale) / 60, text)}</span>
+                        {directions.routes.length > 1 && (
+                          <span className={`direction-delta${isFastest ? ' best' : ''}`}>
+                            {isFastest
+                              ? text.destinations.recommended
+                              : deltaMinutes > 0
+                                ? text.destinations.slowerBy(formatTripTime(deltaMinutes, text))
+                                : text.destinations.recommended}
+                          </span>
+                        )}
+                      </span>
+                      <span className="direction-detail">
+                        <span className="direction-plan-tag">{text.destinations.plans[route.plan]}</span>
+                        <span>{formatTripDistance(route.length * scale, text.decimal, mph)}</span>
+                      </span>
                     </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )
-      })()}
+                    {index === directions.picked && (
+                      <button type="button" className="direction-go" disabled={asking} onClick={start}>
+                        {text.destinations.go}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
       {!(typeof directions === 'object' && directions !== null) && (
         <div className="destination-actions">
           {actions.map((action, index) => (

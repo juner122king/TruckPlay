@@ -30,7 +30,7 @@ pub fn bridge_name() -> String {
     format!("Local\\WestPlay.Bridge.v{BRIDGE_VERSION}")
 }
 pub const BRIDGE_MAGIC: u32 = u32::from_le_bytes(*b"WPB7");
-pub const BRIDGE_VERSION: u32 = 32;
+pub const BRIDGE_VERSION: u32 = 33;
 
 /// Size of the app's frames, and the base size of the screen textures in the mod (`westplay_setup::game_mod`
 /// builds them from these).
@@ -692,11 +692,15 @@ pub struct RouteBlock {
     /// The plugin: the `request` it last answered, and how (a [`RouteAnswer`] code), `answer` written first.
     pub answered: AtomicU32,
     pub answer: AtomicI32,
-    /// [`RouteAction::Follow`]'s waypoints (map node uids), in route order: the first `via_count`, written
-    /// before `request` changes.
-    pub vias: [AtomicU64; MAX_VIAS],
+    /// [`RouteAction::Follow`] / [`RouteAction::SetStops`]'s waypoints (map node uids), in route order: the
+    /// first `via_count`, written before `request` changes.
+    pub vias: [AtomicU64; MAX_ROUTE_STOPS],
     pub via_count: AtomicU32,
 }
+
+/// The most waypoints the game accepts in one list (on a job, up to 10 intermediate stops before the job's
+/// destination; off a job, up to 10 total targets including the destination).
+pub const MAX_ROUTE_STOPS: usize = 10;
 
 /// The most waypoints a [`RouteAction::Follow`] holds a route with: the game takes ten, the destination one of
 /// them.
@@ -716,11 +720,17 @@ pub enum RouteAction {
     /// The route to the node through the waypoints `vias` (in order), as WestPlay planned it: the route the
     /// player picked, held by them. Not while on a job.
     Follow = 4,
+    /// Replaces the player's ordered waypoints (`vias[..via_count]`): on a job, the intermediate stops before
+    /// the job's kept destination (0..=10); off a job, the complete target list whose last entry is the
+    /// destination (0 ends the route, 1..=10 sets mode 5).
+    SetStops = 5,
 }
 
 impl RouteAction {
     pub fn from_code(code: u32) -> Option<Self> {
-        [Self::AddStop, Self::Go, Self::End, Self::Follow].into_iter().find(|action| *action as u32 == code)
+        [Self::AddStop, Self::Go, Self::End, Self::Follow, Self::SetStops]
+            .into_iter()
+            .find(|action| *action as u32 == code)
     }
 }
 
@@ -1667,5 +1677,16 @@ mod tests {
         }
         assert_eq!(GameActionAnswer::from_code(0), None);
         assert_eq!(GameActionAnswer::from_code(-99), None);
+    }
+
+    #[test]
+    fn route_action_codes_round_trip() {
+        for action in
+            [RouteAction::AddStop, RouteAction::Go, RouteAction::End, RouteAction::Follow, RouteAction::SetStops]
+        {
+            assert_eq!(RouteAction::from_code(action as u32), Some(action));
+        }
+        assert_eq!(RouteAction::from_code(0), None);
+        assert_eq!(RouteAction::from_code(99), None);
     }
 }

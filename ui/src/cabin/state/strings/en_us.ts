@@ -110,6 +110,21 @@ export const strings: Strings = {
       added: (name) => `Added ${name}`,
       noNearby: 'No matching stop found ahead',
     },
+    overviewStops: {
+      title: 'Route stops',
+      add: 'Add',
+      emptyStops: 'No intermediate stops yet',
+      jobLockedBadge: 'Job destination locked',
+      reorderHandle: (name) => `Drag to reorder ${name}`,
+      removeStop: (name) => `Remove ${name}`,
+      reordered: 'Stop order updated',
+      removed: (name) => `Removed ${name}`,
+      grabbed: (name, position, total) =>
+        `Picked up ${name}, position ${position} of ${total}. Use arrow keys to move.`,
+      movedTo: (name, position, total) => `Moved ${name} to position ${position} of ${total}`,
+      dropped: (name, position, total) => `Placed ${name} at position ${position} of ${total}`,
+      cancelled: (name) => `Cancelled reordering ${name}`,
+    },
   },
   keyboard: {
     space: 'space',

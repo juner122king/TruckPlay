@@ -36,7 +36,8 @@ use westplay_mapdata::junctions::{self, Junctions, Maneuver};
 use westplay_setup::map;
 use westplay_shared::BridgeMapping;
 use westplay_shared::navigator::{
-    NEXT_NODE, NextNode, ROUTE_WALK, SET_TARGETS, find_unique, read_next_node, read_route_walk, read_set_targets,
+    NEXT_NODE, NextNode, ROUTE_WALK, SET_TARGETS, Targets, find_unique, read_next_node, read_route_walk,
+    read_set_targets,
 };
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
@@ -65,16 +66,23 @@ const MAP_NODE_SIZE: usize = 0x38;
 const MAX_NODES: usize = 200_000;
 
 /// Where the game keeps its navigator: a global (its offset in the executable) pointing to an object, the
-/// navigator's offset in it, and where in the navigator its next node and its waypoints' list are (read from
-/// the game's code).
+/// navigator's offset in it, and where in the navigator its next node and its target/waypoint lists are
+/// (read from the game's code).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Layout {
     pub global_rva: usize,
     pub navigator: usize,
     pub next: NextNode,
-    pub waypoints: usize,
+    pub targets: Targets,
     /// A route node's size.
     pub node_size: usize,
+}
+
+/// One of the navigator's ordered targets (intermediate stop or destination), in route order.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RouteTarget {
+    pub uid: u64,
+    pub position: [f32; 2],
 }
 
 /// One of the route's map nodes: where it is, which way it points (the way of the roads through it,
@@ -104,6 +112,11 @@ pub enum RouteUpdate {
         /// The game's waypoints (their map nodes' uids, in the order they were put in), the player's stops
         /// and any WestPlay put in to hold a route it handed over; none if they couldn't be read.
         waypoints: Vec<u64>,
+        /// The navigator's targets in route order (intermediate stops, then a job's destination when `on_job`
+        /// is true, or ending at the last waypoint when false); empty if they couldn't be read.
+        targets: Vec<RouteTarget>,
+        /// Whether the navigator's routing mode is an active freight job (1..=4, 6, 7).
+        on_job: bool,
     },
     /// The ways through the route's junctions and its turns there (by the node index each starts at), and
     /// how far to the right of its way the route runs at its nodes on roads (on the carriageway it drives
@@ -294,6 +307,9 @@ struct RouteReader {
     /// The route followed: which it is in the game's memory, its map nodes, and for each of its nodes in
     /// memory, the map node at or after it.
     route: Option<(RouteKey, Vec<RouteNode>, Vec<usize>)>,
+    /// Last emitted target sequence (`on_job`, target uids in route order), so target-order changes emit
+    /// even if a replanned route happens to share the same header key.
+    targets_key: Option<(bool, Vec<u64>)>,
     /// The host's number for the route last sent.
     number: u32,
     sent_next: Option<usize>,
@@ -308,8 +324,13 @@ impl RouteReader {
     fn poll(&mut self, memory: &impl Memory, global: usize, layout: &Layout) -> Vec<RouteUpdate> {
         let Some(header) = read_header(memory, global, layout) else { return self.lost() };
         let key = (header.id, header.array, header.count);
+        let on_job = read_mode(memory, global, layout).is_some_and(|mode| matches!(mode, 1..=4 | 6 | 7));
+        let targets = read_targets(memory, global, layout);
+        let targets_key = targets.as_ref().map(|list| (on_job, list.iter().map(|t| t.uid).collect::<Vec<u64>>()));
+        let route_changed = self.route.as_ref().map(|(seen, _, _)| *seen) != Some(key);
+        let targets_changed = targets_key.is_some() && self.targets_key != targets_key;
         let mut updates = Vec::new();
-        if self.route.as_ref().map(|(seen, _, _)| *seen) != Some(key) {
+        if route_changed || targets_changed {
             // A new route that doesn't read (it doesn't add up): no route. One that reads differently twice
             // (still being written): looked at again next time.
             let (Some(first), Some(again)) = (read_nodes(memory, &header), read_nodes(memory, &header)) else {
@@ -321,9 +342,11 @@ impl RouteReader {
             let (nodes, after) = first;
             self.number = self.number.wrapping_add(1);
             self.sent_next = None;
-            // Its waypoints with it: the game plans anew as they change.
+            // Its waypoints and ordered targets with it: the game plans anew as they change.
             let waypoints = read_waypoints(memory, global, layout).unwrap_or_default();
-            updates.push(RouteUpdate::Route { id: self.number, nodes: nodes.clone(), waypoints });
+            let targets = targets.unwrap_or_default();
+            self.targets_key = targets_key;
+            updates.push(RouteUpdate::Route { id: self.number, nodes: nodes.clone(), waypoints, targets, on_job });
             self.route = Some((key, nodes, after));
         }
         let Some((_, nodes, after)) = &self.route else { return updates };
@@ -338,6 +361,7 @@ impl RouteReader {
     /// No route (or no game): says so once.
     fn lost(&mut self) -> Vec<RouteUpdate> {
         self.sent_next = None;
+        self.targets_key = None;
         match self.route.take() {
             Some(_) => vec![RouteUpdate::None],
             None => Vec::new(),
@@ -393,11 +417,23 @@ fn read_header(memory: &impl Memory, global: usize, layout: &Layout) -> Option<H
     Some(Header { id, array, count, next_index, node_size: size })
 }
 
-/// The navigator's waypoints: their map nodes' uids, in the order they were put in; `None` if what's read
-/// doesn't add up.
-fn read_waypoints(memory: &impl Memory, global: usize, layout: &Layout) -> Option<Vec<u64>> {
+/// The navigator's routing mode (`0` none, `5` free-roam waypoints, `1..=4 | 6 | 7` job).
+fn read_mode(memory: &impl Memory, global: usize, layout: &Layout) -> Option<u32> {
     let owner = memory.u64_at(global)? as usize;
-    let list = owner.checked_add(layout.navigator)?.checked_add(layout.waypoints)?;
+    let mode_addr = owner.checked_add(layout.navigator)?.checked_add(layout.targets.mode)?;
+    let mut raw = [0u8; 4];
+    memory.read(mode_addr, &mut raw).then(|| u32::from_le_bytes(raw))
+}
+
+/// Reads a navigator `array_t` of 0x18-byte targets at `list_offset` into `RouteTarget`s (uid + position).
+fn read_target_list(
+    memory: &impl Memory,
+    global: usize,
+    layout: &Layout,
+    list_offset: usize,
+) -> Option<Vec<RouteTarget>> {
+    let owner = memory.u64_at(global)? as usize;
+    let list = owner.checked_add(layout.navigator)?.checked_add(list_offset)?;
     let count = memory.u64_at(list.checked_add(0x10)?)? as usize;
     if count == 0 {
         return Some(Vec::new());
@@ -414,9 +450,24 @@ fn read_waypoints(memory: &impl Memory, global: usize, layout: &Layout) -> Optio
         .map(|entry| {
             let pointer = u64::from_le_bytes(entry[WAYPOINT_NODE..WAYPOINT_NODE + 8].try_into().unwrap()) as usize;
             let mut map_node = [0u8; MAP_NODE_SIZE];
-            memory.read(pointer, &mut map_node).then(|| map_node_of(&map_node).uid)
+            memory.read(pointer, &mut map_node).then(|| {
+                let node = map_node_of(&map_node);
+                RouteTarget { uid: node.uid, position: node.position }
+            })
         })
         .collect()
+}
+
+/// The navigator's waypoints: their map nodes' uids, in the order they were put in; `None` if what's read
+/// doesn't add up.
+fn read_waypoints(memory: &impl Memory, global: usize, layout: &Layout) -> Option<Vec<u64>> {
+    read_target_list(memory, global, layout, layout.targets.waypoints)
+        .map(|list| list.into_iter().map(|target| target.uid).collect())
+}
+
+/// The navigator's route targets in route order (intermediate stops, plus a job's destination on a job).
+fn read_targets(memory: &impl Memory, global: usize, layout: &Layout) -> Option<Vec<RouteTarget>> {
+    read_target_list(memory, global, layout, layout.targets.route)
 }
 
 /// The route's map nodes, and for each of its nodes in memory, the map node at or after it (where the truck
@@ -784,9 +835,9 @@ fn locate(text: &Section, rdata: &Section) -> Option<Layout> {
     let (global_rva, navigator) = locate_getter(text, rdata)?;
     let code = text.bytes;
     let next = read_next_node(&code[find_unique(code, &NEXT_NODE)?..])?;
-    let waypoints = read_set_targets(&code[find_unique(code, &SET_TARGETS)?..])?.waypoints;
+    let targets = read_set_targets(&code[find_unique(code, &SET_TARGETS)?..])?;
     let node_size = read_route_walk(&code[find_unique(code, &ROUTE_WALK)?..])?;
-    Some(Layout { global_rva, navigator, next, waypoints, node_size })
+    Some(Layout { global_rva, navigator, next, targets, node_size })
 }
 
 /// The global and the navigator's offset in its object, from the distance getter (as [`locate`] says).
@@ -924,7 +975,7 @@ mod tests {
         global_rva: 0,
         navigator: NAVIGATOR,
         next: NextNode { id: 0x190, node: 0x198 },
-        waypoints: 0x248,
+        targets: Targets { mode: 0x1c8, planned: 0x1d0, route: 0x1f8, avoid: 0x220, waypoints: 0x248 },
         node_size: 0x30,
     };
     const NODE_SIZE: usize = LAYOUT.node_size;
@@ -985,25 +1036,61 @@ mod tests {
         // Map nodes 1, 2 and 3; waypoints at the second and the first map node, in that order.
         let mut memory = navigator(77, &[0, 0, 0], 0, 77);
         const WAYPOINTS: usize = 0x50_000;
+        const TARGETS: usize = 0x60_000;
         let owner = memory.blocks.get_mut(&OWNER).unwrap();
-        owner.resize(NAVIGATOR + LAYOUT.waypoints + 0x18, 0);
-        let list = NAVIGATOR + LAYOUT.waypoints;
+        owner.resize(NAVIGATOR + LAYOUT.targets.waypoints + 0x18, 0);
+        let mode_at = NAVIGATOR + LAYOUT.targets.mode;
+        owner[mode_at..mode_at + 4].copy_from_slice(&2u32.to_le_bytes());
+        let list = NAVIGATOR + LAYOUT.targets.waypoints;
         owner[list + 8..list + 16].copy_from_slice(&(WAYPOINTS as u64).to_le_bytes());
         owner[list + 0x10..list + 0x18].copy_from_slice(&2u64.to_le_bytes());
+        let target_list = NAVIGATOR + LAYOUT.targets.route;
+        owner[target_list + 8..target_list + 16].copy_from_slice(&(TARGETS as u64).to_le_bytes());
+        owner[target_list + 0x10..target_list + 0x18].copy_from_slice(&3u64.to_le_bytes());
         let mut entries = vec![0u8; 2 * WAYPOINT_SIZE];
         for (entry, node) in [1usize, 0].into_iter().enumerate() {
             let at = entry * WAYPOINT_SIZE + WAYPOINT_NODE;
             entries[at..at + 8].copy_from_slice(&((MAP_NODES + node * 0x100) as u64).to_le_bytes());
         }
         memory.blocks.insert(WAYPOINTS, entries);
+        let mut target_entries = vec![0u8; 3 * WAYPOINT_SIZE];
+        for (entry, node) in [0usize, 1, 2].into_iter().enumerate() {
+            let at = entry * WAYPOINT_SIZE + WAYPOINT_NODE;
+            target_entries[at..at + 8].copy_from_slice(&((MAP_NODES + node * 0x100) as u64).to_le_bytes());
+        }
+        memory.blocks.insert(TARGETS, target_entries);
         let mut reader = RouteReader::default();
         let updates = poll(&mut reader, &memory);
-        assert!(matches!(&updates[0], RouteUpdate::Route { waypoints, .. } if waypoints == &[2, 1]), "{updates:?}");
+        assert!(
+            matches!(
+                &updates[0],
+                RouteUpdate::Route { waypoints, targets, on_job: true, .. }
+                    if waypoints == &[2, 1]
+                        && targets.iter().map(|t| t.uid).collect::<Vec<_>>() == [1, 2, 3]
+            ),
+            "{updates:?}"
+        );
+        // Reordering targets in memory emits a fresh route update even if the header key didn't change.
+        let mut reordered = vec![0u8; 3 * WAYPOINT_SIZE];
+        for (entry, node) in [1usize, 0, 2].into_iter().enumerate() {
+            let at = entry * WAYPOINT_SIZE + WAYPOINT_NODE;
+            reordered[at..at + 8].copy_from_slice(&((MAP_NODES + node * 0x100) as u64).to_le_bytes());
+        }
+        memory.blocks.insert(TARGETS, reordered);
+        let updates = poll(&mut reader, &memory);
+        assert!(
+            matches!(
+                &updates[0],
+                RouteUpdate::Route { targets, on_job: true, .. }
+                    if targets.iter().map(|t| t.uid).collect::<Vec<_>>() == [2, 1, 3]
+            ),
+            "{updates:?}"
+        );
         // A list that can't be read: none known (not an empty list).
         assert_eq!(read_waypoints(&navigator(77, &[0], 0, 77), GLOBAL, &LAYOUT), None);
         // An empty one: none.
         let mut empty = navigator(77, &[0], 0, 77);
-        empty.blocks.get_mut(&OWNER).unwrap().resize(NAVIGATOR + LAYOUT.waypoints + 0x18, 0);
+        empty.blocks.get_mut(&OWNER).unwrap().resize(NAVIGATOR + LAYOUT.targets.waypoints + 0x18, 0);
         assert_eq!(read_waypoints(&empty, GLOBAL, &LAYOUT), Some(Vec::new()));
     }
 
@@ -1115,7 +1202,7 @@ mod tests {
                 global_rva: 0x9000,
                 navigator: 0x4128,
                 next: NextNode { id: 0x1a0, node: 0x1a8 },
-                waypoints: 0x258,
+                targets: Targets { mode: 0x1d8, planned: 0x1e0, route: 0x208, avoid: 0x230, waypoints: 0x258 },
                 node_size: 0x38
             })
         );

@@ -8,6 +8,7 @@ import { MapCacheNotice } from '../maps/MapCacheNotice'
 import { DashboardMapControls, MapControls } from '../maps/MapControls'
 import { useMapData } from '../maps/mapData'
 import { MapSearch } from '../maps/MapSearch'
+import { OverviewStopsCard } from '../maps/OverviewStopsCard'
 import { RoadMap } from '../maps/RoadMap'
 import { SpeedCameraPillView } from '../maps/SpeedCameraPill'
 import { SpeedDisplay } from '../maps/SpeedDisplay'
@@ -35,12 +36,13 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
   const chosen = useLive((state) => state.chosenLanguage)
   const hasRoute = useLive((state) => state.route !== null && (state.telemetry?.navigationDistance ?? 0) > 0)
   const [searchOpen, setSearchOpen] = useState(false)
-  const [tripExpanded, setTripExpanded] = useState(false)
+  const [tripCollapsed, setTripCollapsed] = useState(false)
   const [notice, setNotice] = useState<{ text: string; id: number } | null>(null)
   const tileRef = useRef<HTMLDivElement>(null)
 
   if ((!interactive || !data) && searchOpen) setSearchOpen(false)
-  if ((!interactive || searchOpen || overview) && tripExpanded) setTripExpanded(false)
+  if ((!interactive || !hasRoute) && tripCollapsed) setTripCollapsed(false)
+  const tripExpanded = interactive && hasRoute && !searchOpen && !overview && !tripCollapsed
 
   useVisualCenterSync(tileRef, { interactive, overview, searchOpen, tripExpanded, hasRoute })
 
@@ -66,7 +68,6 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
 
   const toggleSearch = () => {
     if (!searchOpen && useMapBrowsing.getState().routeOverview) recentreLiveMap()
-    setTripExpanded(false)
     setSearchOpen((open) => !open)
   }
 
@@ -75,7 +76,10 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
   // shows of it) slides against it, and the speed capsule moves with the window’s right edge; its shadow in two
   // parts, the left one still, the rest sliding. In the Maps app, all of them simply the tile.
   return (
-    <div ref={tileRef} className={`map-tile${interactive ? ' map-navigation' : ''}${overview ? ' route-overview' : ''}`}>
+    <div
+      ref={tileRef}
+      className={`map-tile${interactive ? ' map-navigation' : ''}${overview ? ' route-overview' : ''}`}
+    >
       <div className="map-shadow map-shadow-left" aria-hidden />
       <div className="map-shadow-clip" aria-hidden>
         <div className="map-shadow map-shadow-moving" />
@@ -104,7 +108,7 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
               concealed={overview || searchOpen}
               hasMapData={Boolean(data)}
               expanded={tripExpanded}
-              onExpandedChange={setTripExpanded}
+              onExpandedChange={(next) => setTripCollapsed(!next)}
               onOpenSearch={toggleSearch}
               onNotify={notify}
             />
@@ -121,6 +125,9 @@ export function MapView({ interactive = false }: { interactive?: boolean }) {
           {data && !interactive && <DashboardMapControls />}
           {data && interactive && (
             <MapSearch open={searchOpen} onClose={() => setSearchOpen(false)} onNotify={notify} />
+          )}
+          {interactive && overview && hasRoute && !searchOpen && (
+            <OverviewStopsCard onAddStop={toggleSearch} onNotify={notify} />
           )}
           {notice && (
             <div key={notice.id} className="map-confirmation glass" role="status">

@@ -12,8 +12,9 @@ import {
 } from './liveMap'
 
 /**
- * The Maps app's bottom-right corner dock: an always-visible icon-only re-centre target button stacked above a
- * vertical view capsule ([Compass | + | -]) and a horizontal action capsule ([Search | Route Overview]).
+ * The Maps app's bottom-right corner dock: two stacked vertical 2-button capsules on the right edge
+ * ([Recentre | Compass] above [+ | -]), paired with a horizontal action capsule ([Search | Route Overview])
+ * whenever a route is active or the search drawer is open.
  */
 export function MapControls({
   searchOpen = false,
@@ -85,69 +86,74 @@ export function MapControlsView({
   const centred = !browsing && !overview
   const lockedOverview = overview && overviewLocked
   const overviewMode = !overview ? 'off' : lockedOverview ? 'locked' : 'timed'
+  const showActionBar = hasRoute || searchOpen
   return (
     <div className="map-controls map-dock">
-      <button
-        type="button"
-        className={`map-control map-recentre-btn glass${centred ? ' centred' : ' off-center'}`}
-        aria-label={recentreLabel}
-        aria-pressed={centred}
-        onClick={onRecentre}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="6.5" />
-          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
-          <circle className="map-recentre-core" cx="12" cy="12" r="2.5" />
-        </svg>
-      </button>
+      <div className="map-view-rail map-orient-rail glass">
+        <button
+          type="button"
+          className={`map-control map-recentre-btn${centred ? ' centred' : ' off-center'}`}
+          aria-label={recentreLabel}
+          aria-pressed={centred}
+          onClick={onRecentre}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="6.5" />
+            <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+            <circle className="map-recentre-core" cx="12" cy="12" r="2.5" />
+          </svg>
+        </button>
+        <span className="map-zoom-divider" aria-hidden />
+        <MapCompass
+          label={labels.northUp}
+          embedded
+          northUp={!overview && northUp}
+          disabled={overview}
+          onClick={onNorthUp}
+        />
+      </div>
       <div className="map-dock-row">
-        <div className="map-action-bar glass">
-          <button
-            type="button"
-            className={`map-control map-dock-search${searchOpen ? ' selected' : ''}`}
-            aria-label={labels.search}
-            aria-expanded={searchOpen}
-            onClick={onToggleSearch}
-          >
-            <SearchGlyph />
-          </button>
-          {hasRoute && (
-            <>
-              <span className="map-dock-divider-v" aria-hidden />
-              <button
-                type="button"
-                className={`map-control map-overview${overview ? ' selected' : ''}${lockedOverview ? ' locked' : ''}`}
-                data-overview-mode={overviewMode}
-                aria-label={labels.routeOverview}
-                aria-pressed={overview}
-                onClick={onOverview}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="5" cy="18" r="2" />
-                  <circle cx="19" cy="6" r="2" />
-                  <path d="M5 16v-4a3 3 0 0 1 3-3h8a3 3 0 0 0 3-3" />
-                </svg>
-                {lockedOverview && (
-                  <span className="map-overview-lock" aria-hidden="true">
-                    <svg viewBox="0 0 16 16">
-                      <rect x="3.5" y="7.5" width="9" height="6.5" rx="1.6" />
-                      <path d="M5.5 7.5V5.3a2.5 2.5 0 0 1 5 0v2.2" />
-                    </svg>
-                  </span>
-                )}
-              </button>
-            </>
-          )}
-        </div>
-        <div className="map-view-rail glass">
-          <MapCompass
-            label={labels.northUp}
-            embedded
-            northUp={!overview && northUp}
-            disabled={overview}
-            onClick={onNorthUp}
-          />
-          <span className="map-zoom-divider" aria-hidden />
+        {showActionBar && (
+          <div className="map-action-bar glass">
+            <button
+              type="button"
+              className={`map-control map-dock-search${searchOpen ? ' selected' : ''}`}
+              aria-label={labels.search}
+              aria-expanded={searchOpen}
+              onClick={onToggleSearch}
+            >
+              <SearchGlyph />
+            </button>
+            {hasRoute && (
+              <>
+                <span className="map-dock-divider-v" aria-hidden />
+                <button
+                  type="button"
+                  className={`map-control map-overview${overview ? ' selected' : ''}${lockedOverview ? ' locked' : ''}`}
+                  data-overview-mode={overviewMode}
+                  aria-label={labels.routeOverview}
+                  aria-pressed={overview}
+                  onClick={onOverview}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="5" cy="18" r="2" />
+                    <circle cx="19" cy="6" r="2" />
+                    <path d="M5 16v-4a3 3 0 0 1 3-3h8a3 3 0 0 0 3-3" />
+                  </svg>
+                  {lockedOverview && (
+                    <span className="map-overview-lock" aria-hidden="true">
+                      <svg viewBox="0 0 16 16">
+                        <rect x="3.5" y="7.5" width="9" height="6.5" rx="1.6" />
+                        <path d="M5.5 7.5V5.3a2.5 2.5 0 0 1 5 0v2.2" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        <div className="map-view-rail map-zoom-rail glass">
           <MapZoomButtons zoomInLabel={labels.zoomIn} zoomOutLabel={labels.zoomOut} onZoom={onZoom} />
         </div>
       </div>

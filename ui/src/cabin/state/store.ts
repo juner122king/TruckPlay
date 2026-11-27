@@ -17,6 +17,7 @@ import {
   isPerformanceMode,
   type PerformanceMode,
   postToHost,
+  type RouteTargetInfo,
   type SemaphoreInfo,
   subscribeHostMessages,
   type Telemetry,
@@ -401,8 +402,10 @@ export interface LiveState {
     shifts: ReadonlyMap<number, number>
   } | null
   routeNext: number
-  /** The player's stops along the route: their map nodes' indices in it, ascending. */
+  /** The player's stops along the route: their map nodes' indices in it, in route order. */
   routeStops: readonly number[]
+  /** The navigator's ordered targets (intermediate stops and trailing destination, with job lock flag). */
+  routeTargets: readonly RouteTargetInfo[]
   /** The routes offered for the `routes` request `id` that the host has read so far, drawn as the game's route is, by
    * their place among them. */
   offeredLines: { id: number; lines: (Point[] | undefined)[] } | null
@@ -455,6 +458,7 @@ export const useLive = create<LiveState>()(() => ({
   route: null,
   routeNext: 0,
   routeStops: [],
+  routeTargets: [],
   offeredLines: null,
   weather: null,
   gameShown: true,
@@ -672,10 +676,13 @@ function receiveHostMessage(now: () => number): (message: HostMessage) => void {
                 },
           routeNext: 0,
           routeStops: [],
+          routeTargets: [],
         })
         break
       case 'routeStops':
-        if (useLive.getState().route?.id === message.id) useLive.setState({ routeStops: message.stops })
+        if (useLive.getState().route?.id === message.id) {
+          useLive.setState({ routeStops: message.stops, routeTargets: message.targets ?? [] })
+        }
         break
       case 'routePaths': {
         const route = useLive.getState().route

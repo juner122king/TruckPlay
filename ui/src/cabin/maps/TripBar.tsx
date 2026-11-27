@@ -94,8 +94,14 @@ export function TripBarView({
                 disabled={busyStop !== null}
                 onClick={() => onQuickStop?.(category)}
               >
-                <PitStopGlyph category={category} />
-                <span>{text.destinations.quickStops[category]}</span>
+                <span className="pitstop-chip-icon" aria-hidden="true">
+                  <PitStopGlyph category={category} />
+                </span>
+                <span className="pitstop-chip-label">
+                  {busyStop === category
+                    ? text.destinations.quickStops.searching
+                    : text.destinations.quickStops[category]}
+                </span>
               </button>
             ))}
           </div>
@@ -128,18 +134,15 @@ export function TripBarView({
                   <PitStopGlyph category={category} />
                 </span>
                 <span className="trip-pitstop-label">
-                  {busyStop === category ? text.destinations.quickStops.searching : text.destinations.quickStops[category]}
+                  {busyStop === category
+                    ? text.destinations.quickStops.searching
+                    : text.destinations.quickStops[category]}
                 </span>
               </button>
             ))}
           </div>
           <div className="trip-route-actions">
-            <button
-              type="button"
-              className="trip-action-btn overview"
-              disabled={endingRoute}
-              onClick={onOverview}
-            >
+            <button type="button" className="trip-action-btn overview" disabled={endingRoute} onClick={onOverview}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="5" cy="18" r="2" />
                 <circle cx="19" cy="6" r="2" />
@@ -277,11 +280,8 @@ export function TripBar({
           result.distanceMeters !== undefined && result.distanceMeters > 0
             ? formatTripDistance(result.distanceMeters * scale, text.decimal, live.mph)
             : ''
-        onExpandedChange(false)
         onNotify?.(
-          dist
-            ? text.destinations.quickStops.addedDistance(label, dist)
-            : text.destinations.quickStops.added(label),
+          dist ? text.destinations.quickStops.addedDistance(label, dist) : text.destinations.quickStops.added(label),
         )
       } else if (result.status === 'noPlaces') {
         onNotify?.(text.destinations.quickStops.noNearby)
@@ -321,15 +321,9 @@ export function TripBar({
       text={text}
       onToggleExpand={() => onExpandedChange(!expanded)}
       onQuickStop={handleQuickStop}
-      onOverview={() => {
-        onExpandedChange(false)
-        overviewLiveRoute()
-      }}
+      onOverview={overviewLiveRoute}
       onEndRoute={handleEndRoute}
-      onOpenSearch={() => {
-        onExpandedChange(false)
-        onOpenSearch?.()
-      }}
+      onOpenSearch={onOpenSearch}
     />
   )
 }

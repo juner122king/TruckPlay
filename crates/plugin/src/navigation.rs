@@ -111,7 +111,7 @@ unsafe fn change(game: &Game, action: RouteAction, uid: u64, vias: &[u64]) -> Ro
         }
         let navigator = core.add(game.navigator);
         let node = match action {
-            RouteAction::End => None,
+            RouteAction::End | RouteAction::SetStops => None,
             RouteAction::AddStop | RouteAction::Go | RouteAction::Follow => match (game.find_node)(core, uid) {
                 node if node.is_null() => return RouteAnswer::NoSuchNode,
                 node => Some(target(node as usize)),
@@ -132,6 +132,7 @@ unsafe fn change(game: &Game, action: RouteAction, uid: u64, vias: &[u64]) -> Ro
         let mode = (navigator.add(at.mode) as *const u32).read();
         let planned = match action {
             RouteAction::Follow => follow(mode, &through, node),
+            RouteAction::SetStops => set_stops(mode, &route, &waypoints, &through),
             _ => {
                 // Where each is: a map node's position (x, z in 1/256 m, as the game keeps it: route.rs). Each
                 // target's node is the game's own, from its navigator's lists or its node table (checked as read).
@@ -229,8 +230,8 @@ fn plan(
             keep([&stops[..at], &[node], &stops[at..], end].concat(), [waypoints, &[node]].concat())
         }
         (RouteAction::Go | RouteAction::AddStop, None) => Err(RouteAnswer::Unexpected),
-        // Through its waypoints: `follow`.
-        (RouteAction::Follow, _) => Err(RouteAnswer::Unexpected),
+        // Through its waypoints: `follow` / `set_stops`.
+        (RouteAction::Follow | RouteAction::SetStops, _) => Err(RouteAnswer::Unexpected),
     }
 }
 
@@ -269,6 +270,39 @@ fn follow(mode: u32, vias: &[Target], node: Option<Target>) -> Result<Planned, R
     }
     let route = [vias, &[node]].concat();
     Ok(Planned { mode: 5, route: route.clone(), waypoints: route })
+}
+
+/// Replaces the player's ordered waypoints with `stops` (in route order):
+/// - On a job (`mode` 1..=4 | 6 | 7): preserves the job's routing mode and trailing destination; `stops`
+///   replaces only the intermediate stops before it (0..=10).
+/// - Off a job: `stops` becomes the complete target list where the last entry is the destination (empty
+///   ends navigation with mode 0; 1..=10 sets mode 5).
+fn set_stops(mode: u32, route: &[Target], waypoints: &[Target], stops: &[Target]) -> Result<Planned, RouteAnswer> {
+    if stops.len() as u64 > MAX_WAYPOINTS {
+        return Err(RouteAnswer::Full);
+    }
+    for (i, stop) in stops.iter().enumerate() {
+        if stops[..i].iter().any(|prev| node_of(prev) == node_of(stop)) {
+            return Err(RouteAnswer::AlreadyThere);
+        }
+    }
+    let job = matches!(mode, 1..=4 | 6 | 7);
+    if job {
+        let Some((&destination, before)) = route.split_last() else {
+            return Err(RouteAnswer::Unexpected);
+        };
+        if before.len() != waypoints.len() {
+            return Err(RouteAnswer::Unexpected);
+        }
+        if stops.iter().any(|stop| node_of(stop) == node_of(&destination)) {
+            return Err(RouteAnswer::AlreadyThere);
+        }
+        Ok(Planned { mode, route: [stops, &[destination]].concat(), waypoints: stops.to_vec() })
+    } else if stops.is_empty() {
+        Ok(Planned { mode: 0, route: Vec::new(), waypoints: Vec::new() })
+    } else {
+        Ok(Planned { mode: 5, route: stops.to_vec(), waypoints: stops.to_vec() })
+    }
 }
 
 /// A list's targets, if it reads as one.
@@ -674,6 +708,49 @@ mod tests {
         assert_eq!(plan(RouteAction::AddStop, 5, &ten, &ten, Some(new)), Err(RouteAnswer::Full));
         // A job's route not its stops and then its destination: misread, so nothing is done.
         assert_eq!(plan(RouteAction::AddStop, 1, &[a], &[a], Some(new)), Err(RouteAnswer::Unexpected));
+    }
+
+    #[test]
+    fn set_stops_reorders_and_deletes_for_both_job_and_free_routes() {
+        let (a, b, c, destination) = (target(0xa0), target(0xb0), target(0xc0), target(0xd0));
+        // On a job: reorders intermediate stops while keeping the job mode and trailing destination untouched.
+        let planned = set_stops(2, &[a, b, destination], &[a, b], &[b, a]).unwrap();
+        assert_eq!(planned.mode, 2);
+        assert_eq!(nodes(&planned.route), [0xb0, 0xa0, 0xd0]);
+        assert_eq!(nodes(&planned.waypoints), [0xb0, 0xa0]);
+        // On a job: deleting all intermediate stops keeps the route to the job's destination.
+        let cleared = set_stops(1, &[a, destination], &[a], &[]).unwrap();
+        assert_eq!(cleared.mode, 1);
+        assert_eq!(nodes(&cleared.route), [0xd0]);
+        assert!(cleared.waypoints.is_empty());
+        // On a job: up to 10 intermediate stops can be reordered.
+        let ten: Vec<Target> = (1..=10).map(|i| target(i * 0x10)).collect();
+        let mut job_route = ten.clone();
+        job_route.push(destination);
+        let mut reversed = ten.clone();
+        reversed.reverse();
+        let full_job = set_stops(1, &job_route, &ten, &reversed).unwrap();
+        assert_eq!(full_job.route.len(), 11);
+        assert_eq!(node_of(full_job.route.last().unwrap()), 0xd0);
+        // On a job: passing the job's destination itself as an intermediate stop is rejected.
+        assert_eq!(set_stops(1, &[a, destination], &[a], &[destination]), Err(RouteAnswer::AlreadyThere));
+
+        // Off a job: all points (including destination) can be reordered; the new last becomes destination.
+        let reordered = set_stops(5, &[a, b, c], &[a, b, c], &[c, a, b]).unwrap();
+        assert_eq!(reordered.mode, 5);
+        assert_eq!(nodes(&reordered.route), [0xc0, 0xa0, 0xb0]);
+        assert_eq!(nodes(&reordered.waypoints), [0xc0, 0xa0, 0xb0]);
+        // Off a job: deleting down to one point makes it the destination.
+        let one = set_stops(5, &[a, b], &[a, b], &[a]).unwrap();
+        assert_eq!((one.mode, nodes(&one.route), nodes(&one.waypoints)), (5, vec![0xa0], vec![0xa0]));
+        // Off a job: deleting the last remaining point ends navigation.
+        let ended = set_stops(5, &[a], &[a], &[]).unwrap();
+        assert_eq!(ended, Planned { mode: 0, route: vec![], waypoints: vec![] });
+
+        // Validation: duplicates and >10 stops rejected.
+        assert_eq!(set_stops(5, &[a, b], &[a, b], &[a, a]), Err(RouteAnswer::AlreadyThere));
+        let eleven: Vec<Target> = (1..=11).map(|i| target(i * 0x10)).collect();
+        assert_eq!(set_stops(5, &[a], &[a], &eleven), Err(RouteAnswer::Full));
     }
 
     #[test]

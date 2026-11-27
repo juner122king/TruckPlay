@@ -104,6 +104,20 @@ export interface Strings {
       added: (name: string) => string
       noNearby: string
     }
+    overviewStops: {
+      title: string
+      add: string
+      emptyStops: string
+      jobLockedBadge: string
+      reorderHandle: (name: string) => string
+      removeStop: (name: string) => string
+      reordered: string
+      removed: (name: string) => string
+      grabbed: (name: string, position: number, total: number) => string
+      movedTo: (name: string, position: number, total: number) => string
+      dropped: (name: string, position: number, total: number) => string
+      cancelled: (name: string) => string
+    }
   }
   /** The keyboard: its keys (named for screen readers where they show a symbol), and a field's clear button. */
   keyboard: {

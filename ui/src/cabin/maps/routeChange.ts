@@ -17,6 +17,15 @@ export function changeRoute(action: RouteAction, node?: string): Promise<RouteAn
   return new Promise((resolve) => waiting.set(id, resolve))
 }
 
+/** Replaces the game's ordered waypoints: on a job, the intermediate stops before the locked job destination;
+ * off a job, the complete target sequence whose last item is the destination (empty ends the route). */
+export function setRouteStops(nodes: readonly string[]): Promise<RouteAnswer> {
+  if (!isInHost()) return Promise.resolve('noAnswer')
+  const id = nextId++
+  postToHost({ type: 'route', id, action: 'setStops', nodes: [...nodes] })
+  return new Promise((resolve) => waiting.set(id, resolve))
+}
+
 /** The host's `routeAnswer`: settles the request it answers. */
 export function receiveRouteAnswer(id: number, answer: RouteAnswer): void {
   waiting.get(id)?.(answer)

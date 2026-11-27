@@ -416,9 +416,9 @@
   position: absolute;
   left: var(--content-left);
   top: calc(var(--edge) + var(--nav-corner-inset, 8px));
-  width: fit-content;
-  min-width: 284px;
-  max-width: min(416px, calc(100% - var(--content-left) - var(--edge) - 210px));
+  width: var(--nav-left-card-width, min(352px, calc(100% - var(--content-left) - var(--edge) - 210px)));
+  min-width: 0;
+  max-width: var(--nav-left-card-width, min(352px, calc(100% - var(--content-left) - var(--edge) - 210px)));
   padding: 0;
   border-radius: 24px;
   overflow: clip;
@@ -1872,23 +1872,19 @@
   right: calc(var(--edge) + var(--nav-corner-inset, 8px));
   bottom: calc(var(--edge) + var(--nav-corner-inset, 8px));
   align-items: flex-end;
-  gap: 10px;
+  gap: 12px;
 }
 
 .map-navigation .map-recentre-btn {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
   transition:
     background-color 180ms var(--motion-ease),
     color 180ms var(--motion-ease),
-    box-shadow 180ms var(--motion-ease),
     scale 150ms var(--motion-ease);
 }
 
 .map-navigation .map-recentre-btn svg {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   stroke-width: 2.1;
 }
 
@@ -1904,26 +1900,20 @@
 
 .map-navigation .map-recentre-btn.centred {
   color: #409cff;
-  box-shadow:
-    inset 0 0 0 1.5px rgb(10 132 255 / 0.55),
-    inset 0 1.5px 0 rgb(255 255 255 / 0.22),
-    var(--shadow-raised-large);
+  background: rgb(10 132 255 / 0.16);
 }
 
 .appearance-light .map-navigation .map-recentre-btn.centred {
   color: #007aff;
-  box-shadow:
-    inset 0 0 0 1.5px rgb(0 122 255 / 0.45),
-    inset 0 1.5px 0 rgb(255 255 255 / 0.88),
-    var(--shadow-raised-large);
+  background: rgb(0 122 255 / 0.11);
 }
 
 .map-navigation .map-recentre-btn.centred:hover {
-  background: rgb(28 33 42 / 0.8);
+  background: rgb(10 132 255 / 0.24);
 }
 
 .appearance-light .map-navigation .map-recentre-btn.centred:hover {
-  background: rgb(255 255 255 / 0.94);
+  background: rgb(0 122 255 / 0.18);
 }
 
 .map-navigation .map-recentre-btn.off-center {
@@ -1941,30 +1931,30 @@
 
 .map-navigation .map-recentre-btn.off-center:hover {
   color: #fff;
-  background: rgb(32 36 44 / 0.82);
+  background: rgb(255 255 255 / 0.1);
 }
 
 .appearance-light .map-navigation .map-recentre-btn.off-center:hover {
   color: #14161a;
-  background: rgb(255 255 255 / 0.94);
+  background: rgb(0 0 0 / 0.06);
 }
 
 .map-dock-row {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 12px;
 }
 
 .map-action-bar {
   display: flex;
   align-items: center;
-  border-radius: 32px;
+  border-radius: 36px;
   overflow: hidden;
 }
 
 .map-dock-divider-v {
   width: 1.5px;
-  height: 34px;
+  height: 38px;
   background: currentColor;
   opacity: 0.16;
   flex: none;
@@ -1974,23 +1964,23 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 32px;
+  border-radius: 36px;
   overflow: hidden;
 }
 
 .map-navigation .map-dock :is(.map-action-bar, .map-view-rail) :is(.map-control, .map-compass) {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 0;
 }
 
 .map-navigation .map-dock .map-control svg {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
 }
 
 .map-navigation .map-dock .map-zoom-divider {
-  width: 36px;
+  width: 40px;
   height: 1.5px;
 }
 
@@ -2046,48 +2036,48 @@
 
 @container carplay (max-height: 520px) {
   .map-navigation .map-controls.map-dock {
-    gap: 8px;
+    gap: 10px;
     right: calc(var(--edge) + var(--nav-corner-inset, 6px));
     bottom: calc(var(--edge) + var(--nav-corner-inset, 6px));
   }
   .map-navigation .map-dock-row {
-    gap: 8px;
+    gap: 10px;
   }
-  .map-navigation .map-recentre-btn,
   .map-navigation .map-dock :is(.map-action-bar, .map-view-rail) :is(.map-control, .map-compass) {
-    width: 54px;
-    height: 54px;
+    width: 60px;
+    height: 60px;
   }
   .map-navigation .map-action-bar,
   .map-navigation .map-view-rail {
-    border-radius: 27px;
+    border-radius: 30px;
   }
   .map-navigation .map-dock-divider-v {
-    height: 28px;
+    height: 32px;
   }
   .map-navigation .map-recentre-btn svg,
   .map-navigation .map-dock .map-control svg {
-    width: 26px;
-    height: 26px;
+    width: 30px;
+    height: 30px;
   }
   .map-navigation .map-dock .map-overview-lock {
-    right: 4px;
-    top: 4px;
-    width: 18px;
-    height: 18px;
+    right: 5px;
+    top: 5px;
+    width: 19px;
+    height: 19px;
   }
   .map-navigation .map-dock .map-overview-lock svg {
     width: 12px;
     height: 12px;
   }
   .map-navigation .map-dock .map-zoom-divider {
-    width: 30px;
+    width: 34px;
   }
   .map-navigation .guidance-banner {
     left: var(--content-left);
     top: calc(var(--edge) + var(--nav-corner-inset, 6px));
-    min-width: 236px;
-    max-width: min(344px, calc(100% - var(--content-left) - var(--edge) - 165px));
+    width: var(--nav-left-card-width);
+    min-width: 0;
+    max-width: var(--nav-left-card-width);
     border-radius: 20px;
   }
   .map-navigation .guidance-banner .guidance-primary {
@@ -2182,4 +2172,519 @@
 .map-destination,
 .map-route-stop {
   z-index: 4;
+}
+
+/* Route Overview Waypoint List Card (OverviewStopsCard.tsx): Liquid Glass floating panel on the left. */
+.overview-stops-card {
+  --drop-marker-color: #409cff;
+  position: absolute;
+  left: var(--content-left);
+  top: calc(var(--edge) + var(--nav-corner-inset, 8px));
+  z-index: 8;
+  width: min(376px, calc(100% - var(--content-left) - var(--edge) - 256px));
+  max-height: calc(100% - (var(--edge) + var(--nav-corner-inset, 8px)) * 2);
+  padding: 14px;
+  border-radius: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  color: #fff;
+  background: linear-gradient(165deg, rgb(24 30 39 / 0.88) 0%, rgb(14 18 25 / 0.94) 100%);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(20px) saturate(165%);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.24),
+    0 20px 44px rgb(0 0 0 / 0.4);
+  animation: overview-stops-in 260ms var(--motion-ease) both;
+}
+
+.appearance-light .overview-stops-card {
+  --drop-marker-color: #007aff;
+  color: #14161a;
+  background: linear-gradient(165deg, rgb(252 253 255 / 0.92) 0%, rgb(242 245 250 / 0.96) 100%);
+  border-color: rgb(20 24 32 / 0.1);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 0.96),
+    0 18px 40px rgb(0 0 0 / 0.16);
+}
+
+@keyframes overview-stops-in {
+  from {
+    opacity: 0;
+    translate: -10px 0;
+  }
+}
+
+.overview-stops-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 0;
+}
+
+.overview-stops-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.overview-stops-title {
+  margin: 0;
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 720;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overview-stops-count {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.11);
+  color: rgb(255 255 255 / 0.86);
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 660;
+  white-space: nowrap;
+}
+
+.appearance-light .overview-stops-count {
+  background: rgb(20 24 32 / 0.07);
+  color: rgb(20 24 32 / 0.78);
+}
+
+.overview-stops-add {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 12px 0 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--apple-blue) 24%, rgb(255 255 255 / 0.08));
+  border: 1px solid color-mix(in oklab, var(--apple-blue) 45%, transparent);
+  color: #8cc9ff;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 680;
+  white-space: nowrap;
+  transition:
+    background-color 160ms var(--motion-ease),
+    scale 140ms var(--motion-ease);
+}
+
+.appearance-light .overview-stops-add {
+  background: color-mix(in oklab, var(--apple-blue) 12%, transparent);
+  border-color: color-mix(in oklab, var(--apple-blue) 30%, transparent);
+  color: #006ee6;
+}
+
+.overview-stops-add:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--apple-blue) 34%, rgb(255 255 255 / 0.12));
+}
+
+.overview-stops-add:active:not(:disabled) {
+  scale: 0.95;
+}
+
+.overview-stops-add svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.overview-stops-list {
+  position: relative;
+  margin: 0;
+  padding: 4px 2px 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.overview-stops-list[data-drop='true']::before,
+.overview-stops-list[data-drop='true']::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.overview-stops-list[data-drop='true']::before {
+  left: 6px;
+  top: calc(var(--drop-y, 0px) - 5px);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2.5px solid var(--drop-marker-color);
+  background: rgb(20 24 32 / 0.92);
+  box-sizing: border-box;
+}
+
+.appearance-light .overview-stops-list[data-drop='true']::before {
+  background: #fff;
+}
+
+.overview-stops-list[data-drop='true']::after {
+  left: 15px;
+  right: 8px;
+  top: calc(var(--drop-y, 0px) - 1.5px);
+  height: 3px;
+  border-radius: 999px;
+  background: var(--drop-marker-color);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--drop-marker-color) 65%, transparent);
+}
+
+.overview-stop-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px 30px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 6px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.065);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  scroll-margin: 12px;
+  view-transition-name: match-element;
+  transition:
+    background-color 160ms var(--motion-ease),
+    border-color 160ms var(--motion-ease),
+    box-shadow 180ms var(--motion-ease),
+    scale 160ms var(--motion-ease);
+}
+
+.overview-stop-row:last-child {
+  margin-bottom: 6px;
+}
+
+.appearance-light .overview-stop-row {
+  background: rgb(255 255 255 / 0.78);
+  border-color: rgb(20 24 32 / 0.075);
+}
+
+.overview-stop-row.is-destination {
+  background: rgb(255 255 255 / 0.095);
+  border-color: rgb(255 255 255 / 0.14);
+}
+
+.appearance-light .overview-stop-row.is-destination {
+  background: rgb(255 255 255 / 0.92);
+  border-color: rgb(20 24 32 / 0.11);
+}
+
+.overview-stop-row.is-locked {
+  border-style: dashed;
+  border-color: rgb(255 255 255 / 0.2);
+}
+
+.appearance-light .overview-stop-row.is-locked {
+  border-color: rgb(20 24 32 / 0.18);
+}
+
+.overview-stop-row.is-lifted {
+  z-index: 20;
+  scale: 1.02;
+  pointer-events: none;
+  background: rgb(32 40 54 / 0.96);
+  border-color: color-mix(in oklab, var(--apple-blue) 60%, rgb(255 255 255 / 0.3));
+  box-shadow: 0 14px 30px rgb(0 0 0 / 0.48);
+}
+
+.appearance-light .overview-stop-row.is-lifted {
+  background: rgb(255 255 255 / 0.98);
+  border-color: color-mix(in oklab, var(--apple-blue) 50%, transparent);
+  box-shadow: 0 12px 26px rgb(0 0 0 / 0.2);
+}
+
+.overview-stop-row.is-grabbed,
+.overview-stop-row:has(.overview-stop-handle:focus-visible) {
+  outline: 2px solid var(--drop-marker-color);
+  outline-offset: 1px;
+}
+
+.overview-stop-handle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border-radius: 10px;
+  color: rgb(255 255 255 / 0.62);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition:
+    background-color 140ms var(--motion-ease),
+    color 140ms var(--motion-ease);
+}
+
+.appearance-light .overview-stop-handle {
+  color: rgb(20 24 32 / 0.52);
+}
+
+.overview-stop-handle:is(:hover, :focus-visible):not(:disabled) {
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+.appearance-light .overview-stop-handle:is(:hover, :focus-visible):not(:disabled) {
+  background: rgb(20 24 32 / 0.08);
+  color: #14161a;
+}
+
+.overview-stop-handle[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--apple-blue) 28%, transparent);
+  color: #8cc9ff;
+}
+
+.overview-stop-handle:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.overview-stop-handle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+}
+
+.overview-stop-handle-spacer {
+  width: 32px;
+  height: 36px;
+}
+
+.overview-stops-dragging,
+.overview-stops-dragging * {
+  cursor: grabbing !important;
+}
+
+.overview-stop-marker {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.28);
+  box-sizing: border-box;
+}
+
+.overview-stop-marker.waypoint {
+  background: #6035ed;
+}
+
+.overview-stop-marker.destination {
+  background: #ff3b30;
+}
+
+.overview-stop-marker svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.overview-stop-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.overview-stop-name {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 660;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overview-stop-meta {
+  font-size: calc(13px * var(--text-scale, 1));
+  color: rgb(255 255 255 / 0.66);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.appearance-light .overview-stop-meta {
+  color: rgb(20 24 32 / 0.6);
+}
+
+.overview-stop-delete {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgb(255 69 58 / 0.14);
+  color: #ff7a70;
+  transition:
+    background-color 150ms var(--motion-ease),
+    scale 140ms var(--motion-ease);
+}
+
+.appearance-light .overview-stop-delete {
+  background: rgb(255 59 48 / 0.1);
+  color: #d12c22;
+}
+
+.overview-stop-delete:hover:not(:disabled) {
+  background: rgb(255 69 58 / 0.26);
+}
+
+.appearance-light .overview-stop-delete:hover:not(:disabled) {
+  background: rgb(255 59 48 / 0.18);
+}
+
+.overview-stop-delete:active:not(:disabled) {
+  scale: 0.92;
+}
+
+.overview-stop-delete:disabled {
+  opacity: 0.35;
+}
+
+.overview-stop-delete svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+}
+
+.overview-stop-lock {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(255 255 255 / 0.58);
+}
+
+.appearance-light .overview-stop-lock {
+  background: rgb(20 24 32 / 0.05);
+  color: rgb(20 24 32 / 0.5);
+}
+
+.overview-stop-lock svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.overview-stops-hint {
+  margin: 0;
+  padding: 2px 6px 0;
+  font-size: calc(13px * var(--text-scale, 1));
+  color: rgb(255 255 255 / 0.6);
+  line-height: 1.3;
+}
+
+.appearance-light .overview-stops-hint {
+  color: rgb(20 24 32 / 0.58);
+}
+
+.overview-stops-card .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@container carplay (max-height: 520px) {
+  .overview-stops-card {
+    top: calc(var(--edge) + var(--nav-corner-inset, 6px));
+    width: min(328px, calc(100% - var(--content-left) - var(--edge) - 212px));
+    max-height: calc(100% - (var(--edge) + var(--nav-corner-inset, 6px)) * 2);
+    padding: 10px 11px;
+    border-radius: 20px;
+    gap: 7px;
+  }
+  .overview-stops-title {
+    font-size: calc(15.5px * var(--text-scale, 1));
+  }
+  .overview-stops-add {
+    height: 30px;
+    padding: 0 10px 0 8px;
+    font-size: calc(13px * var(--text-scale, 1));
+  }
+  .overview-stop-row {
+    grid-template-columns: 28px 26px minmax(0, 1fr) 32px;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 13px;
+  }
+  .overview-stop-handle,
+  .overview-stop-handle-spacer {
+    width: 28px;
+    height: 30px;
+  }
+  .overview-stop-marker {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+  .overview-stop-name {
+    font-size: calc(14.5px * var(--text-scale, 1));
+  }
+  .overview-stop-meta {
+    font-size: calc(12px * var(--text-scale, 1));
+  }
+  .overview-stop-delete,
+  .overview-stop-lock {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+  }
+}
+
+@media (forced-colors: active) {
+  .overview-stops-card {
+    --drop-marker-color: Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-stops-card,
+  .overview-stop-row {
+    animation: none;
+    transition: none;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
 }

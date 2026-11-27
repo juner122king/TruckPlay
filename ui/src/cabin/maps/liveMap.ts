@@ -1027,6 +1027,22 @@ function panelCover(map: maplibregl.Map): number {
   return Math.max(0, (panel.right - box.left) * (container.clientWidth / box.width))
 }
 
+/** How far the map's right edge is covered by the speed capsule and map controls dock (px, in the map's own units). */
+function rightControlsCover(map: maplibregl.Map): number {
+  const container = map.getContainer()
+  const box = container.getBoundingClientRect()
+  if (box.width === 0) return 0
+  const scaleX = container.clientWidth / box.width
+  let cover = 0
+  for (const selector of ['.map-tile .speed-stack', '.map-tile .map-controls.map-dock']) {
+    const rect = document.querySelector(selector)?.getBoundingClientRect()
+    if (rect && rect.width > 0 && rect.height > 0) {
+      cover = Math.max(cover, (box.right - rect.left) * scaleX)
+    }
+  }
+  return cover
+}
+
 /** Shows the routes offered before Go (`lines`, `[x, z]` metres each), `picked` in the route's blue over the
  * others, `onPick` called with a route's index as its line is tapped; none to clear them. */
 export function showOfferedRoutes(lines: Point[][], picked: number | null, onPick?: (index: number) => void) {
@@ -1049,16 +1065,23 @@ export function showOfferedRoutes(lines: Point[][], picked: number | null, onPic
     if (x0 < x1 || z0 < z1) {
       const [lng0, lat0] = toLngLat(x0, z1)
       const [lng1, lat1] = toLngLat(x1, z0)
+      const width = live.map.getContainer().clientWidth
+      const rightPadding = Math.min(Math.max(60, rightControlsCover(live.map) + 28), Math.max(60, width / 4))
+      const leftPadding = Math.min(panelCover(live.map) + 40, Math.max(60, width - rightPadding - 120))
+      // Clear the chase camera's persistent visual-center padding first: MapLibre's fitBounds adds its
+      // padding option on top of any existing camera padding, which otherwise double-shifts the preview right.
+      live.map.stop()
+      live.map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
       live.map.fitBounds(
         [
           [lng0, lat0],
           [lng1, lat1],
         ],
         {
-          padding: { top: 60, right: 60, bottom: 60, left: panelCover(live.map) + 40 },
+          padding: { top: 60, right: rightPadding, bottom: 60, left: leftPadding },
           pitch: 0,
           bearing: 0,
-          duration: 900,
+          duration: reducedMotion() ? 0 : 900,
         },
       )
     } else if (live.map.getBearing() !== 0 || live.map.getPitch() !== 0) {
@@ -1132,6 +1155,31 @@ export function overviewLiveRoute() {
   frameCurrentRoute(live)
 }
 
+/** How far the map's left edge is covered by the overview stops card (px, in the map's own units). */
+function overviewCardCover(map: maplibregl.Map): number {
+  const container = map.getContainer()
+  const box = container.getBoundingClientRect()
+  const panel = document.querySelector('.map-tile .overview-stops-card')?.getBoundingClientRect()
+  if (!panel || panel.width <= 0 || box.width === 0) return 0
+  return Math.max(0, (panel.right - box.left) * (container.clientWidth / box.width))
+}
+
+/** Extends the timed route-overview deadline on explicit interaction with overview HUD controls. */
+export function touchLiveOverview() {
+  currentOverview.touch()
+}
+
+/** Suspends or resumes the timed route-overview auto-return timer (e.g. while dragging a waypoint). */
+export function holdLiveOverview(held: boolean) {
+  currentOverview.hold(held)
+}
+
+/** Reframes the active route overview once an overview HUD overlay mounts or resizes. */
+export function reframeLiveOverview() {
+  if (!live || !currentOverview.active() || live.pressed) return
+  frameCurrentRoute(live)
+}
+
 function frameCurrentRoute(target: LiveMap) {
   const route = useLive.getState().route
   if (!route) return
@@ -1147,6 +1195,10 @@ function frameCurrentRoute(target: LiveMap) {
   const [[x0, z0], [x1, z1]] = bounds
   target.overviewNeedsFit = false
   const width = target.map.getContainer().clientWidth
+  const rightPadding = Math.min(140, width / 4)
+  const cardCover = target.interactive ? overviewCardCover(target.map) : 0
+  const wantedLeft = target.interactive ? Math.max(160, width * 0.18, cardCover > 0 ? cardCover + 32 : 0) : 64
+  const leftPadding = Math.min(wantedLeft, Math.max(64, width - rightPadding - 120))
   // fitBounds adds its padding to the existing camera insets. Remove the chase camera's
   // top inset first, otherwise the current-position marker is pushed against the bottom edge.
   target.map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 })
@@ -1154,8 +1206,8 @@ function frameCurrentRoute(target: LiveMap) {
     padding: {
       top: 72,
       bottom: 90,
-      left: target.interactive ? Math.max(160, width * 0.18) : 64,
-      right: Math.min(140, width / 4),
+      left: leftPadding,
+      right: rightPadding,
     },
     bearing: 0,
     pitch: 0,
