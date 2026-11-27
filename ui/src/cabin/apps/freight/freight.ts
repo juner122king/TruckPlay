@@ -1,5 +1,6 @@
 import { type ClockStyle, formatGameTime, HOURS_24 } from '../../../shared/format'
 import type { JobInfo, Telemetry, TruckInfo } from '../../../shared/host'
+import { logoBrands } from '../../boot/brand'
 import type { MapLabel } from '../../maps/mapData'
 
 /**
@@ -327,6 +328,130 @@ export function formatNextBreakLocation(
   return `Rest area in ${cityName} · ${dist} · ${etaClockTime}`
 }
 
+export interface BrandIdentity {
+  /** Canonical normalized brand key (e.g. 'daf', 'scania', 'kenworth', 'custom'). */
+  key: string
+  /** Sculptural display wordmark (uppercased for Latin scripts, preserved for CJK). */
+  wordmark: string
+  /** Heritage signature accent for dark obsidian cockpit. */
+  accentDark: string
+  /** High-contrast heritage accent for light brushed aluminum cockpit. */
+  accentLight: string
+}
+
+const BRAND_PALETTE: Readonly<Record<string, { accentDark: string; accentLight: string }>> = {
+  // ETS2 flagship European makers
+  daf: { accentDark: '#e63946', accentLight: '#c81e2b' },
+  scania: { accentDark: '#3b82f6', accentLight: '#1d4ed8' },
+  volvo: { accentDark: '#60a5fa', accentLight: '#1e40af' },
+  mercedes: { accentDark: '#cbd5e1', accentLight: '#475569' },
+  man: { accentDark: '#ef4444', accentLight: '#b91c1c' },
+  renault: { accentDark: '#f43f5e', accentLight: '#be123c' },
+  iveco: { accentDark: '#38bdf8', accentLight: '#0369a1' },
+  // ATS flagship American makers
+  peterbilt: { accentDark: '#ef4444', accentLight: '#b91c1c' },
+  kenworth: { accentDark: '#f43f5e', accentLight: '#be123c' },
+  freightliner: { accentDark: '#7dd3fc', accentLight: '#0284c7' },
+  westernstar: { accentDark: '#f59e0b', accentLight: '#b45309' },
+  mack: { accentDark: '#d97706', accentLight: '#92400e' },
+  international: { accentDark: '#fb923c', accentLight: '#c2410c' },
+}
+
+const ATS_BRAND_MATCHERS: readonly { key: string; patterns: readonly string[] }[] = [
+  { key: 'peterbilt', patterns: ['peterbilt'] },
+  { key: 'kenworth', patterns: ['kenworth'] },
+  { key: 'freightliner', patterns: ['freightliner'] },
+  { key: 'westernstar', patterns: ['westernstar', 'western star', 'western_star'] },
+  { key: 'mack', patterns: ['mack'] },
+  { key: 'international', patterns: ['international', 'intnational'] },
+]
+
+const DEFAULT_BRAND_ACCENT = { accentDark: '#f5a623', accentLight: '#c77700' }
+
+/**
+ * Resolves a truck's brand into a canonical key, sculptural display wordmark,
+ * and dual-appearance heritage accent colors across ETS2, ATS, and modded vehicles.
+ */
+export function resolveBrandIdentity(brandId: string, brand: string): BrandIdentity {
+  const candidates = logoBrands(brandId, brand)
+  let key = 'custom'
+
+  for (const id of candidates) {
+    const normalized = id.toLowerCase()
+    if (BRAND_PALETTE[normalized]) {
+      key = normalized
+      break
+    }
+  }
+
+  if (key === 'custom') {
+    const combined = `${brandId} ${brand}`.toLowerCase()
+    const words = combined.split(/[^a-z0-9]+/)
+    for (const matcher of ATS_BRAND_MATCHERS) {
+      if (matcher.patterns.some((p) => (p.includes(' ') || p.includes('_') ? combined.includes(p) : words.includes(p)))) {
+        key = matcher.key
+        break
+      }
+    }
+  }
+
+  const rawLabel = (brand || brandId || '').trim()
+  const hasLatin = /[a-z]/i.test(rawLabel)
+  const wordmark = rawLabel ? (hasLatin ? rawLabel.toUpperCase() : rawLabel) : '--'
+  const palette = BRAND_PALETTE[key] ?? DEFAULT_BRAND_ACCENT
+
+  return {
+    key,
+    wordmark,
+    accentDark: palette.accentDark,
+    accentLight: palette.accentLight,
+  }
+}
+
+/** Formats currency consistently for metric (€, ETS2) and imperial ($, ATS). */
+export function formatCurrency(amount: number, isMph: boolean): string {
+  if (!Number.isFinite(amount)) return '--'
+  const rounded = Math.round(amount)
+  const negative = rounded < 0
+  const absFormatted = Math.abs(rounded).toLocaleString()
+  if (isMph) {
+    return negative ? `-$${absFormatted}` : `$${absFormatted}`
+  }
+  return negative ? `-${absFormatted} €` : `${absFormatted} €`
+}
+
+export type WearPartId =
+  | 'engine'
+  | 'transmission'
+  | 'cabin'
+  | 'chassis'
+  | 'wheels'
+  | 'trailerBody'
+  | 'trailerChassis'
+  | 'trailerWheels'
+
+export interface ValueUnitParts {
+  value: string
+  unit: string
+}
+
+/** Splits a formatted metric like "268 km" or "$18,450" into primary numeral and unit for instrument typography. */
+export function splitValueUnit(formatted: string): ValueUnitParts {
+  const trimmed = formatted.trim()
+  if (!trimmed || trimmed === '--') return { value: '--', unit: '' }
+  if (trimmed.startsWith('$') || trimmed.startsWith('-$')) {
+    const sign = trimmed.startsWith('-') ? '-' : ''
+    const rest = trimmed.slice(sign.length + 1)
+    return { value: `${sign}${rest}`, unit: '$' }
+  }
+  const idx = trimmed.lastIndexOf(' ')
+  if (idx <= 0) return { value: trimmed, unit: '' }
+  return {
+    value: trimmed.slice(0, idx),
+    unit: trimmed.slice(idx + 1),
+  }
+}
+
 /** Calculates unit rate earnings (€/km or $/mi). */
 export function calculateRate(income: number, plannedKm: number, isMph: boolean): string {
   if (plannedKm <= 0 || income <= 0) return '--'
@@ -426,6 +551,12 @@ export function evaluateWear(name: string, rawFraction: number | undefined): Com
 }
 
 export type HosAdviceStatus = 'ok' | 'rest_soon' | 'overdue'
+
+export const HOS_BREAK_TONES: Record<HosAdviceStatus, 'neutral' | 'warn' | 'bad'> = {
+  ok: 'neutral',
+  rest_soon: 'warn',
+  overdue: 'bad',
+}
 
 export interface HosEvaluation {
   restDueMinutes: number

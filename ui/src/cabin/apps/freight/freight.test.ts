@@ -13,6 +13,7 @@ import {
   formatAirPressure,
   formatArrivalTime,
   formatCargoMass,
+  formatCurrency,
   formatDuration,
   formatFuel,
   formatFuelRange,
@@ -20,8 +21,10 @@ import {
   isLowFuel,
   isPreviewMode,
   isTrailerCoupled,
+  resolveBrandIdentity,
   resolveLocalizedCity,
   resolveLocalizedCompany,
+  splitValueUnit,
 } from './freight'
 
 describe('freight logic helpers', () => {
@@ -304,5 +307,49 @@ describe('freight logic helpers', () => {
     expect(isLowFuel(180)).toBe(true)
     expect(isLowFuel(250)).toBe(false)
     expect(isLowFuel(1420)).toBe(false)
+  })
+
+  it('formats currency for metric and imperial systems and splits metric units cleanly', () => {
+    expect(formatCurrency(18450, false)).toBe('18,450 €')
+    expect(formatCurrency(18450, true)).toBe('$18,450')
+    expect(formatCurrency(-185, false)).toBe('-185 €')
+    expect(formatCurrency(-185, true)).toBe('-$185')
+    expect(formatCurrency(0, false)).toBe('0 €')
+    expect(formatCurrency(Number.NaN, false)).toBe('--')
+
+    expect(splitValueUnit('268 km')).toEqual({ value: '268', unit: 'km' })
+    expect(splitValueUnit('8.6 bar')).toEqual({ value: '8.6', unit: 'bar' })
+    expect(splitValueUnit('18,265 €')).toEqual({ value: '18,265', unit: '€' })
+    expect(splitValueUnit('$18,265')).toEqual({ value: '18,265', unit: '$' })
+    expect(splitValueUnit('-$185')).toEqual({ value: '-185', unit: '$' })
+    expect(splitValueUnit('--')).toEqual({ value: '--', unit: '' })
+  })
+
+  it('resolves truck brand identities across ETS2, ATS, modded, localized, and custom vehicles', () => {
+    const daf = resolveBrandIdentity('daf', 'DAF')
+    expect(daf.key).toBe('daf')
+    expect(daf.wordmark).toBe('DAF')
+
+    const moddedDaf = resolveBrandIdentity('new_daf', 'DAF')
+    expect(moddedDaf.key).toBe('daf')
+
+    const moddedMercedes = resolveBrandIdentity('t16shd', 'Travego 16SHD (OB)')
+    expect(moddedMercedes.key).toBe('mercedes')
+
+    const zhScania = resolveBrandIdentity('scania', '斯堪尼亚')
+    expect(zhScania.key).toBe('scania')
+    expect(zhScania.wordmark).toBe('斯堪尼亚')
+
+    const kenworth = resolveBrandIdentity('kenworth', 'Kenworth')
+    expect(kenworth.key).toBe('kenworth')
+    expect(kenworth.wordmark).toBe('KENWORTH')
+
+    const westernStar = resolveBrandIdentity('western_star', 'Western Star')
+    expect(westernStar.key).toBe('westernstar')
+    expect(westernStar.wordmark).toBe('WESTERN STAR')
+
+    const custom = resolveBrandIdentity('tatra', 'Tatra')
+    expect(custom.key).toBe('custom')
+    expect(custom.wordmark).toBe('TATRA')
   })
 })

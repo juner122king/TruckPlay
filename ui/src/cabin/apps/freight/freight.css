@@ -1,15 +1,11 @@
 /* ==========================================================================
-   Freight Assistant — Apple CarPlay Ultra / iOS 26 Liquid Glass Styling
-   Built on WestPlay semantic tokens (shell/apple.css & shell/shell.css) for
-   automatic Light/Dark appearance, --text-scale scaling, and container-based
-   adaptation across every truck display profile.
+   Freight Assistant — Precision Automotive Cockpit Styling
+   Porsche Cockpit / Scania Smart Dash inspired instrumentation:
+   - Dark Obsidian & Brushed Titanium (default) + Light Brushed Aluminum
+   - Tabular numerals, calibrated micro-ticks, recessed instrument wells
+   - Zero-scroll single-viewport fit at 1280x720 + compact/narrow adaptation
+   - Full [data-lite], --text-scale, prefers-reduced-motion & forced-colors
    ========================================================================== */
-
-@property --value {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0;
-}
 
 :root {
   --fr-in-oklch: ;
@@ -22,135 +18,406 @@
 }
 
 .shell .freight-app {
-  --fr-key: var(--apple-blue);
-  --fr-key-tint: color-mix(in oklab, var(--fr-key) 14%, transparent);
-  --fr-bar: 76px;
-  --fr-bar-inset: max(0px, calc((var(--panel-radius) - var(--fr-bar) / 2) * var(--corner-inset)));
-  --fr-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 12px);
-  --fr-gutter: 24px;
+  /* Core semantic instrument tokens (Dark Obsidian / Titanium) */
+  --fr-bg: #080a0f;
+  --fr-chassis: linear-gradient(172deg, #161a23 0%, #10131a 55%, #0c0f15 100%);
+  --fr-chassis-border: rgb(255 255 255 / 0.085);
+  --fr-chassis-bevel: rgb(255 255 255 / 0.14);
+  --fr-chassis-shadow: 0 12px 30px rgb(0 0 0 / 0.46), 0 2px 6px rgb(0 0 0 / 0.34);
+
+  --fr-well: rgb(5 8 13 / 0.56);
+  --fr-well-border: rgb(255 255 255 / 0.065);
+  --fr-well-inset: inset 0 1px 3px rgb(0 0 0 / 0.36);
+
+  --fr-bar-bg: rgb(18 22 30 / 0.78);
+  --fr-bar-border: rgb(255 255 255 / 0.11);
+  --fr-slider-bg: linear-gradient(180deg, #272d3a 0%, #1c212c 100%);
+  --fr-slider-border: rgb(255 255 255 / 0.18);
+
+  --fr-ink: #f3f6fb;
+  --fr-ink-sub: rgb(186 198 216 / 0.74);
+  --fr-ink-dim: rgb(156 168 188 / 0.5);
+  --fr-hairline: rgb(255 255 255 / 0.08);
+  --fr-track: rgb(255 255 255 / 0.1);
+
+  --fr-cyan: #38bdf8;
+  --fr-blue: #0a84ff;
+  --fr-amber: #f5a623;
+  --fr-emerald: #30d158;
+  --fr-mint: #00dac3;
+  --fr-crimson: #ff453a;
+
+  --fr-dial-highlight: #1a1f2b;
+  --fr-dial-core: #0a0d13;
+  --fr-cad-grid: rgb(180 198 224 / 0.075);
+  --fr-cad-ground: rgb(180 198 224 / 0.22);
+  --fr-cad-base-stroke: rgb(198 214 236 / 0.72);
+  --fr-cad-base-fill: rgb(198 214 236 / 0.055);
+  --fr-cad-detail: rgb(180 198 224 / 0.32);
+
+  --fr-bar-h: 56px;
+  --fr-bar-inset: max(10px, calc((var(--panel-radius) - var(--fr-bar-h) / 2) * var(--corner-inset)));
+  --fr-corner-clear: calc(var(--panel-radius) * var(--corner-inset) + 10px);
+  --fr-gutter: 20px;
+
+  /* Precision machined radius scale */
+  --fr-r-module: 12px;
+  --fr-r-well: 8px;
+  --fr-r-control: 10px;
+  --fr-r-control-inner: 7px;
+  --fr-r-row: 6px;
+  --fr-r-badge: 5px;
+  --fr-r-bar: 3px;
 
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border-radius: var(--panel-radius);
   background:
-    radial-gradient(120% 55% at 50% 0%, color-mix(in oklab, var(--apple-blue) 8%, transparent), transparent 72%),
-    var(--apple-background);
-  color: var(--apple-label);
+    radial-gradient(85% 42% at 50% 0%, rgb(56 189 248 / 0.075), transparent 72%),
+    radial-gradient(60% 35% at 88% 100%, rgb(245 166 35 / 0.045), transparent 70%),
+    var(--fr-bg);
+  color: var(--fr-ink);
   isolation: isolate;
   container: freight / size;
 }
 
+/* Light Brushed Aluminum / Precision Ceramic Appearance */
 .shell.appearance-light .freight-app {
+  --fr-bg: #e9edf3;
+  --fr-chassis: linear-gradient(174deg, #ffffff 0%, #f5f7fb 100%);
+  --fr-chassis-border: rgb(15 23 42 / 0.085);
+  --fr-chassis-bevel: rgb(255 255 255 / 0.96);
+  --fr-chassis-shadow: 0 10px 26px rgb(15 23 42 / 0.075), 0 1px 3px rgb(15 23 42 / 0.06);
+
+  --fr-well: rgb(232 237 245 / 0.72);
+  --fr-well-border: rgb(15 23 42 / 0.075);
+  --fr-well-inset: inset 0 1px 2px rgb(15 23 42 / 0.05);
+
+  --fr-bar-bg: rgb(255 255 255 / 0.78);
+  --fr-bar-border: rgb(15 23 42 / 0.09);
+  --fr-slider-bg: linear-gradient(180deg, #ffffff 0%, #f1f4f9 100%);
+  --fr-slider-border: rgb(15 23 42 / 0.1);
+
+  --fr-ink: #0f172a;
+  --fr-ink-sub: rgb(30 41 59 / 0.68);
+  --fr-ink-dim: rgb(51 65 85 / 0.5);
+  --fr-hairline: rgb(15 23 42 / 0.09);
+  --fr-track: rgb(15 23 42 / 0.11);
+
+  --fr-cyan: #0284c7;
+  --fr-blue: #0070e0;
+  --fr-amber: #c77700;
+  --fr-emerald: #169c46;
+  --fr-mint: #0d9488;
+  --fr-crimson: #d92d20;
+
+  --fr-dial-highlight: #ffffff;
+  --fr-dial-core: #eaeef5;
+  --fr-cad-grid: rgb(15 23 42 / 0.06);
+  --fr-cad-ground: rgb(15 23 42 / 0.22);
+  --fr-cad-base-stroke: rgb(30 50 82 / 0.74);
+  --fr-cad-base-fill: rgb(30 50 82 / 0.055);
+  --fr-cad-detail: rgb(30 50 82 / 0.3);
+
   background:
-    radial-gradient(120% 50% at 50% 0%, color-mix(in oklab, var(--apple-blue) 5%, transparent), transparent 70%),
-    var(--apple-background);
+    radial-gradient(85% 40% at 50% 0%, rgb(2 132 199 / 0.06), transparent 70%),
+    var(--fr-bg);
 }
 
-/* --- Floating Glass Navigation Bar --------------------------------------------------------------------- */
+/* --- Floating Precision Console Bar -------------------------------------------------------------------- */
 
 .shell .fr-bar {
   --text-scale: 1;
-  --fr-bar-inset: max(0px, calc((var(--panel-radius) - var(--fr-bar) / 2) * var(--corner-inset)));
   position: relative;
   z-index: 4;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  height: var(--fr-bar);
-  margin: var(--fr-bar-inset) var(--fr-bar-inset) 0;
-  padding-inline: 4px;
+  height: var(--fr-bar-h);
+  margin: var(--fr-bar-inset) max(var(--fr-gutter), var(--fr-corner-clear)) 0;
   flex: none;
 }
 
 .shell .fr-bar-side {
   display: flex;
   align-items: center;
-  min-width: 120px;
-  height: 100%;
+  min-width: 0;
 }
 
 .shell .fr-bar-side.end {
   justify-content: flex-end;
 }
 
-.shell .fr-truck-chip {
+/* Sculptural Brushed-Metal Automotive Nameplate (46px, optical parity with segmented tab bar) */
+.shell .fr-brand-plate {
+  --brand-accent: var(--brand-accent-dark, var(--fr-amber));
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 15px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--glass-rim) 55%, transparent);
-  font-size: 15px;
-  font-weight: 650;
-  color: var(--apple-label);
-  white-space: nowrap;
+  gap: 11px;
+  height: 46px;
+  padding: 0 11px 0 13px;
+  border-radius: var(--fr-r-well);
+  border: 1px solid color-mix(in oklab, var(--brand-accent) 18%, var(--fr-bar-border));
+  background:
+    radial-gradient(65% 130% at 0% 50%, color-mix(in oklab, var(--brand-accent) 16%, transparent), transparent 72%),
+    repeating-linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.022) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(164deg, #1d222d 0%, #131720 55%, #0e1118 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 rgb(0 0 0 / 0.45),
+    0 6px 18px rgb(0 0 0 / 0.34);
+  overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
 }
 
-.shell .fr-live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--apple-green);
-  box-shadow: 0 0 8px color-mix(in oklab, var(--apple-green) 70%, transparent);
+.shell.appearance-light .fr-brand-plate {
+  --brand-accent: var(--brand-accent-light, var(--fr-amber));
+  border-color: color-mix(in oklab, var(--brand-accent) 22%, var(--fr-bar-border));
+  background:
+    radial-gradient(60% 130% at 0% 50%, color-mix(in oklab, var(--brand-accent) 10%, transparent), transparent 70%),
+    repeating-linear-gradient(
+      180deg,
+      rgb(15 23 42 / 0.018) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(164deg, #ffffff 0%, #f1f4f9 58%, #e6ebf2 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.96),
+    inset 0 -1px 0 rgb(15 23 42 / 0.06),
+    0 4px 14px rgb(15 23 42 / 0.08);
+}
+
+.shell .fr-brand-blade {
+  position: absolute;
+  inset: 7px auto 7px 5px;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--brand-accent);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--brand-accent) 68%, transparent);
+}
+
+.shell.appearance-light .fr-brand-blade {
+  box-shadow: none;
+}
+
+.shell .fr-brand-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.shell .fr-brand-wordmark {
+  font-size: 13.5px;
+  font-weight: 820;
+  letter-spacing: 0.16em;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(180deg, #ffffff 10%, #cfd8e6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.shell.appearance-light .fr-brand-wordmark {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #0b1220;
+}
+
+.shell .fr-brand-plate.single-line .fr-brand-wordmark {
+  font-size: 15px;
+}
+
+.shell .fr-brand-model {
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  line-height: 1.05;
+  color: var(--fr-ink-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .fr-brand-status {
+  display: grid;
+  place-items: center;
+  padding-left: 10px;
+  margin-left: 1px;
+  height: 22px;
+  border-left: 1px solid var(--fr-hairline);
   flex: none;
 }
 
+.shell .fr-speed-chip,
 .shell .fr-preview-badge {
   display: inline-flex;
   align-items: center;
-  height: 44px;
-  padding: 0 15px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--apple-orange) 16%, transparent);
-  border: 1px solid color-mix(in oklab, var(--apple-orange) 42%, transparent);
-  color: var(--apple-orange);
-  font-size: 14px;
-  font-weight: 650;
+  gap: 8px;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-bar-bg);
+  border: 1px solid var(--fr-bar-border);
+  backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: inset 0 1px 0 var(--fr-chassis-bevel);
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
 }
 
+.shell .fr-live-dot {
+  width: 6.5px;
+  height: 6.5px;
+  border-radius: 50%;
+  background: var(--fr-ink-dim);
+  flex: none;
+}
+
+.shell .fr-live-dot.live {
+  background: var(--fr-emerald);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--fr-emerald) 20%, transparent),
+    0 0 8px color-mix(in oklab, var(--fr-emerald) 78%, transparent);
+}
+
+.shell .fr-preview-badge {
+  color: var(--fr-amber);
+  border-color: color-mix(in oklab, var(--fr-amber) 38%, transparent);
+  background: color-mix(in oklab, var(--fr-amber) 12%, var(--fr-bar-bg));
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.shell .fr-preview-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fr-amber);
+}
+
+.shell .fr-speed-chip {
+  font-variant-numeric: tabular-nums;
+  gap: 5px;
+}
+
+.shell .fr-speed-chip strong {
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--fr-ink);
+}
+
+.shell .fr-speed-chip span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fr-ink-dim);
+  letter-spacing: 0.03em;
+}
+
+/* Machined Segmented Tab Console with Sliding Luminous Capsule */
 .shell .fr-tab-bar {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(112px, 1fr));
   align-items: center;
-  gap: 4px;
-  height: var(--fr-bar);
-  padding: 6px;
-  border-radius: calc(var(--fr-bar) / 2);
-  border: 1px solid color-mix(in oklab, var(--glass-rim) 50%, transparent);
+  height: 46px;
+  padding: 4px;
+  border-radius: var(--fr-r-control);
+  background: var(--fr-bar-bg);
+  border: 1px solid var(--fr-bar-border);
+  backdrop-filter: blur(24px) saturate(160%);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.35),
+    0 6px 20px rgb(0 0 0 / 0.25);
+}
+
+.shell.appearance-light .fr-tab-bar {
+  box-shadow:
+    inset 0 1px 2px rgb(15 23 42 / 0.08),
+    0 4px 16px rgb(15 23 42 / 0.06);
+}
+
+.shell .fr-tab-slider {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  border-radius: var(--fr-r-control-inner);
+  background: var(--fr-slider-bg);
+  border: 1px solid var(--fr-slider-border);
+  box-shadow:
+    inset 0 1px 0 var(--fr-chassis-bevel),
+    0 3px 10px rgb(0 0 0 / 0.28);
+  transform: translateX(calc(var(--active-index, 0) * 100%));
+  pointer-events: none;
+}
+
+.shell.appearance-light .fr-tab-slider {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 8px rgb(15 23 42 / 0.1);
 }
 
 .shell .fr-tab {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  z-index: 1;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-width: 118px;
+  gap: 7px;
   height: 100%;
-  padding-inline: 20px;
-  border-radius: calc((var(--fr-bar) - 12px) / 2);
-  font-size: 15px;
+  padding-inline: 16px;
+  border-radius: var(--fr-r-control-inner);
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.1;
-  color: var(--apple-label-secondary);
+  letter-spacing: 0.015em;
+  color: var(--fr-ink-sub);
   white-space: nowrap;
-  transition:
-    background-color 180ms var(--motion-ease),
-    color 180ms var(--motion-ease),
-    box-shadow 180ms var(--motion-ease);
+  transition: color 180ms var(--motion-ease);
+}
+
+.shell .fr-tab[aria-selected='true'] {
+  color: var(--fr-ink);
+  font-weight: 700;
+}
+
+.shell .fr-tab[aria-selected='true'] svg {
+  color: var(--fr-amber);
+}
+
+/* Non-color selection cue (WCAG 1.4.1): precision bottom micro-tick on active tab */
+.shell .fr-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 18px;
+  height: 2px;
+  translate: -50% 0;
+  border-radius: 2px;
+  background: var(--fr-amber);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .shell .fr-tab {
-    transition:
-      background-color 180ms var(--motion-ease),
-      color 180ms var(--motion-ease),
-      box-shadow 180ms var(--motion-ease),
-      scale 150ms var(--motion-ease);
+  .shell .fr-tab-slider {
+    transition: transform 300ms var(--motion-ease);
   }
 
   .shell .fr-tab:active {
@@ -158,39 +425,25 @@
   }
 }
 
-.shell .fr-tab[aria-selected='true'] {
-  color: var(--fr-key);
-  font-weight: 700;
-  background: color-mix(in oklab, #fff 13%, var(--apple-card));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.24),
-    var(--shadow-raised);
-}
-
-.shell.appearance-light .fr-tab[aria-selected='true'] {
-  background: #fff;
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    0 2px 8px rgb(0 0 0 / 0.1),
-    0 1px 2px rgb(0 0 0 / 0.06);
-}
-
-/* Non-color selection cue (WCAG 1.4.1): crisp accent bar below active tab */
-.shell .fr-tab[aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  inset: auto 26% 5px;
-  border-block-end: 2.5px solid var(--fr-key);
-  border-radius: 2px;
-}
-
 .shell .fr-tab:focus-visible,
-.shell .fr-action-pill:focus-visible {
-  outline: 3px solid var(--fr-key);
+.shell .fr-action-pill:focus-visible,
+.shell .fr-wear-row:focus-visible {
+  outline: 2.5px solid var(--fr-amber);
   outline-offset: 2px;
 }
 
-/* --- Scrollable Body & Panel Entrance ------------------------------------------------------------------ */
+/* Vector-native focus feedback for SVG CAD parts (avoids rectangular bounding-box ring) */
+.shell .fr-cad-part:focus,
+.shell .fr-cad-part:focus-visible {
+  outline: none;
+}
+
+.shell .fr-cad-part:focus-visible .fr-cad-stroke,
+.shell .fr-cad-part:focus-visible .fr-cad-wheel-outer {
+  stroke-width: 2.6;
+}
+
+/* --- Main Scroll / Viewport Canvas --------------------------------------------------------------------- */
 
 .shell .fr-scroll {
   flex: 1;
@@ -199,13 +452,7 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-width: none;
-  margin-top: calc(-1 * (var(--fr-bar) + var(--fr-bar-inset)));
-  padding: calc(var(--fr-bar) + var(--fr-bar-inset) + 14px) max(var(--fr-gutter), var(--fr-corner-clear))
-    max(20px, var(--fr-corner-clear));
-  mask-image: linear-gradient(
-    transparent calc(var(--fr-bar-inset) + 6px),
-    #000 calc(var(--fr-bar) + var(--fr-bar-inset) + 14px)
-  );
+  padding: 12px max(var(--fr-gutter), var(--fr-corner-clear)) max(16px, var(--fr-corner-clear));
 }
 
 .shell .fr-scroll::-webkit-scrollbar {
@@ -213,21 +460,26 @@
 }
 
 .shell .fr-panel {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
+.shell .fr-panel:focus {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .shell .fr-panel {
-    animation: fr-panel-in 220ms var(--motion-ease) both;
+    animation: fr-panel-enter 220ms var(--motion-ease) both;
   }
 }
 
-@keyframes fr-panel-in {
+@keyframes fr-panel-enter {
   from {
     opacity: 0;
-    translate: 0 8px;
+    translate: 0 6px;
   }
   to {
     opacity: 1;
@@ -235,178 +487,76 @@
   }
 }
 
-.shell .fr-panel:focus {
-  outline: none;
-}
+/* --- Precision Instrument Module Shell ----------------------------------------------------------------- */
 
-/* --- Empty States -------------------------------------------------------------------------------------- */
-
-.shell .fr-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 20px 36px 28px;
-  text-align: center;
-}
-
-.shell .fr-empty-icon {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--apple-card);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 60%, transparent);
-  color: var(--fr-key);
-  box-shadow: var(--shadow-raised);
-}
-
-.shell .fr-empty-title {
-  margin: 4px 0 0;
-  font-size: calc(28px * var(--text-scale, 1));
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.shell .fr-empty-desc {
-  margin: 0;
-  max-width: 34em;
-  font-size: calc(20px * var(--text-scale, 1));
-  line-height: 1.4;
-  color: var(--apple-label-secondary);
-}
-
-.shell .fr-empty-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.shell .fr-action-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 50px;
-  padding: 0 22px;
-  border-radius: 999px;
-  background: var(--apple-card);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 55%, transparent);
-  color: var(--fr-key);
-  font-size: calc(18px * var(--text-scale, 1));
-  font-weight: 600;
-  box-shadow: var(--shadow-raised);
-  transition: background-color 160ms var(--motion-ease);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .shell .fr-action-pill {
-    transition:
-      background-color 160ms var(--motion-ease),
-      scale 150ms var(--motion-ease);
-  }
-
-  .shell .fr-action-pill:active {
-    scale: 0.96;
-  }
-}
-
-.shell .fr-action-pill:active {
-  background: var(--apple-card-raised);
-}
-
-/* --- Twin-Card Liquid Glass Grid ----------------------------------------------------------------------- */
-
-.shell .fr-grid-2 {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  align-content: stretch;
-}
-
-.shell .fr-card {
+.shell .fr-module {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 12px;
   min-width: 0;
-  padding: 20px 22px;
-  border-radius: 26px;
+  min-height: 0;
+  padding: 16px 20px;
+  border-radius: var(--fr-r-module);
   overflow: hidden;
   isolation: isolate;
-  background: linear-gradient(180deg, #1f1f24 0%, #17171b 100%);
-  border: 1px solid rgb(255 255 255 / 0.08);
+  background: var(--fr-chassis);
+  border: 1px solid var(--fr-chassis-border);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.13),
-    0 10px 28px rgb(0 0 0 / 0.34);
+    inset 0 1px 0 var(--fr-chassis-bevel),
+    var(--fr-chassis-shadow);
 }
 
-.shell.appearance-light .fr-card {
-  background: linear-gradient(180deg, #ffffff 0%, #fafafc 100%);
-  border: 1px solid rgb(0 0 0 / 0.06);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    0 2px 6px rgb(0 0 0 / 0.05),
-    0 12px 28px rgb(0 0 0 / 0.06);
-}
-
-/* Restrained state-aware atmospheric aura along top edge of each card */
-.shell .fr-card[data-tone]::before {
+/* Whisper-thin top luminous instrument accent filament */
+.shell .fr-module[data-tone]::before {
   content: '';
   position: absolute;
-  inset: 0 0 auto;
-  height: 92px;
-  z-index: -1;
+  inset: 0 18% auto;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, var(--mod-accent, transparent), transparent);
+  opacity: 0.72;
   pointer-events: none;
-  background: radial-gradient(78% 100% at 18% 0%, var(--card-aura, transparent), transparent 72%);
 }
 
-.shell .fr-card[data-tone='neutral'] {
-  --card-aura: color-mix(in oklab, var(--apple-blue) 12%, transparent);
+.shell .fr-module[data-tone]::after {
+  content: '';
+  position: absolute;
+  inset: 0 12% auto;
+  height: 44px;
+  z-index: -1;
+  background: radial-gradient(60% 100% at 50% 0%, color-mix(in oklab, var(--mod-accent, transparent) 14%, transparent), transparent 80%);
+  pointer-events: none;
 }
 
-.shell .fr-card[data-tone='info'] {
-  --card-aura: color-mix(in oklab, var(--apple-cyan) 14%, transparent);
+.shell.appearance-light .fr-module[data-tone]::after {
+  opacity: 0.55;
 }
 
-.shell .fr-card[data-tone='good'] {
-  --card-aura: color-mix(in oklab, var(--apple-green) 13%, transparent);
+.shell .fr-module[data-tone='neutral'] {
+  --mod-accent: rgb(255 255 255 / 0.38);
 }
 
-.shell .fr-card[data-tone='warn'] {
-  --card-aura: color-mix(in oklab, var(--apple-orange) 15%, transparent);
+.shell.appearance-light .fr-module[data-tone='neutral'] {
+  --mod-accent: rgb(15 23 42 / 0.2);
 }
 
-.shell .fr-card[data-tone='bad'] {
-  --card-aura: color-mix(in oklab, var(--apple-red) 16%, transparent);
+.shell .fr-module[data-tone='info'] {
+  --mod-accent: var(--fr-cyan);
 }
 
-.shell.appearance-light .fr-card[data-tone='neutral'] {
-  --card-aura: color-mix(in oklab, var(--apple-blue) 7%, transparent);
+.shell .fr-module[data-tone='good'] {
+  --mod-accent: var(--fr-emerald);
 }
 
-.shell.appearance-light .fr-card[data-tone='info'] {
-  --card-aura: color-mix(in oklab, var(--apple-cyan) 8%, transparent);
+.shell .fr-module[data-tone='warn'] {
+  --mod-accent: var(--fr-amber);
 }
 
-.shell.appearance-light .fr-card[data-tone='good'] {
-  --card-aura: color-mix(in oklab, var(--apple-green) 7%, transparent);
+.shell .fr-module[data-tone='bad'] {
+  --mod-accent: var(--fr-crimson);
 }
 
-.shell.appearance-light .fr-card[data-tone='warn'] {
-  --card-aura: color-mix(in oklab, var(--apple-orange) 9%, transparent);
-}
-
-.shell.appearance-light .fr-card[data-tone='bad'] {
-  --card-aura: color-mix(in oklab, var(--apple-red) 10%, transparent);
-}
-
-.shell .fr-card-head {
+.shell .fr-mod-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -414,168 +564,387 @@
   flex: none;
 }
 
-.shell .fr-card-title-row {
-  flex: 1;
-  display: flex;
+.shell .fr-mod-heading {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+  color: var(--fr-ink-sub);
 }
 
-.shell .fr-card-heading-stack {
-  min-width: 0;
-}
-
-.shell .fr-card-title {
+.shell .fr-mod-title {
   margin: 0;
-  font-size: calc(16.5px * var(--text-scale, 1));
+  font-size: calc(15.5px * var(--text-scale, 1));
   font-weight: 700;
-  line-height: 1.2;
-  color: var(--apple-label);
+  letter-spacing: 0.01em;
+  color: var(--fr-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.shell .fr-card-subtitle {
-  margin-top: 2px;
-  font-size: calc(13px * var(--text-scale, 1));
-  font-weight: 500;
-  color: var(--apple-label-secondary);
+.shell .fr-kicker {
+  font-size: calc(11.5px * var(--text-scale, 1));
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fr-ink-dim);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* iOS Settings-style Icon Tiles */
-.shell .fr-tile {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
-}
+/* --- Semantic Status Pills & Tone Utilities ------------------------------------------------------------ */
 
-.shell .fr-tile.small {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-}
-
-.shell .fr-tile.blue {
-  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-blue) 88%, white), var(--apple-blue));
-}
-
-.shell .fr-tile.cyan {
-  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-cyan) 88%, white), var(--apple-cyan));
-}
-
-.shell .fr-tile.green {
-  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-green) 88%, white), var(--apple-green));
-}
-
-.shell .fr-tile.orange {
-  background: linear-gradient(155deg, color-mix(in oklab, var(--apple-orange) 88%, white), var(--apple-orange));
-}
-
-/* Semantic Status Pills (Icon + Text, never color alone) */
 .shell .fr-status-pill {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: calc(12.5px * var(--text-scale, 1));
+  padding: 4px 9px;
+  border-radius: var(--fr-r-badge);
+  border: 1px solid transparent;
+  font-size: calc(12px * var(--text-scale, 1));
   font-weight: 650;
   line-height: 1.15;
   white-space: nowrap;
 }
 
+.shell .fr-status-pill.compact {
+  padding: 3px 9px;
+  font-size: calc(11.5px * var(--text-scale, 1));
+}
+
 .shell .fr-status-pill.good {
-  background: color-mix(in oklab, var(--apple-green) 16%, transparent);
-  color: var(--apple-green);
+  background: color-mix(in oklab, var(--fr-emerald) 13%, transparent);
+  border-color: color-mix(in oklab, var(--fr-emerald) 28%, transparent);
+  color: var(--fr-emerald);
 }
 
 .shell .fr-status-pill.info {
-  background: var(--fr-key-tint);
-  color: var(--fr-key);
+  background: color-mix(in oklab, var(--fr-cyan) 13%, transparent);
+  border-color: color-mix(in oklab, var(--fr-cyan) 28%, transparent);
+  color: var(--fr-cyan);
 }
 
 .shell .fr-status-pill.warn {
-  background: color-mix(in oklab, var(--apple-orange) 16%, transparent);
-  color: var(--apple-orange);
+  background: color-mix(in oklab, var(--fr-amber) 14%, transparent);
+  border-color: color-mix(in oklab, var(--fr-amber) 34%, transparent);
+  color: var(--fr-amber);
 }
 
 .shell .fr-status-pill.bad {
-  background: color-mix(in oklab, var(--apple-red) 16%, transparent);
-  color: var(--apple-red);
+  background: color-mix(in oklab, var(--fr-crimson) 14%, transparent);
+  border-color: color-mix(in oklab, var(--fr-crimson) 34%, transparent);
+  color: var(--fr-crimson);
 }
 
 .shell .fr-status-pill.neutral {
-  background: var(--apple-fill-tertiary);
-  color: var(--apple-label-secondary);
+  background: var(--fr-well);
+  border-color: var(--fr-well-border);
+  color: var(--fr-ink-sub);
 }
 
-.shell .fr-pct-badge {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--fr-key-tint);
-  color: var(--fr-key);
-  font-size: calc(15px * var(--text-scale, 1));
-  font-weight: 700;
+.shell .tone-good {
+  color: var(--fr-emerald) !important;
+}
+
+.shell .tone-warn {
+  color: var(--fr-amber) !important;
+}
+
+.shell .tone-bad {
+  color: var(--fr-crimson) !important;
+}
+
+/* --- Optical Numeral + Unit Pair ----------------------------------------------------------------------- */
+
+.shell .fr-metric-pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-/* --- Waybill Route Stage & Cargo ----------------------------------------------------------------------- */
+.shell .fr-metric-pair.hero .fr-metric-val {
+  font-size: calc(40px * var(--text-scale, 1));
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
 
-.shell .fr-route-stage {
+.shell .fr-metric-pair.hero .fr-metric-unit {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-sub);
+}
+
+.shell .fr-metric-pair.payout .fr-metric-val {
+  font-size: calc(28px * var(--text-scale, 1));
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.shell .fr-metric-pair.payout .fr-metric-unit {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.shell .fr-metric-pair.payout .fr-metric-unit.prefix {
+  margin-right: -2px;
+}
+
+.shell .fr-metric-pair.compact .fr-metric-val {
+  font-size: calc(22px * var(--text-scale, 1));
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+.shell .fr-metric-pair.compact .fr-metric-unit {
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-sub);
+}
+
+/* --- Shared Recessed Metric Grid & Next Break Strip ---------------------------------------------------- */
+
+.shell .fr-metric-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.shell .fr-metric-grid.cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.shell .fr-metric-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.shell .fr-metric-grid.dense {
+  flex: 1;
+  align-content: stretch;
+}
+
+.shell .fr-cell {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px 18px;
-  border-radius: 20px;
-  background: var(--apple-fill-quaternary);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 50%, transparent);
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
 }
 
-.shell .fr-route-pair {
+.shell .fr-cell-label {
+  font-size: calc(12px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .fr-cell-val {
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 750;
+  color: var(--fr-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell .fr-break-strip {
+  position: relative;
+  margin-top: auto;
+  padding: 12px 14px 12px 18px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
+  overflow: hidden;
+}
+
+.shell .fr-break-strip::before {
+  content: '';
+  position: absolute;
+  inset: 7px auto 7px 6px;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--fr-amber);
+  opacity: 0.78;
+}
+
+.shell .fr-break-strip.tone-warn {
+  border-color: color-mix(in oklab, var(--fr-amber) 36%, transparent);
+}
+
+.shell .fr-break-strip.tone-bad {
+  border-color: color-mix(in oklab, var(--fr-crimson) 42%, transparent);
+}
+
+.shell .fr-break-strip.tone-bad::before {
+  background: var(--fr-crimson);
+  opacity: 1;
+}
+
+.shell .fr-break-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
-.shell .fr-city-block {
-  flex: 0 1 auto;
+.shell .fr-break-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--fr-ink);
+}
+
+.shell .fr-break-label svg {
+  color: var(--fr-amber);
+}
+
+.shell .fr-break-time {
+  font-size: calc(15.5px * var(--text-scale, 1));
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--fr-ink);
+}
+
+.shell .fr-break-sub {
+  margin-top: 4px;
+  font-size: calc(13px * var(--text-scale, 1));
+  color: var(--fr-ink-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- TAB 1: WAYBILL (Full-Width Corridor Hero + Asymmetric Twin Deck) ---------------------------------- */
+
+.shell .fr-waybill-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 14px;
+}
+
+.shell .fr-corridor-hero {
+  gap: 14px;
+  padding: 16px 22px 18px;
+}
+
+.shell .fr-corridor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.shell .fr-corridor-cargo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.shell .fr-cargo-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: calc(14.5px * var(--text-scale, 1));
+  color: var(--fr-ink-sub);
+}
+
+.shell .fr-cargo-inline svg {
+  color: var(--fr-cyan);
+  flex: none;
+}
+
+.shell .fr-cargo-title {
+  font-weight: 680;
+  color: var(--fr-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell .fr-cargo-dot {
+  opacity: 0.45;
+}
+
+.shell .fr-cargo-weight {
+  flex: none;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-corridor-pct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: none;
+}
+
+.shell .fr-pct-readout {
+  font-size: calc(18px * var(--text-scale, 1));
+  font-weight: 800;
+  color: var(--fr-cyan);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-corridor-body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.shell .fr-corridor-route {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr minmax(110px, auto);
+  align-items: center;
+  gap: 20px;
+}
+
+.shell .fr-city-node {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
-.shell .fr-city-block.end {
+.shell .fr-city-node.end {
   align-items: flex-end;
   text-align: right;
 }
 
 .shell .fr-city-kicker {
-  font-size: calc(11.5px * var(--text-scale, 1));
-  font-weight: 650;
-  letter-spacing: 0.05em;
+  font-size: calc(11px * var(--text-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--apple-label-secondary);
+  color: var(--fr-ink-dim);
 }
 
 .shell .fr-city-name {
   max-width: 100%;
-  font-size: calc(23px * var(--text-scale, 1));
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  line-height: 1.12;
+  font-size: calc(27px * var(--text-scale, 1));
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--fr-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -583,470 +952,730 @@
 
 .shell .fr-city-sub {
   max-width: 100%;
-  font-size: calc(13.5px * var(--text-scale, 1));
-  color: var(--apple-label-secondary);
+  font-size: calc(13px * var(--text-scale, 1));
+  color: var(--fr-ink-sub);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.shell .fr-route-connector {
-  flex: 1 1 32px;
-  min-width: 32px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--fr-key);
-  padding-top: 12px;
-}
-
-.shell .fr-route-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex: none;
-}
-
-.shell .fr-route-dot.origin {
-  background: var(--apple-blue);
-}
-
-.shell .fr-route-dot.dest {
-  background: var(--apple-cyan);
-}
-
-.shell .fr-route-line {
-  flex: 1;
-  height: 2px;
-  border-top: 2px dashed color-mix(in oklab, var(--fr-key) 55%, transparent);
-}
-
-.shell .fr-cargo-chip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 9px 13px;
-  border-radius: 13px;
-  background: color-mix(in oklab, var(--apple-card) 75%, transparent);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 35%, transparent);
-}
-
-.shell .fr-cargo-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  color: var(--fr-key);
-}
-
-.shell .fr-cargo-name {
-  font-size: calc(17px * var(--text-scale, 1));
-  font-weight: 650;
-  color: var(--apple-label);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.shell .fr-cargo-mass {
-  flex: none;
-  font-size: calc(16px * var(--text-scale, 1));
-  font-weight: 650;
-  color: var(--apple-label-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-/* --- Grouped Key-Value Plate --------------------------------------------------------------------------- */
-
-.shell .fr-kv-plate {
-  margin-top: auto;
-  padding: 4px 16px;
-  border-radius: 18px;
-  background: var(--apple-fill-quaternary);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 42%, transparent);
-}
-
-.shell .fr-kv-list {
-  margin: 0;
-  padding: 0;
+.shell .fr-corridor-track-col {
   display: flex;
   flex-direction: column;
-}
-
-.shell .fr-kv-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10.5px 0;
-}
-
-.shell .fr-kv-row + .fr-kv-row {
-  border-top: 1px solid color-mix(in oklab, var(--apple-separator) 75%, transparent);
-}
-
-.shell .fr-kv-row.featured {
-  padding: 12px 0;
-}
-
-.shell .fr-kv-row dt {
-  margin: 0;
-  font-size: calc(15.5px * var(--text-scale, 1));
-  font-weight: 500;
-  color: var(--apple-label-secondary);
-}
-
-.shell .fr-kv-row dt.fr-kv-strong {
-  color: var(--apple-label);
-  font-weight: 650;
-}
-
-.shell .fr-kv-row dt.fr-kv-icon-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.shell .fr-kv-row dd {
-  margin: 0;
-  font-size: calc(16.5px * var(--text-scale, 1));
-  font-weight: 700;
-  color: var(--apple-label);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.shell .fr-kv-row.featured dd {
-  font-size: calc(18.5px * var(--text-scale, 1));
-  font-weight: 750;
-}
-
-.shell .tone-good {
-  color: var(--apple-green) !important;
-}
-
-.shell .tone-warn {
-  color: var(--apple-orange) !important;
-}
-
-.shell .tone-bad {
-  color: var(--apple-red) !important;
-}
-
-/* --- Progress & Hero Metric ---------------------------------------------------------------------------- */
-
-.shell .fr-hero-metric {
-  display: flex;
-  align-items: baseline;
   gap: 10px;
-  margin-top: 2px;
+  min-width: 140px;
+  padding-top: 8px;
 }
 
-.shell .fr-hero-value {
-  font-size: calc(44px * var(--text-scale, 1));
-  font-weight: 800;
-  line-height: 1.04;
-  letter-spacing: -0.025em;
-  font-variant-numeric: tabular-nums;
-}
-
-.shell .fr-hero-caption {
-  font-size: calc(17px * var(--text-scale, 1));
-  font-weight: 550;
-  color: var(--apple-label-secondary);
-}
-
-.shell .fr-progress-shell {
+.shell .fr-track-shell {
   position: relative;
-  padding-block: 4px;
+  display: flex;
+  align-items: center;
+  height: 18px;
 }
 
-.shell .fr-progress-track {
-  width: 100%;
-  height: 12px;
-  border-radius: 999px;
-  background: var(--apple-fill);
+.shell .fr-track-anchor {
+  position: relative;
+  z-index: 2;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.shell .fr-track-anchor.origin {
+  background: var(--fr-blue);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--fr-blue) 22%, transparent);
+}
+
+.shell .fr-track-anchor.dest {
+  background: var(--fr-cyan);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--fr-cyan) 22%, transparent);
+}
+
+.shell .fr-track-rail {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  margin-inline: 6px;
+  border-radius: var(--fr-r-bar);
+  background: var(--fr-track);
   overflow: hidden;
 }
 
-.shell .fr-progress-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg var(--fr-in-oklch), var(--apple-blue), var(--apple-cyan));
+.shell .fr-track-ticks {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 11%,
+    rgb(255 255 255 / 0.14) 11% calc(11% + 1px)
+  );
+  pointer-events: none;
 }
 
-.shell .fr-progress-thumb {
+.shell.appearance-light .fr-track-ticks {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 11%,
+    rgb(15 23 42 / 0.14) 11% calc(11% + 1px)
+  );
+}
+
+.shell .fr-track-fill {
+  position: relative;
+  height: 100%;
+  border-radius: var(--fr-r-bar);
+  background: linear-gradient(90deg var(--fr-in-oklch), var(--fr-blue), var(--fr-cyan));
+}
+
+.shell .fr-track-marker {
   position: absolute;
   top: 50%;
-  width: 18px;
-  height: 18px;
+  z-index: 3;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  border: 3px solid var(--apple-cyan);
+  border: 2.5px solid var(--fr-cyan);
   box-shadow:
-    0 0 10px color-mix(in oklab, var(--apple-cyan) 65%, transparent),
-    0 2px 5px rgb(0 0 0 / 0.35);
+    0 0 12px color-mix(in oklab, var(--fr-cyan) 75%, transparent),
+    0 2px 5px rgb(0 0 0 / 0.4);
   translate: -50% -50%;
   pointer-events: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .shell .fr-progress-fill,
-  .shell .fr-progress-thumb {
+  .shell .fr-track-fill,
+  .shell .fr-track-marker {
     transition:
       width 320ms var(--motion-ease),
       left 320ms var(--motion-ease);
   }
 }
 
-.shell .fr-progress-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: calc(14px * var(--text-scale, 1));
-  color: var(--apple-label-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.shell .fr-progress-meta strong {
-  color: var(--apple-label);
-  font-weight: 650;
-}
-
-/* --- Raised Inset Sub-Card ----------------------------------------------------------------------------- */
-
-.shell .fr-inset-card {
-  margin-top: auto;
-  padding: 13px 16px;
-  border-radius: 18px;
-  background: var(--apple-card-raised);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 45%, transparent);
-}
-
-.shell.appearance-light .fr-inset-card {
-  background: var(--apple-fill-quaternary);
-}
-
-.shell .fr-inset-card.alert-border {
-  border-color: color-mix(in oklab, var(--apple-orange) 45%, transparent);
-}
-
-.shell .fr-inset-card.danger-border {
-  border-color: color-mix(in oklab, var(--apple-red) 48%, transparent);
-}
-
-.shell .fr-inset-top {
+.shell .fr-track-caption {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-}
-
-.shell .fr-inset-title {
-  font-size: calc(16px * var(--text-scale, 1));
-  font-weight: 650;
-}
-
-.shell .fr-inset-value {
-  font-size: calc(17px * var(--text-scale, 1));
-  font-weight: 700;
+  font-size: calc(12.5px * var(--text-scale, 1));
+  color: var(--fr-ink-dim);
   font-variant-numeric: tabular-nums;
 }
 
-.shell .fr-inset-sub {
-  margin-top: 5px;
-  font-size: calc(14px * var(--text-scale, 1));
-  color: var(--apple-label-secondary);
+.shell .fr-track-caption strong {
+  color: var(--fr-ink-sub);
+  font-weight: 680;
+}
+
+.shell .fr-corridor-divider {
+  width: 1px;
+  align-self: stretch;
+  margin-block: 4px;
+  background: linear-gradient(180deg, transparent, var(--fr-hairline) 22%, var(--fr-hairline) 78%, transparent);
+  flex: none;
+}
+
+.shell .fr-hero-distance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  min-width: 156px;
+  flex: none;
+}
+
+.shell .fr-waybill-deck {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.06fr 0.94fr;
+  gap: 14px;
+}
+
+.shell .fr-schedule-card {
+  justify-content: space-between;
+}
+
+.shell .fr-margin-console {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 15px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
+}
+
+.shell .fr-margin-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shell .fr-margin-countdown {
+  font-size: calc(17px * var(--text-scale, 1));
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  color: var(--fr-ink);
+}
+
+.shell .fr-margin-bar {
+  display: flex;
+  gap: 4px;
+  height: 8px;
+  padding: 1.5px;
+  border-radius: var(--fr-r-bar);
+  background: var(--fr-track);
+  overflow: hidden;
+}
+
+.shell .fr-margin-drive {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg var(--fr-in-oklch), var(--fr-blue), var(--fr-cyan));
+}
+
+.shell .fr-margin-buf {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.shell .fr-margin-buf.good {
+  background: var(--fr-emerald);
+}
+
+.shell .fr-margin-buf.warn {
+  background: var(--fr-amber);
+}
+
+.shell .fr-margin-buf.bad {
+  background: var(--fr-crimson);
+}
+
+/* --- TAB 2: INSPECTION (CAD Wireframe Diagnostic Stage + Wear Telemetry Matrix) ------------------------ */
+
+.shell .fr-inspect-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
+
+.shell .fr-inspect-primary {
+  gap: 10px;
+}
+
+.shell .fr-inspect-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+
+.shell .fr-inspect-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.shell .fr-inspect-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.shell .fr-inspect-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.shell .fr-inspect-truck-name {
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-sub);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.shell .fr-inset-sub-inline {
-  font-size: calc(14px * var(--text-scale, 1));
-  color: var(--apple-label-secondary);
-}
-
-/* --- Inspection: Semantic Health Ring, Fuel Gauge & Wear Meters ---------------------------------------- */
-
-.shell .fr-health-band {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.shell .fr-health-ring-wrap {
+/* Precision 240° Automotive Health Arc Gauge */
+.shell .fr-health-gauge {
   position: relative;
+  width: 78px;
+  height: 78px;
   display: grid;
   place-items: center;
   flex: none;
+  --gauge-start: var(--fr-emerald);
+  --gauge-end: var(--fr-mint);
 }
 
-/* Hide native <progress> chrome so conic-gradient ring renders cleanly */
-progress.fr-health-ring::-webkit-progress-bar,
-progress.fr-health-ring::-webkit-progress-value {
-  display: none;
-  background: none;
+.shell .fr-health-gauge.tone-warn {
+  --gauge-start: var(--fr-amber);
+  --gauge-end: #ffd166;
 }
 
-progress.fr-health-ring::-moz-progress-bar {
-  display: none;
-  background: none;
+.shell .fr-health-gauge.tone-bad {
+  --gauge-start: var(--fr-crimson);
+  --gauge-end: var(--fr-amber);
 }
 
-progress.fr-health-ring {
-  --size: 108px;
-  --thickness: 11px;
-  --ring-color: var(--apple-green);
-  appearance: none;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  background: conic-gradient(var(--ring-color) calc(var(--value) * 1%), var(--apple-fill) 0);
-  background-clip: border-area;
-  border: var(--thickness) solid transparent;
-  background-origin: border-box;
-  transition: --value 0s var(--motion-ease);
+.shell .fr-health-svg {
+  width: 100%;
+  height: 100%;
 }
 
-progress.fr-health-ring.tone-warn {
-  --ring-color: var(--apple-orange);
+.shell .fr-gauge-bezel {
+  fill: var(--fr-well);
+  stroke: var(--fr-well-border);
+  stroke-width: 1.2;
 }
 
-progress.fr-health-ring.tone-bad {
-  --ring-color: var(--apple-red);
+.shell .fr-gauge-tick {
+  stroke: var(--fr-ink-dim);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+
+.shell .fr-gauge-tick.major {
+  stroke: var(--fr-ink-sub);
+  stroke-width: 1.4;
+  opacity: 0.78;
+}
+
+.shell .fr-gauge-track {
+  fill: none;
+  stroke: var(--fr-track);
+  stroke-width: 6.5;
+  stroke-linecap: round;
+}
+
+.shell .fr-gauge-arc {
+  fill: none;
+  stroke-width: 6.5;
+  stroke-linecap: round;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  progress.fr-health-ring {
-    transition-duration: 0.4s;
+  .shell .fr-gauge-arc {
+    transition: stroke-dasharray 380ms var(--motion-ease);
   }
 }
 
-@supports not (background-clip: border-area) {
-  progress.fr-health-ring {
-    mask-image: radial-gradient(transparent calc(50% - var(--thickness)), black calc(50% - var(--thickness) + 0.5px));
-    border: 0;
-  }
+.shell .fr-gauge-tip {
+  fill: #fff;
+  stroke: var(--gauge-end);
+  stroke-width: 2;
 }
 
-.shell .fr-health-ring-center {
+.shell .fr-health-center {
   position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding-top: 4px;
   line-height: 1;
 }
 
 .shell .fr-health-score {
-  font-size: calc(32px * var(--text-scale, 1));
+  font-size: calc(22px * var(--text-scale, 1));
   font-weight: 800;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  color: var(--fr-ink);
 }
 
 .shell .fr-health-max {
   margin-top: 2px;
-  font-size: calc(13px * var(--text-scale, 1));
-  font-weight: 600;
-  color: var(--apple-label-secondary);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fr-ink-dim);
 }
 
-.shell .fr-fuel-card {
+/* Interactive CAD Wireframe Stage */
+.shell .fr-cad-stage {
   flex: 1;
-  min-width: 0;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: var(--fr-r-well);
+  padding: 8px 12px 10px;
+  background:
+    radial-gradient(75% 75% at 50% 48%, rgb(56 189 248 / 0.055), transparent 76%),
+    var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
+}
+
+.shell.appearance-light .fr-cad-stage {
+  background:
+    radial-gradient(75% 75% at 50% 48%, rgb(2 132 199 / 0.05), transparent 76%),
+    var(--fr-well);
+}
+
+.shell .fr-cad-viewport {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.shell .fr-cad-svg {
+  width: 100%;
+  height: 100%;
+  max-height: 224px;
+  overflow: visible;
+}
+
+.shell .fr-cad-grid line {
+  stroke: var(--fr-cad-grid);
+  stroke-width: 1;
+}
+
+.shell .fr-cad-grid .fr-cad-ground {
+  stroke: var(--fr-cad-ground);
+  stroke-dasharray: 4 4;
+}
+
+.shell .fr-cad-grid .fr-cad-datum-tick {
+  stroke: var(--fr-cad-ground);
+  stroke-width: 1;
+}
+
+.shell .fr-cad-part {
+  cursor: pointer;
+  --part-stroke: var(--fr-cad-base-stroke);
+  --part-fill: var(--fr-cad-base-fill);
+  --part-node: var(--fr-emerald);
+}
+
+.shell .fr-cad-part.grade-warn {
+  --part-stroke: var(--fr-amber);
+  --part-fill: color-mix(in oklab, var(--fr-amber) 17%, transparent);
+  --part-node: var(--fr-amber);
+}
+
+.shell .fr-cad-part.grade-bad {
+  --part-stroke: var(--fr-crimson);
+  --part-fill: color-mix(in oklab, var(--fr-crimson) 21%, transparent);
+  --part-node: var(--fr-crimson);
+}
+
+.shell .fr-cad-part.selected {
+  --part-stroke: var(--fr-cyan);
+  --part-fill: color-mix(in oklab, var(--fr-cyan) 20%, transparent);
+  --part-node: var(--fr-cyan);
+}
+
+.shell .fr-cad-part.selected.grade-warn {
+  --part-stroke: var(--fr-amber);
+  --part-fill: color-mix(in oklab, var(--fr-amber) 28%, transparent);
+  --part-node: var(--fr-amber);
+}
+
+.shell .fr-cad-part.selected.grade-bad {
+  --part-stroke: var(--fr-crimson);
+  --part-fill: color-mix(in oklab, var(--fr-crimson) 32%, transparent);
+  --part-node: var(--fr-crimson);
+}
+
+.shell .fr-cad-fill {
+  fill: var(--part-fill);
+  transition: fill 180ms var(--motion-ease);
+}
+
+.shell .fr-cad-fill.strong {
+  fill: color-mix(in oklab, var(--part-stroke) 15%, transparent);
+}
+
+.shell .fr-cad-stroke {
+  fill: none;
+  stroke: var(--part-stroke);
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    stroke 180ms var(--motion-ease),
+    stroke-width 180ms var(--motion-ease);
+}
+
+.shell .fr-cad-stroke.thin {
+  stroke-width: 1.2;
+}
+
+.shell .fr-cad-part.selected .fr-cad-stroke,
+.shell .fr-cad-part:hover .fr-cad-stroke {
+  stroke-width: 2.2;
+}
+
+.shell .fr-cad-detail {
+  fill: none;
+  stroke: var(--fr-cad-detail);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.shell .fr-cad-wheel-halo {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+  transition: stroke 180ms var(--motion-ease);
+}
+
+.shell .fr-cad-part.selected .fr-cad-wheel-halo,
+.shell .fr-cad-part:focus-visible .fr-cad-wheel-halo {
+  stroke: var(--part-stroke);
+}
+
+.shell .fr-cad-wheel-outer {
+  fill: var(--fr-bg);
+  stroke: var(--part-stroke);
+  stroke-width: 2.2;
+}
+
+.shell .fr-cad-wheel-rim {
+  fill: var(--part-fill);
+  stroke: var(--part-stroke);
+  stroke-width: 1.15;
+}
+
+.shell .fr-cad-node {
+  fill: var(--part-node);
+  stroke: var(--fr-bg);
+  stroke-width: 1.4;
+}
+
+.shell .fr-cad-part.selected .fr-cad-node {
+  r: 4.2;
+}
+
+.shell .fr-cad-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding-top: 6px;
+  border-top: 1px solid var(--fr-hairline);
+}
+
+.shell .fr-cad-tip {
+  font-size: calc(12.5px * var(--text-scale, 1));
+  color: var(--fr-ink-dim);
+  letter-spacing: 0.01em;
+}
+
+.shell .fr-cad-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shell .fr-cad-readout-name {
+  font-size: calc(13.5px * var(--text-scale, 1));
+  font-weight: 700;
+  color: var(--fr-ink);
+}
+
+.shell .fr-cad-readout-val {
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bottom Dual Fuel & Braking Instrument Strip */
+.shell .fr-telemetry-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  flex: none;
+}
+
+.shell .fr-inst-cell {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  padding: 13px 15px;
-  border-radius: 18px;
-  background: var(--apple-fill-quaternary);
-  border: 1px solid color-mix(in oklab, var(--apple-separator) 45%, transparent);
+  min-width: 0;
+  padding: 11px 14px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
 }
 
-.shell .fr-fuel-card.low {
-  border-color: color-mix(in oklab, var(--apple-orange) 48%, transparent);
+.shell .fr-inst-cell.tone-warn-box {
+  border-color: color-mix(in oklab, var(--fr-amber) 42%, transparent);
 }
 
-.shell .fr-fuel-head {
+.shell .fr-inst-cell.tone-bad-box {
+  border-color: color-mix(in oklab, var(--fr-crimson) 45%, transparent);
+}
+
+.shell .fr-inst-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.shell .fr-fuel-title {
+.shell .fr-inst-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: calc(14px * var(--text-scale, 1));
-  font-weight: 600;
-  color: var(--apple-label-secondary);
-  white-space: nowrap;
-}
-
-.shell .fr-fuel-range {
-  font-size: calc(14px * var(--text-scale, 1));
+  font-size: calc(12.5px * var(--text-scale, 1));
   font-weight: 650;
-  color: var(--apple-label-secondary);
-  font-variant-numeric: tabular-nums;
+  color: var(--fr-ink-sub);
   white-space: nowrap;
 }
 
-.shell .fr-fuel-amount {
-  font-size: calc(24px * var(--text-scale, 1));
-  font-weight: 750;
+.shell .fr-inst-sub {
+  font-size: calc(12px * var(--text-scale, 1));
+  font-weight: 650;
+  color: var(--fr-ink-dim);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.shell .fr-fuel-track {
+.shell .fr-inst-pneumatic-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shell .fr-brake-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shell .fr-brake-badge-label {
+  font-size: calc(11.5px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-dim);
+  white-space: nowrap;
+}
+
+.shell .fr-bar-track {
   width: 100%;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--apple-fill-tertiary);
+  height: 6px;
+  border-radius: var(--fr-r-bar);
+  background: var(--fr-track);
   overflow: hidden;
 }
 
-.shell .fr-fuel-fill {
+.shell .fr-bar-fill {
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg var(--fr-in-oklch), var(--apple-blue), var(--apple-cyan));
+  border-radius: var(--fr-r-bar);
 }
 
-.shell .fr-fuel-card.low .fr-fuel-fill {
-  background: var(--apple-orange);
+.shell .fr-bar-fill.fuel {
+  background: linear-gradient(90deg var(--fr-in-oklch), var(--fr-blue), var(--fr-cyan));
+}
+
+.shell .fr-bar-fill.warn {
+  background: var(--fr-amber);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .shell .fr-fuel-fill {
+  .shell .fr-bar-fill,
+  .shell .fr-wear-fill {
     transition: width 300ms var(--motion-ease);
   }
+}
+
+/* Right Column: Subsystem Wear Matrix & Cargo Integrity */
+.shell .fr-inspect-matrix {
+  gap: 10px;
+}
+
+.shell .fr-wear-groups {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.shell .fr-wear-groups::-webkit-scrollbar {
+  display: none;
+}
+
+.shell .fr-wear-subblock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .shell .fr-wear-list {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
 }
 
 .shell .fr-wear-row {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding: 4px 8px;
-  border-radius: 11px;
+  padding: 7.5px 11px;
+  border-radius: var(--fr-r-row);
+  border: 1px solid transparent;
+  text-align: left;
+  transition:
+    background-color 150ms var(--motion-ease),
+    border-color 150ms var(--motion-ease);
+}
+
+.shell .fr-wear-row:hover {
+  background: rgb(255 255 255 / 0.045);
+}
+
+.shell.appearance-light .fr-wear-row:hover {
+  background: rgb(15 23 42 / 0.04);
 }
 
 .shell .fr-wear-row.grade-warn {
-  background: color-mix(in oklab, var(--apple-orange) 11%, transparent);
+  background: color-mix(in oklab, var(--fr-amber) 10%, transparent);
 }
 
 .shell .fr-wear-row.grade-bad {
-  background: color-mix(in oklab, var(--apple-red) 12%, transparent);
+  background: color-mix(in oklab, var(--fr-crimson) 12%, transparent);
+}
+
+.shell .fr-wear-row.selected {
+  background: color-mix(in oklab, var(--fr-cyan) 12%, var(--fr-well));
+  border-color: color-mix(in oklab, var(--fr-cyan) 48%, transparent);
+}
+
+.shell .fr-wear-row.selected.grade-warn {
+  background: color-mix(in oklab, var(--fr-amber) 16%, var(--fr-well));
+  border-color: color-mix(in oklab, var(--fr-amber) 55%, transparent);
+}
+
+.shell .fr-wear-row.selected.grade-bad {
+  background: color-mix(in oklab, var(--fr-crimson) 18%, var(--fr-well));
+  border-color: color-mix(in oklab, var(--fr-crimson) 55%, transparent);
 }
 
 .shell .fr-wear-head {
@@ -1059,125 +1688,166 @@ progress.fr-health-ring.tone-bad {
 .shell .fr-wear-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
 .shell .fr-wear-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex: none;
 }
 
 .shell .fr-wear-dot.grade-good {
-  background: var(--apple-green);
+  background: var(--fr-emerald);
 }
 
 .shell .fr-wear-dot.grade-warn {
-  background: var(--apple-orange);
+  background: var(--fr-amber);
 }
 
 .shell .fr-wear-dot.grade-bad {
-  background: var(--apple-red);
+  background: var(--fr-crimson);
 }
 
 .shell .fr-wear-name {
-  font-size: calc(16px * var(--text-scale, 1));
-  font-weight: 550;
-  color: var(--apple-label);
+  font-size: calc(13.5px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.shell .fr-wear-val {
-  font-size: calc(15px * var(--text-scale, 1));
-  font-weight: 700;
+.shell .fr-wear-val,
+.shell .fr-cad-readout-val {
+  font-size: calc(13px * var(--text-scale, 1));
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
 
-.shell .fr-wear-val.grade-good {
-  color: var(--apple-green);
+.shell .fr-wear-val.grade-good,
+.shell .fr-cad-readout-val.grade-good {
+  color: var(--fr-emerald);
 }
 
-.shell .fr-wear-val.grade-warn {
-  color: var(--apple-orange);
+.shell .fr-wear-val.grade-warn,
+.shell .fr-cad-readout-val.grade-warn {
+  color: var(--fr-amber);
 }
 
-.shell .fr-wear-val.grade-bad {
-  color: var(--apple-red);
+.shell .fr-wear-val.grade-bad,
+.shell .fr-cad-readout-val.grade-bad {
+  color: var(--fr-crimson);
 }
 
 .shell .fr-wear-track {
   width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--apple-fill-tertiary);
+  height: 4.5px;
+  border-radius: 2px;
+  background: var(--fr-track);
   overflow: hidden;
 }
 
 .shell .fr-wear-fill {
   height: 100%;
-  border-radius: 999px;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .shell .fr-wear-fill {
-    transition: width 300ms var(--motion-ease);
-  }
+  border-radius: 2px;
 }
 
 .shell .fr-wear-fill.grade-good {
-  background: var(--apple-green);
+  background: var(--fr-emerald);
 }
 
 .shell .fr-wear-fill.grade-warn {
-  background: var(--apple-orange);
+  background: var(--fr-amber);
 }
 
 .shell .fr-wear-fill.grade-bad {
-  background: var(--apple-red);
+  background: var(--fr-crimson);
 }
 
 .shell .fr-section-divider {
-  margin-top: 2px;
-  padding-top: 10px;
-  border-top: 1px solid var(--apple-separator);
-  font-size: calc(15px * var(--text-scale, 1));
-  font-weight: 650;
-  color: var(--apple-label-secondary);
+  padding-top: 6px;
+  border-top: 1px solid var(--fr-hairline);
+  font-size: calc(11.5px * var(--text-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fr-ink-dim);
 }
 
-/* --- HOS: 11-Hour Tachograph Dial & Timeline Legend ---------------------------------------------------- */
+.shell .fr-cargo-integrity {
+  flex: none;
+  padding: 10px 12px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.shell .fr-cargo-integrity-top,
+.shell .fr-cargo-integrity-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shell .fr-cargo-integrity-sub {
+  font-size: calc(12.5px * var(--text-scale, 1));
+  color: var(--fr-ink-sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.shell .fr-cargo-integrity-sub strong {
+  color: var(--fr-ink);
+  font-weight: 700;
+}
+
+/* --- TAB 3: HOS (Horological Tachograph + Smart Rest Timeline) ----------------------------------------- */
+
+.shell .fr-hos-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 14px;
+}
 
 .shell .fr-tacho-wrap {
   flex: 1;
+  min-height: 0;
   display: grid;
   place-items: center;
-  padding: 2px 0;
 }
 
 .shell .fr-tacho-ring {
   position: relative;
-  width: 204px;
-  height: 204px;
+  width: min(276px, 100%);
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
-  --tacho-start: var(--apple-blue);
-  --tacho-end: var(--apple-cyan);
+  --tacho-start: var(--fr-blue);
+  --tacho-end: var(--fr-cyan);
 }
 
 .shell .fr-tacho-ring.level-fresh {
-  --tacho-start: var(--apple-green);
-  --tacho-end: var(--apple-mint);
+  --tacho-start: var(--fr-emerald);
+  --tacho-end: var(--fr-mint);
 }
 
 .shell .fr-tacho-ring.level-normal {
-  --tacho-start: var(--apple-blue);
-  --tacho-end: var(--apple-cyan);
+  --tacho-start: var(--fr-blue);
+  --tacho-end: var(--fr-cyan);
 }
 
 .shell .fr-tacho-ring.level-tired {
-  --tacho-start: var(--apple-orange);
-  --tacho-end: var(--apple-red);
+  --tacho-start: var(--fr-amber);
+  --tacho-end: var(--fr-crimson);
 }
 
 .shell .fr-tacho-svg {
@@ -1185,16 +1855,33 @@ progress.fr-health-ring.tone-bad {
   height: 100%;
 }
 
-.shell .fr-tacho-tick {
-  stroke: var(--apple-label-quaternary);
+.shell .fr-tacho-bezel {
+  fill: none;
+  stroke: var(--fr-hairline);
+  stroke-width: 1.4;
 }
 
-.shell .fr-tacho-dial {
-  fill: var(--apple-fill-quaternary);
+.shell .fr-tacho-tick {
+  stroke: var(--fr-ink-dim);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.42;
+}
+
+.shell .fr-tacho-tick.major {
+  stroke: var(--fr-ink-sub);
+  stroke-width: 1.7;
+  opacity: 0.85;
+}
+
+.shell .fr-tacho-dial-rim {
+  fill: none;
+  stroke: var(--fr-hairline);
+  stroke-width: 1.1;
 }
 
 .shell .fr-tacho-track {
-  stroke: var(--apple-fill);
+  stroke: var(--fr-track);
 }
 
 .shell .fr-tacho-tip {
@@ -1211,265 +1898,543 @@ progress.fr-health-ring.tone-bad {
 
 .shell .fr-tacho-center {
   position: absolute;
-  inset: 24px;
+  inset: 34px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   text-align: center;
+}
+
+.shell .fr-tacho-scale-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--fr-ink-dim);
 }
 
 .shell .fr-tacho-time {
   font-size: calc(22px * var(--text-scale, 1));
   font-weight: 800;
-  color: var(--apple-label);
+  letter-spacing: -0.02em;
+  color: var(--fr-ink);
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
+.shell .fr-tacho-divider {
+  width: 26px;
+  height: 1px;
+  background: var(--fr-hairline);
+  margin-block: 1px;
+}
+
+/* Advisory Console Box */
 .shell .fr-advice-box {
-  padding: 13px 15px;
-  border-radius: 18px;
-  border: 1px solid transparent;
+  position: relative;
+  padding: 12px 15px 12px 18px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  overflow: hidden;
+}
+
+.shell .fr-advice-box::before {
+  content: '';
+  position: absolute;
+  inset: 7px auto 7px 6px;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--fr-emerald);
 }
 
 .shell .fr-advice-box.good {
-  background: color-mix(in oklab, var(--apple-green) 12%, transparent);
-  border-color: color-mix(in oklab, var(--apple-green) 28%, transparent);
+  border-color: color-mix(in oklab, var(--fr-emerald) 26%, transparent);
 }
 
 .shell .fr-advice-box.warn {
-  background: color-mix(in oklab, var(--apple-orange) 12%, transparent);
-  border-color: color-mix(in oklab, var(--apple-orange) 32%, transparent);
+  border-color: color-mix(in oklab, var(--fr-amber) 34%, transparent);
+}
+
+.shell .fr-advice-box.warn::before {
+  background: var(--fr-amber);
 }
 
 .shell .fr-advice-box.bad {
-  background: color-mix(in oklab, var(--apple-red) 12%, transparent);
-  border-color: color-mix(in oklab, var(--apple-red) 34%, transparent);
+  border-color: color-mix(in oklab, var(--fr-crimson) 38%, transparent);
+}
+
+.shell .fr-advice-box.bad::before {
+  background: var(--fr-crimson);
 }
 
 .shell .fr-advice-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: calc(16px * var(--text-scale, 1));
-  font-weight: 700;
+  gap: 7px;
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 720;
 }
 
 .shell .fr-advice-box.good .fr-advice-head {
-  color: var(--apple-green);
+  color: var(--fr-emerald);
 }
 
 .shell .fr-advice-box.warn .fr-advice-head {
-  color: var(--apple-orange);
+  color: var(--fr-amber);
 }
 
 .shell .fr-advice-box.bad .fr-advice-head {
-  color: var(--apple-red);
+  color: var(--fr-crimson);
 }
 
 .shell .fr-advice-text {
   margin: 5px 0 0;
-  font-size: calc(15px * var(--text-scale, 1));
-  line-height: 1.38;
-  color: var(--apple-label-secondary);
+  font-size: calc(13.5px * var(--text-scale, 1));
+  line-height: 1.4;
+  color: var(--fr-ink-sub);
 }
 
+/* Calibrated Journey Timeline */
 .shell .fr-timeline-block {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+  box-shadow: var(--fr-well-inset);
 }
 
-.shell .fr-timeline-title-row {
+.shell .fr-timeline-block .fr-cell {
+  background: color-mix(in oklab, var(--fr-bg) 45%, transparent);
+}
+
+.shell.appearance-light .fr-timeline-block .fr-cell {
+  background: rgb(255 255 255 / 0.78);
+}
+
+.shell .fr-timeline-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .shell .fr-timeline-title {
-  font-size: calc(16px * var(--text-scale, 1));
-  font-weight: 650;
-}
-
-.shell .fr-timeline-bar {
-  display: flex;
-  gap: 4px;
-  height: 10px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--apple-fill-tertiary);
-}
-
-.shell .fr-tl-seg {
-  height: 100%;
-  border-radius: 999px;
-}
-
-.shell .fr-tl-seg.drive,
-.shell .fr-tl-legend-item i.drive {
-  background: var(--apple-blue);
-}
-
-.shell .fr-tl-seg.rest,
-.shell .fr-tl-legend-item i.rest {
-  background: var(--apple-orange);
-}
-
-.shell .fr-tl-seg.buffer,
-.shell .fr-tl-legend-item i.buffer {
-  background: var(--apple-green);
+  font-size: calc(14px * var(--text-scale, 1));
+  font-weight: 700;
+  color: var(--fr-ink);
 }
 
 .shell .fr-timeline-legend {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .shell .fr-tl-legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: calc(13px * var(--text-scale, 1));
-  font-weight: 550;
-  color: var(--apple-label-secondary);
+  gap: 5px;
+  font-size: calc(12px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-sub);
 }
 
 .shell .fr-tl-legend-item i {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   display: inline-block;
 }
 
-.shell .fr-hos-note {
-  margin: 0;
-  font-size: calc(17px * var(--text-scale, 1));
-  line-height: 1.45;
-  color: var(--apple-label-secondary);
+.shell .fr-timeline-bar {
+  display: flex;
+  gap: 4px;
+  height: 11px;
+  padding: 2px;
+  border-radius: var(--fr-r-bar);
+  background: var(--fr-track);
 }
 
-/* --- Compact & Narrow Screen Adaptation ---------------------------------------------------------------- */
+.shell .fr-tl-seg {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.shell .fr-tl-seg.drive,
+.shell .fr-tl-legend-item i.drive {
+  background: var(--fr-cyan);
+}
+
+.shell .fr-tl-seg.rest,
+.shell .fr-tl-legend-item i.rest {
+  background: var(--fr-amber);
+}
+
+.shell .fr-tl-seg.buffer,
+.shell .fr-tl-legend-item i.buffer {
+  background: var(--fr-emerald);
+}
+
+.shell .fr-hos-note-box {
+  padding: 14px 16px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-well);
+  border: 1px solid var(--fr-well-border);
+}
+
+.shell .fr-hos-note {
+  margin: 0;
+  font-size: calc(14.5px * var(--text-scale, 1));
+  line-height: 1.45;
+  color: var(--fr-ink-sub);
+}
+
+/* --- Cockpit Standby & Empty States -------------------------------------------------------------------- */
+
+.shell .fr-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 32px;
+  text-align: center;
+}
+
+.shell .fr-empty-bezel {
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fr-chassis);
+  border: 1px solid var(--fr-chassis-border);
+  color: var(--fr-amber);
+  box-shadow:
+    inset 0 1px 0 var(--fr-chassis-bevel),
+    0 10px 28px rgb(0 0 0 / 0.35);
+}
+
+.shell .fr-empty-title {
+  margin: 4px 0 0;
+  font-size: calc(25px * var(--text-scale, 1));
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  color: var(--fr-ink);
+}
+
+.shell .fr-empty-desc {
+  margin: 0;
+  max-width: 36em;
+  font-size: calc(16px * var(--text-scale, 1));
+  line-height: 1.45;
+  color: var(--fr-ink-sub);
+}
+
+.shell .fr-standby-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 6px;
+  padding: 12px 22px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-chassis);
+  border: 1px solid var(--fr-chassis-border);
+  box-shadow: inset 0 1px 0 var(--fr-chassis-bevel);
+}
+
+.shell .fr-standby-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.shell .fr-standby-label {
+  font-size: calc(11.5px * var(--text-scale, 1));
+  font-weight: 600;
+  color: var(--fr-ink-dim);
+}
+
+.shell .fr-standby-val {
+  font-size: calc(16px * var(--text-scale, 1));
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  color: var(--fr-ink);
+}
+
+.shell .fr-standby-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--fr-hairline);
+}
+
+.shell .fr-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.shell .fr-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: var(--fr-r-well);
+  background: var(--fr-slider-bg);
+  border: 1px solid var(--fr-slider-border);
+  color: var(--fr-ink);
+  font-size: calc(15px * var(--text-scale, 1));
+  font-weight: 650;
+  box-shadow:
+    inset 0 1px 0 var(--fr-chassis-bevel),
+    0 6px 18px rgb(0 0 0 / 0.24);
+}
+
+.shell .fr-action-pill svg {
+  color: var(--fr-amber);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell .fr-action-pill {
+    transition: scale 140ms var(--motion-ease);
+  }
+
+  .shell .fr-action-pill:active {
+    scale: 0.96;
+  }
+}
+
+/* --- Low-Spec / Lite Mode Fallback (zero expensive backdrop-filter / SVG blur) ------------------------- */
+
+.shell[data-lite] .fr-tab-bar,
+.shell[data-lite] .fr-speed-chip,
+.shell[data-lite] .fr-preview-badge {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #141821;
+}
+
+.shell[data-lite].appearance-light .fr-tab-bar,
+.shell[data-lite].appearance-light .fr-speed-chip,
+.shell[data-lite].appearance-light .fr-preview-badge {
+  background: #f8fafd;
+}
+
+.shell[data-lite] .fr-brand-blade {
+  box-shadow: none;
+}
+
+.shell[data-lite] .fr-tacho-arc {
+  filter: none !important;
+}
+
+/* --- Compact Height Adaptation (Scania 7" / Cascadia / Western Star <= 520px) -------------------------- */
 
 @container freight (max-height: 520px) {
   .shell .freight-app {
-    --fr-bar: 56px;
-    --fr-gutter: 16px;
+    --fr-bar-h: 46px;
+    --fr-gutter: 14px;
+    --fr-r-module: 10px;
+    --fr-r-well: 7px;
   }
 
-  .shell .fr-truck-chip,
-  .shell .fr-preview-badge {
-    height: 36px;
-    font-size: 13px;
+  .shell .fr-bar {
+    margin-top: 8px;
+  }
+
+  .shell .fr-tab-bar {
+    height: 38px;
+    grid-template-columns: repeat(3, minmax(94px, 1fr));
   }
 
   .shell .fr-tab {
-    flex-direction: row;
+    font-size: 13px;
+    padding-inline: 10px;
+  }
+
+  .shell .fr-brand-plate {
+    height: 38px;
+    padding: 0 9px 0 11px;
     gap: 8px;
-    min-width: 96px;
-    padding-inline: 14px;
-    font-size: 14px;
   }
 
-  .shell .fr-tab[aria-selected='true']::after {
-    inset: auto 20% 3px;
+  .shell .fr-brand-wordmark {
+    font-size: 12px;
+    letter-spacing: 0.13em;
   }
 
-  .shell .fr-card {
-    padding: 15px 17px;
-    gap: 10px;
-    border-radius: 22px;
+  .shell .fr-brand-model {
+    font-size: 9.5px;
   }
 
-  .shell .fr-route-stage {
-    padding: 10px 12px;
-    gap: 8px;
+  .shell .fr-brand-status {
+    padding-left: 8px;
+    height: 18px;
+  }
+
+  .shell .fr-speed-chip,
+  .shell .fr-preview-badge {
+    height: 34px;
+    padding: 0 11px;
+  }
+
+  .shell .fr-scroll {
+    padding: 8px 14px 12px;
+  }
+
+  .shell .fr-panel {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .shell .fr-module {
+    padding: 12px 15px;
+    gap: 9px;
+    border-radius: var(--fr-r-module);
   }
 
   .shell .fr-city-name {
-    font-size: calc(18.5px * var(--text-scale, 1));
+    font-size: calc(20px * var(--text-scale, 1));
   }
 
-  .shell .fr-hero-value {
-    font-size: calc(32px * var(--text-scale, 1));
+  .shell .fr-metric-pair.hero .fr-metric-val {
+    font-size: calc(30px * var(--text-scale, 1));
   }
 
-  progress.fr-health-ring {
-    --size: 84px;
-    --thickness: 9px;
+  .shell .fr-metric-pair.payout .fr-metric-val {
+    font-size: calc(22px * var(--text-scale, 1));
+  }
+
+  .shell .fr-cell {
+    padding: 8px 11px;
+  }
+
+  .shell .fr-cell-val {
+    font-size: calc(15px * var(--text-scale, 1));
+  }
+
+  .shell .fr-health-gauge {
+    width: 64px;
+    height: 64px;
   }
 
   .shell .fr-health-score {
-    font-size: calc(24px * var(--text-scale, 1));
+    font-size: calc(18px * var(--text-scale, 1));
   }
 
-  .shell .fr-kv-plate {
-    padding: 2px 12px;
-  }
-
-  .shell .fr-kv-row {
-    padding: 6px 0;
+  .shell .fr-cad-stage {
+    min-height: 120px;
   }
 
   .shell .fr-tacho-ring {
-    width: 152px;
-    height: 152px;
+    width: 162px;
+  }
+
+  .shell .fr-tacho-time {
+    font-size: calc(17px * var(--text-scale, 1));
   }
 }
 
+/* --- Narrow Width Adaptation (<= 780px) ---------------------------------------------------------------- */
+
 @container freight (max-width: 780px) {
-  .shell .fr-grid-2 {
+  .shell .fr-panel {
+    height: auto;
+  }
+
+  .shell .fr-corridor-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .shell .fr-corridor-divider {
+    width: 100%;
+    height: 1px;
+    margin: 0;
+    background: var(--fr-hairline);
+  }
+
+  .shell .fr-hero-distance {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .shell .fr-waybill-deck,
+  .shell .fr-inspect-layout,
+  .shell .fr-hos-layout {
     grid-template-columns: 1fr;
-    align-content: start;
   }
 
-  .shell .fr-bar-side {
-    min-width: 48px;
-  }
-
-  .shell .fr-truck-chip span {
+  .shell .fr-brand-model,
+  .shell .fr-brand-status {
     display: none;
+  }
+
+  .shell .fr-brand-plate {
+    padding-right: 12px;
   }
 }
 
 /* --- Accessibility: Forced Colors Mode ----------------------------------------------------------------- */
 
 @media (forced-colors: active) {
-  .shell .fr-card,
-  .shell .fr-route-stage,
-  .shell .fr-kv-plate,
-  .shell .fr-fuel-card,
-  .shell .fr-inset-card,
+  .shell .fr-module,
+  .shell .fr-cell,
+  .shell .fr-cad-stage,
+  .shell .fr-inst-cell,
+  .shell .fr-break-strip,
+  .shell .fr-cargo-integrity,
+  .shell .fr-advice-box,
   .shell .fr-tab-bar,
+  .shell .fr-brand-plate,
   .shell .fr-action-pill,
   .shell .fr-status-pill,
-  .shell .fr-progress-track,
-  .shell .fr-fuel-track,
+  .shell .fr-track-rail,
+  .shell .fr-bar-track,
   .shell .fr-wear-track {
     border: 1px solid ButtonText;
   }
 
-  progress.fr-health-ring {
-    forced-color-adjust: none;
-    --ring-color: CanvasText;
-    background: conic-gradient(CanvasText calc(var(--value) * 1%), Canvas 0);
+  .shell .fr-brand-wordmark {
+    background: none;
+    color: CanvasText;
+  }
+
+  .shell .fr-brand-blade {
+    background: Highlight;
+  }
+
+  .shell .fr-tab-slider {
+    border: 2px solid Highlight;
   }
 
   .shell .fr-tab[aria-selected='true'] {
-    background: Highlight;
     color: HighlightText;
+    background: Highlight;
   }
 
   .shell .fr-tab[aria-selected='true']::after {
-    border-block-end-color: HighlightText;
+    background: HighlightText;
   }
 
-  .shell .fr-progress-fill,
-  .shell .fr-fuel-fill,
+  .shell .fr-track-fill,
+  .shell .fr-bar-fill,
   .shell .fr-wear-fill {
     background: Highlight;
   }

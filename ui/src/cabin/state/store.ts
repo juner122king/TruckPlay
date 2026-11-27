@@ -449,7 +449,7 @@ export const useLive = create<LiveState>()(() => ({
   headquarters: null,
   company: null,
   hvtMap: null,
-  gameLanguage: null,
+  gameLanguage: previewLanguage(),
   chosenLanguage: null,
   mapPreparation: null,
   timeZones: false,
@@ -486,6 +486,12 @@ function previewLayout(): ScreenLayoutId | null {
   if (isInHost() || typeof location === 'undefined') return null
   const layout = new URLSearchParams(location.search).get('layout')
   return isScreenLayoutId(layout) ? layout : null
+}
+
+/** In a browser preview, `?lang=zh_cn` selects the cabin language. */
+function previewLanguage(): string | null {
+  if (isInHost() || typeof location === 'undefined') return null
+  return new URLSearchParams(location.search).get('lang')
 }
 
 /**
